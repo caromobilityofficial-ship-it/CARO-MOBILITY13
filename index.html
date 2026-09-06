@@ -1153,7 +1153,14 @@
             <div class="terms-item"><label class="check-wrap"><input type="checkbox" class="term-check" id="term3" onchange="syncAllCheck()"/><span class="check-custom"></span><span data-i18n="term3">[필수] 위치정보 서비스 이용약관</span></label><button class="terms-view-btn" onclick="openTerms('location')" data-i18n="view">보기</button></div>
             <div class="terms-item"><label class="check-wrap"><input type="checkbox" class="term-check" id="term4" onchange="syncAllCheck()"/><span class="check-custom"></span><span data-i18n="term4">[선택] 마케팅 정보 수신 동의</span></label><button class="terms-view-btn" onclick="openTerms('marketing')" data-i18n="view">보기</button></div>
             <div class="terms-item"><label class="check-wrap"><input type="checkbox" class="term-check" id="term5" onchange="syncAllCheck()"/><span class="check-custom"></span><span data-i18n="term5">[선택] 제3자 정보제공 동의</span></label><button class="terms-view-btn" onclick="openTerms('third')" data-i18n="view">보기</button></div>
-            <button class="submit-btn mt24" onclick="goSignupStep(2)" data-i18n="next">다음</button>
+            <!-- ★ 간편 가입 (카카오/네이버) — 약관 동의 후 진행. caro-auth.js 플래그가 꺼져 있으면 '준비 중' 안내 -->
+            <div class="divider mt24"><span>간편 가입</span></div>
+            <div class="social-btns">
+                <button type="button" class="social-btn kakao-btn" onclick="if(validateTerms()) socialLogin('카카오')">카카오로 시작하기</button>
+                <button type="button" class="social-btn naver-btn" onclick="if(validateTerms()) socialLogin('네이버')">네이버로 시작하기</button>
+            </div>
+            <div class="divider"><span>또는 이메일로 가입</span></div>
+            <button class="submit-btn" onclick="goSignupStep(2)" data-i18n="next">다음</button>
             <button class="back-bottom-btn" onclick="goTo('main-screen')" data-i18n="back">뒤로</button>
         </div>
     </div>
@@ -1981,7 +1988,8 @@
 
 <!-- ══ Firebase SDK ══ -->
 <script type="module" src="firebase-config.js?v=4"></script>
-<script src="script.js?v=12"></script>
+<script src="script.js?v=13"></script>
+<script type="module" src="caro-auth.js?v=1"></script>
 <script src="script-photo-upload.js?v=5"></script>
 <script src="customer-notices.js?v=8"></script>
 <script src="customer-redesign.js?v=170"></script>

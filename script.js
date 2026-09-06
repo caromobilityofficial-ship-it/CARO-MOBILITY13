@@ -1286,6 +1286,34 @@ function sha256Async(str){
 /* ──────────────────────────────────────────
    로그인 (Firebase 우선 → 로컬 fallback)
 ────────────────────────────────────────── */
+/* ★ 소셜(카카오/네이버) 로그인 완료 후 공통 진입 — handleLogin 내부 _doLoginSuccess 와 동일 */
+function caroFinishLogin(id, uid, name, email){
+  try{
+    localStorage.setItem('caro_auto_login','1');
+    localStorage.setItem('caro_auto_name',name||id||'');
+    localStorage.setItem('caro_auto_id',id||'');
+  }catch(e){}
+  try{ clearAttempts(id); }catch(e){}
+  var err=document.getElementById('login-error'); if(err) err.textContent='';
+  window._caroLoggedIn = true;
+  userInfo.id   = id||'';
+  userInfo.uid  = uid||'';
+  userInfo.name = name||id;
+  userInfo.email= email||'';
+  try{ startSessionTimer(); }catch(e){}
+  try{ if(uid) loadUserProfile(uid); }catch(e){}
+  try{ loadUserData(id); }catch(e){}
+  var wn=document.getElementById('home-welcome-name');
+  if(wn) wn.textContent=(userInfo.name||id)+' 님, 안녕하세요 👋';
+  var hn=document.getElementById('hmenu-name');
+  var hi=document.getElementById('hmenu-id');
+  if(hn) hn.textContent=userInfo.name||id;
+  if(hi) hi.textContent=id;
+  goTo('home-screen', true);
+  setTimeout(function(){ try{ showHomeCtrlSwitch(); }catch(e){} }, 100);
+}
+window.caroFinishLogin = caroFinishLogin;
+
 function handleLogin(){
   var id=val('login-id'), pw=val('login-pw');
   var err=document.getElementById('login-error');
@@ -1470,7 +1498,12 @@ function handleSignup(){
   if(fbReady()){
     var authEmail = email;
     var fn=window.FB_FN, fbAuth=window.FB_AUTH, dbRef=window.FB_DB;
-    fn.createUserWithEmailAndPassword(fbAuth, authEmail, pw)
+    /* ★ caro-auth.js: 문자 인증으로 이미 로그인된 전화 계정이 있으면 이메일/비밀번호를 그 계정에 연결
+         (계정 1개에 전화+이메일 모두 묶임). 없으면 기존처럼 신규 생성 */
+    var createP = (typeof window.caroCreateOrLink==='function')
+      ? window.caroCreateOrLink(authEmail, pw)
+      : fn.createUserWithEmailAndPassword(fbAuth, authEmail, pw);
+    createP
       .then(function(cred){
         var uid=cred.user.uid;
         fn.updateProfile(cred.user, {displayName: name}).catch(console.error);
@@ -1479,8 +1512,11 @@ function handleSignup(){
           phone: phone ? phone.replace(/(\d{3})-(\d{4})-(\d{4})/, '$1-****-$3') : '',
           birth: birth ? birth.slice(0,4)+'****' : '',
           license: license ? license.slice(0,4)+'**********' : '',
+          phoneVerified: !!window._caroPhoneVerified,
+          phoneE164: (cred.user && cred.user.phoneNumber) || '',
+          certCI: window._caroCertCI || '',
           createdAt: fn.serverTimestamp(), uid:uid
-        });
+        }, {merge:true});
       })
       .then(signupDone)
       .catch(function(e){
@@ -1488,6 +1524,8 @@ function handleSignup(){
         if(e.code==='auth/email-already-in-use') msg='이미 가입된 이메일입니다. 로그인 화면에서 로그인해 주세요.';
         else if(e.code==='auth/weak-password')   msg='비밀번호가 너무 단순합니다.';
         else if(e.code==='auth/network-request-failed') msg='네트워크 연결을 확인해 주세요.';
+        else if(e.code==='auth/credential-already-in-use' || e.code==='auth/provider-already-linked') msg='이미 가입된 이메일입니다. 로그인 화면에서 로그인해 주세요.';
+        else if(e.code==='auth/requires-recent-login') msg='인증 시간이 지났습니다. 휴대폰 인증을 다시 진행해 주세요.';
         signupFail(msg);
       });
     return;
@@ -1822,7 +1860,11 @@ function handleLogout(){
   try{localStorage.removeItem('caro_auto_login');localStorage.removeItem('caro_auto_id');localStorage.removeItem('caro_auto_pw');}catch(e){}
     closeDrawer(); goTo('main-screen');
   }
-  function socialLogin(p){ showToast(p+' 로그인 준비 중입니다.'); }
+  function socialLogin(p){
+    /* caro-auth.js 가 켜져 있으면 실제 카카오/네이버 로그인으로 위임 */
+    if(typeof window.caroSocialLogin==='function') return window.caroSocialLogin(p);
+    showToast(p+' 로그인 준비 중입니다.');
+  }
 
 /* ─────────────────────────────────────────────
    13-1. 카로 더 블랙 전환 모션 (4초 천천히)
@@ -4704,7 +4746,13 @@ function openPassAuth(){
   }
   if(!_selectedCarrier){ showToast('통신사를 선택해 주세요.'); return; }
 
-  /* 인증번호 6자리 생성 */
+  /* ★ caro-auth.js: PASS 또는 실제 문자 인증이 켜져 있으면 그쪽으로 (아래 개발용 코드는 실행 안 됨) */
+  if(typeof window.caroAuthActive==='function' && window.caroAuthActive()
+     && typeof window.caroStartVerification==='function'){
+    window.caroStartVerification(); return;
+  }
+
+  /* 인증번호 6자리 생성 — ※ 개발용. 실서비스 전에는 반드시 CARO_AUTH_CONFIG.phoneAuth 를 켤 것 */
   window._smsCode = String(Math.floor(100000 + Math.random() * 900000));
   window._smsExpire = Date.now() + 3 * 60 * 1000; /* 3분 */
   window._smsVerifiedPhone = val('su-phone');
@@ -4756,6 +4804,11 @@ function _startSmsTimer(){
 
 /* 인증번호 확인 */
 function verifySmsCode(){
+  /* ★ caro-auth.js 실제 문자 인증 진행 중이면 그쪽에서 확인 */
+  if(typeof window.caroHasPendingSms==='function' && window.caroHasPendingSms()
+     && typeof window.caroVerifySms==='function'){
+    window.caroVerifySms(); return;
+  }
   var inp = document.getElementById('sms-code-input');
   if(!inp || !inp.value){ showToast('인증번호를 입력해 주세요.'); return; }
   if(Date.now() > window._smsExpire){ showToast('인증번호가 만료되었습니다. 다시 발송해 주세요.'); return; }

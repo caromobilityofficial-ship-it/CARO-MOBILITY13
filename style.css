@@ -4595,3 +4595,61 @@ select:focus{
 #event-screen button.nh-ev-back{ position:fixed !important; left:16px !important; right:16px !important; top:auto !important; bottom:calc(16px + env(safe-area-inset-bottom,0px)) !important; width:calc(100% - 32px) !important; max-width:calc(100% - 32px) !important; height:52px !important; margin:0 !important; box-sizing:border-box !important; }
 /* ④ 로딩화면 하단 2026 텍스트: 제스처바 위로 올림 */
 #splash-screen .splash-footer{ bottom: 56px !important; }
+
+/* ═══════════════════════════════════════════════════════════════
+   CARO 전역 상단 상태바 여백 v3 (2026-09)
+   ───────────────────────────────────────────────────────────────
+   문제 : 안드로이드 웹뷰는 env(safe-area-inset-top)을 0으로 보고한다.
+          그래서 --sat / --android-status-bar 를 쓰는 코드가 전부 0이 되고,
+          시계·와이파이·배터리 아이콘 아래로 앱 헤더가 파고든다.
+   해결 : ① --sat 에 최소값(36px)을 주어 --sat 를 쓰는 모든 화면을 한 번에 해결
+          ② --sat 를 안 쓰는 나머지 상단 헤더를 개별 지정
+   제외 : 로딩화면, 모달/바텀시트, 이미 52~70px 여백이 있는 화면
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── ① 전역 변수: 상태바 최소 확보 높이 ─────────────────────── */
+:root{
+  --sat: max(env(safe-area-inset-top, 0px), 36px);
+}
+
+/* ── ② --sat 를 안 쓰는 상단 헤더 개별 적용 ─────────────────── */
+
+/* 카로 대기화면(홈) 상단바 */
+.nh-hd{ padding-top: calc(12px + var(--sat)) !important; }
+
+/* 이용내역 · 예약내역 · 홈(구 헤더) */
+#home-screen .home-header,
+#usage-history-screen .home-header,
+#my-reservation-screen .home-header{
+  padding-top: calc(14px + var(--sat)) !important;
+}
+
+/* 차량 찾기 */
+#find-screen .find-title-bar{ padding-top: calc(12px + var(--sat)) !important; }
+
+/* 고객센터 상세 · 문의하기 */
+#cs-detail-screen .csd-header,
+#inquiry-screen .csd-header{ padding-top: calc(12px + var(--sat)) !important; }
+
+/* 상담 채팅 */
+#chat-screen .csd-chat-header{ padding-top: calc(10px + var(--sat)) !important; }
+
+/* 실시간 지도(전체화면) 상단바 — 높이까지 같이 늘려야 함 */
+.rental-topbar{
+  height: calc(52px + var(--sat)) !important;
+  padding-top: var(--sat) !important;
+  box-sizing: border-box !important;
+}
+
+/* 촬영 화면 */
+.caro-cam-header{ padding-top: calc(12px + var(--sat)) !important; }
+
+/* 챗봇(전체화면) */
+.cbot-hd{ padding-top: calc(12px + var(--sat)) !important; }
+
+/* 메인 · 완료 화면 */
+#main-screen .main-wrap{ padding-top: calc(16px + var(--sat)) !important; }
+#done-screen .form-container{ margin-top: calc(16px + var(--sat)) !important; }
+
+/* ── ③ 로딩화면 하단 2026 텍스트: 제스처바 위로 (유지) ───────── */
+#splash-screen .splash-footer{ bottom: 56px !important; }
