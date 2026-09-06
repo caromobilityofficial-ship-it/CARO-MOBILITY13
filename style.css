@@ -4665,3 +4665,13 @@ select:focus{
 
 /* 오프라인 안내 바(화면 최상단 고정) — top은 0 유지, 안쪽 여백으로 상태바 확보 (숨김 transform이 -110%라 top을 옮기면 삐져나옴) */
 .caro-off-bar{ top: 0 !important; padding-top: calc(var(--sat) + 9px) !important; }
+
+/* ── v3.2 지도 화면 상단 제목 정중앙 ─────────────────────────────
+   뒤로 버튼은 absolute, 오른쪽 36px 빈칸은 flex 흐름에 남아 있어서
+   제목이 왼쪽으로 치우쳤다. 제목을 상단바 폭 기준으로 절대 중앙 배치 */
+#rental-screen .rental-topbar-title{
+  position:absolute !important; left:0 !important; right:0 !important;
+  top:var(--sat) !important; height:52px !important;
+  display:flex !important; align-items:center !important; justify-content:center !important;
+  text-align:center !important; pointer-events:none;
+}
