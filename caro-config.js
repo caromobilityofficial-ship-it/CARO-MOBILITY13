@@ -33,7 +33,12 @@ window.CARO_CONFIG = {
 
   /* ── 차량 제어 허용 시간창 (분) — 서버와 동일 ── */
   CONTROL_BEFORE_START_MIN: 10,
-  CONTROL_AFTER_END_MIN: 30
+  CONTROL_AFTER_END_MIN: 30,
+
+  /* ── 시연용 지갑 ──
+     true  : 새 계정에 가입 크레딧 10,000원 + 30% 쿠폰을 자동 지급 (시연·테스트용, 실제 돈 아님)
+     false : 지급하지 않음 (실서비스 전환 시 false 로) */
+  DEMO_WALLET: true
 };
 
 /* ═══════════════════════════════════════════════════════════════

@@ -1445,7 +1445,7 @@ function handleLogin(){
        showWithdrawCancelModal(info, daysDiff, function(){
          _doLoginSuccess(uid, name);
        });
-     });
+     }, uid);
    }
 
    function _doLoginSuccess(uid, name){
@@ -5706,11 +5706,19 @@ function confirmWithdrawal(){
     localStorage.removeItem('caro_data_'+userInfo.id);
     var db2=localLoadUsers(); delete db2[userInfo.id]; localSaveUsers(db2);
   }catch(e){}
-  /* Firebase 로그아웃 (계정 삭제 X — 7일 유예) */
-  if(fbReady()){try{window.FB_FN.signOut(window.FB_AUTH);}catch(e){}}
+  /* ★ [v101] 탈퇴 사실을 서버(users/{uid})에도 기록 — 예전엔 이 폰에만 남아 다른 기기·재설치에서 그대로 로그인됐다 */
+  var uidW=userInfo.uid||(window.FB_AUTH&&window.FB_AUTH.currentUser&&window.FB_AUTH.currentUser.uid)||'';
+  var srvP=Promise.resolve();
+  if(fbReady()&&uidW){
+    try{ srvP=window.FB_FN.setDoc(window.FB_FN.doc(window.FB_DB,'users',uidW),{withdrawalPending:true, withdrawnAt:info.withdrawnAt},{merge:true}).catch(function(e){ console.warn('탈퇴 기록 실패:',e&&e.code); }); }catch(e){}
+  }
   closeModal('withdraw-confirm-modal');
   showToast('탈퇴 완료. 7일 이내 로그인 시 복구 가능합니다.');
-  setTimeout(function(){handleLogout();},2000);
+  srvP.then(function(){
+    /* Firebase 로그아웃 (계정 삭제 X — 7일 유예) */
+    if(fbReady()){try{window.FB_FN.signOut(window.FB_AUTH);}catch(e){}}
+    setTimeout(function(){handleLogout();},1200);
+  });
 }
 
 function closeWithdrawConfirmModal(e){
@@ -5718,12 +5726,32 @@ function closeWithdrawConfirmModal(e){
   closeModal('withdraw-confirm-modal');
 }
 
-function checkWithdrawalOnLogin(id, onNormal, onWithdrawn){
+function checkWithdrawalOnLogin(id, onNormal, onWithdrawn, uidArg){
   var info=getWithdrawnInfo(id);
-  if(!info){onNormal();return;}
-  var daysDiff=(new Date()-new Date(info.withdrawnAt))/(1000*60*60*24);
-  if(daysDiff>7){localStorage.removeItem(WITHDRAW_KEY);onNormal();return;}
-  onWithdrawn(info,daysDiff);
+  if(info){
+    var daysDiff=(new Date()-new Date(info.withdrawnAt))/(1000*60*60*24);
+    if(daysDiff>7){ localStorage.removeItem(WITHDRAW_KEY); }
+    else { onWithdrawn(info,daysDiff); return; }
+  }
+  /* ★ [v101] 이 폰에 기록이 없어도 서버(users/{uid}.withdrawalPending)를 확인 — 다른 기기·재설치 대응 */
+  var uid=uidArg||(window.FB_AUTH&&window.FB_AUTH.currentUser&&window.FB_AUTH.currentUser.uid)||'';
+  if(!fbReady()||!uid){ onNormal(); return; }
+  var fn=window.FB_FN;
+  fn.getDoc(fn.doc(window.FB_DB,'users',uid)).then(function(s){
+    var d=(s&&s.exists&&s.exists())?s.data():null;
+    if(!d||!d.withdrawalPending||!d.withdrawnAt){ onNormal(); return; }
+    var days=(Date.now()-Date.parse(d.withdrawnAt))/(1000*60*60*24);
+    if(days>7){
+      /* 유예 기간 종료 — 운영팀이 정리하기 전까지 이용 차단 */
+      try{ fn.signOut(window.FB_AUTH); }catch(e){}
+      var er=document.getElementById('login-error'); if(er) er.textContent='탈퇴 처리된 계정입니다. 다시 이용하시려면 고객센터로 문의해 주세요.';
+      showToast('탈퇴 처리된 계정입니다. 고객센터로 문의해 주세요.');
+      var b=document.querySelector('#login-screen .submit-btn'); if(b) b.disabled=false;
+      return;
+    }
+    var info2={id:id, uid:uid, email:d.email||'', name:d.name||'', withdrawnAt:d.withdrawnAt, userData:null, localUserData:null, fromServer:true};
+    onWithdrawn(info2, days);
+  }).catch(function(){ onNormal(); });
 }
 
 function showWithdrawCancelModal(info,daysDiff,loginCompleteFn){
@@ -5774,6 +5802,11 @@ function cancelWithdrawal(){
   try{if(info.userData) localStorage.setItem('caro_data_'+info.id,JSON.stringify(info.userData));}catch(e){}
   try{if(info.localUserData){var db=localLoadUsers();db[info.id]=info.localUserData;localSaveUsers(db);}}catch(e){}
   localStorage.removeItem(WITHDRAW_KEY);
+  /* ★ [v101] 서버 기록도 해제 */
+  try{
+    var uidC=(window.FB_AUTH&&window.FB_AUTH.currentUser&&window.FB_AUTH.currentUser.uid)||userInfo.uid||(info&&info.uid)||'';
+    if(fbReady()&&uidC) window.FB_FN.setDoc(window.FB_FN.doc(window.FB_DB,'users',uidC),{withdrawalPending:false, withdrawnAt:null, withdrawalCancelledAt:new Date().toISOString()},{merge:true}).catch(function(){});
+  }catch(e){}
   window._pendingWithdrawInfo=null;
   closeModal('withdraw-cancel-modal');
   showToast('✅ 탈퇴가 해지되었습니다! 계속 이용하실 수 있습니다 🎉');
@@ -5785,6 +5818,8 @@ function proceedLogoutAfterWithdraw(){
   window._pendingWithdrawInfo=null;
   window._pendingLoginComplete=null;
   userInfo={id:'',email:'',license:'',name:''};
+  try{ if(fbReady()) window.FB_FN.signOut(window.FB_AUTH); }catch(e){}   /* ★ [v101] 로그인 세션 정리 */
+  try{ localStorage.removeItem('caro_auto_login'); localStorage.removeItem('caro_auto_id'); localStorage.removeItem('caro_auto_name'); }catch(e){}
   goTo('main-screen');
 }
 
@@ -5873,6 +5908,9 @@ function deleteCarFromFirestore(carId, isBL){
   return fn.deleteDoc(fn.doc(db,isBL?FS_BL_COL:FS_CARS_COL,String(carId))).catch(function(e){console.error('차량 삭제 실패:',e);});
 }
 
+/* ★ [v101] 차량 사진 기본값 (연회색 측면 실루엣, data URI) */
+var CARO_CAR_PLACEHOLDER='data:image/svg+xml;utf8,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 104"><rect width="200" height="104" rx="14" fill="#eef0f3"/><path d="M28 66c0-6 4-10 10-10h14l18-20c3-3 6-4 10-4h44c5 0 8 2 11 5l16 19h13c6 0 10 4 10 10v10c0 3-2 5-5 5H33c-3 0-5-2-5-5V66z" fill="#c9ced6"/><path d="M76 56l14-16h28l14 16H76z" fill="#eef0f3"/><circle cx="62" cy="80" r="11" fill="#7d8591"/><circle cx="62" cy="80" r="5" fill="#eef0f3"/><circle cx="146" cy="80" r="11" fill="#7d8591"/><circle cx="146" cy="80" r="5" fill="#eef0f3"/></svg>');
+window.CARO_CAR_PLACEHOLDER=CARO_CAR_PLACEHOLDER;
 function normalizeCarStatus(c){
   /* 어드민은 status:'unavailable', 대시보드는 devDisabled 를 씀 → 하나로 통일 */
   try{
@@ -5882,8 +5920,12 @@ function normalizeCarStatus(c){
     if(unavail){ if(s==='available'||s===''){ c.status='unavailable'; } }
     else { if(s===''||s==='unavailable'){ c.status='available'; } }
     /* 이미지 필드 통일: 어드민은 image, 앱은 img */
+    if(c.img===CARO_CAR_PLACEHOLDER) c.img='';        /* 기본 실루엣이 저장돼 있으면 없는 것으로 취급 (실제 사진이 들어오면 교체되도록) */
+    if(c.image===CARO_CAR_PLACEHOLDER) c.image='';
     if(!c.img && c.image) c.img=c.image;
     if(!c.image && c.img) c.image=c.img;
+    /* ★ [v101] 사진 없이 등록된 차량 → 기본 실루엣 (예전엔 src="undefined" 로 깨진 그림·404 요청 발생) */
+    if(!c.img){ c.img=CARO_CAR_PLACEHOLDER; c.image=CARO_CAR_PLACEHOLDER; c.imgPlaceholder=true; }
     /* ★ FIX(H10): 관제(admin-cars.js)는 price/plate 로 저장하고 앱은 pricePerHour/carNumber 를 읽어
        관제에서 등록한 차량이 0원/시간으로 표시·청구되던 불일치 보정 */
     if((c.pricePerHour==null || c.pricePerHour==='') && c.price!=null && c.price!=='') c.pricePerHour=+c.price||0;
@@ -9635,15 +9677,12 @@ window.devUploadAllCars=function(){
     expiry.setFullYear(expiry.getFullYear() + 1);
     const expiryStr = `${expiry.getFullYear()}.${String(expiry.getMonth()+1).padStart(2,'0')}.${String(expiry.getDate()).padStart(2,'0')}`;
 
-    // 신규 가입 기본값 설정
-    STORE.set('credit', 10000);  // 신규 가입 +10,000원
-    STORE.set('credit_history', [
-      { date: dateStr, desc: '신규 가입 적립', amount: +10000 }
-    ]);
+    // 신규 가입 기본값 설정 — ★ [v101] CARO_CONFIG.DEMO_WALLET=false 면 시연용 크레딧·쿠폰을 주지 않는다
+    const DEMO = !(window.CARO_CONFIG && window.CARO_CONFIG.DEMO_WALLET === false);
+    STORE.set('credit', DEMO ? 10000 : 0);
+    STORE.set('credit_history', DEMO ? [ { date: dateStr, desc: '신규 가입 적립', amount: +10000 } ] : []);
     STORE.set('cards', []);  // 등록 카드 없음
-    STORE.set('coupons', [
-      { id:1, name:'신규 가입 30% 할인', discount:'-30%', expires: expiryStr, status:'available' }
-    ]);
+    STORE.set('coupons', DEMO ? [ { id:1, name:'신규 가입 30% 할인', discount:'-30%', expires: expiryStr, status:'available' } ] : []);
     STORE.set('unpaid', []);  // 미결제 없음
     STORE.set('sns', { kakao:false, naver:false, google:false, apple:false });  // SNS 미연결
     STORE.set('plan', 'lite');  // 기본 요금제 LITE (무료)
