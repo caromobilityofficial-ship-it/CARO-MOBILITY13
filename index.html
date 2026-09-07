@@ -979,28 +979,14 @@
             <div id="pi-card-list"></div>
         </div>
 
-        <!-- 새 카드 추가 -->
+        <!-- ★ FIX(H3): 앱 자체 카드번호·CVC 입력 폼 제거 — 결제는 토스 결제창에서 -->
         <div class="res-section" style="margin-bottom:12px;">
-            <div class="res-section-label">새 카드 추가</div>
-            <div class="input-group">
-                <label class="input-label">카드 번호</label>
-                <input type="tel" id="pi-card-num" class="form-input" placeholder="0000 0000 0000 0000" maxlength="19" oninput="fmtCardNum(this)"/>
+            <div class="res-section-label">결제 방식 안내</div>
+            <div style="font-size:.84rem;line-height:1.6;color:var(--text-2,#555);padding:4px 2px;">
+                카드 정보는 <b>결제 시점에 토스페이먼츠 결제창</b>에서 입력합니다.<br>
+                CARO 앱은 카드번호·유효기간·CVC를 수집하거나 저장하지 않습니다.<br>
+                <span style="color:var(--text-3,#888);">카드 등록(자동결제)은 PG 빌링키 계약 후 제공 예정입니다.</span>
             </div>
-            <div class="input-row" style="gap:12px;">
-                <div class="input-group flex1">
-                    <label class="input-label">유효기간</label>
-                    <input type="tel" id="pi-card-exp" class="form-input" placeholder="MM / YY" maxlength="7" oninput="fmtCardExp(this)"/>
-                </div>
-                <div class="input-group flex1">
-                    <label class="input-label">CVC</label>
-                    <input type="tel" id="pi-card-cvc" class="form-input" placeholder="000(0)" maxlength="4" oninput="fmtCardCvc(this)"/>
-                </div>
-            </div>
-            <div class="input-group">
-                <label class="input-label">카드 별칭 (선택)</label>
-                <input type="text" id="pi-card-alias" class="form-input" placeholder="예: 내 신한카드"/>
-            </div>
-            <button class="submit-btn" onclick="saveCardFromPI()" style="margin-top:4px;">카드 등록</button>
         </div>
 
         <!-- 운전면허 -->
@@ -1987,15 +1973,17 @@
 </div>
 
 <!-- ══ Firebase SDK ══ -->
-<script type="module" src="firebase-config.js?v=4"></script>
-<script src="script.js?v=13"></script>
-<script type="module" src="caro-auth.js?v=1"></script>
+<script src="caro-config.js?v=1"></script>
+<script type="module" src="firebase-config.js?v=5"></script>
+<script src="script.js?v=14"></script>
+<script type="module" src="caro-auth.js?v=2"></script>
 <script src="script-photo-upload.js?v=5"></script>
-<script src="customer-notices.js?v=8"></script>
-<script src="customer-redesign.js?v=170"></script>
+<script src="customer-notices.js?v=9"></script>
+<script src="customer-redesign.js?v=171"></script>
 <script src="caro-sync-fix.js?v=10"></script>
 <script src="caro-icons.js?v=1"></script>
 <script src="caro-ux.js?v=1"></script>
+<script src="caro-secure.js?v=1"></script>
 <!-- ══ 드럼롤 날짜/시간 피커 ══ -->
 <div class="drum-overlay" id="drum-overlay" onclick="closeDrumPicker()">
     <div class="drum-sheet" id="drum-sheet">

@@ -23,6 +23,7 @@ import {
   signOut,
   onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/12.12.1/firebase-auth.js";
+import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/12.12.1/firebase-functions.js";
 import {
   getFirestore,
   doc,
@@ -118,6 +119,9 @@ window.FB_FN = {
   serverTimestamp: serverTimestamp
 };
 
+/* ★ Cloud Functions 호출 (서울 리전). 앱·관제 공용: window.FB_CALL('함수명', {…}) → Promise<result.data> */
+const __fns = getFunctions(app, "asia-northeast3");
+window.FB_CALL = function (name, data) { return httpsCallable(__fns, name)(data || {}).then(function (r) { return r.data; }); };
 window.FB_READY = true;
 console.log('🔥 Firebase 초기화 완료 (caro-mobility-prod)' +
   (__isAdminPage ? ' — 관리자 세션(caroAdmin) 분리 적용' : ''));

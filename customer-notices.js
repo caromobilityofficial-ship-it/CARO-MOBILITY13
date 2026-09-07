@@ -10,6 +10,30 @@
 (function(){
   'use strict';
   var cache={};
+  /* ★ 공지 본문 sanitizer — 허용: p br b strong i em u ul ol li h3 h4 a(href=http/https) span, 그 외 태그·속성·on*·script 제거 */
+  function sanitizeHtml(html){
+    try{
+      var ALLOW={P:1,BR:1,B:1,STRONG:1,I:1,EM:1,U:1,UL:1,OL:1,LI:1,H3:1,H4:1,A:1,SPAN:1,DIV:1};
+      var doc=new DOMParser().parseFromString('<div>'+String(html||'')+'</div>','text/html');
+      var root=doc.body.firstChild;
+      (function walk(node){
+        var kids=Array.prototype.slice.call(node.childNodes);
+        kids.forEach(function(c){
+          if(c.nodeType===8){ c.remove(); return; }
+          if(c.nodeType!==1) return;
+          if(!ALLOW[c.tagName]){ var txt=doc.createTextNode(c.textContent||''); c.replaceWith(txt); return; }
+          Array.prototype.slice.call(c.attributes).forEach(function(a){
+            var n=a.name.toLowerCase();
+            if(c.tagName==='A' && n==='href' && /^https?:\/\//i.test(a.value)){ return; }
+            c.removeAttribute(a.name);
+          });
+          if(c.tagName==='A'){ c.setAttribute('target','_blank'); c.setAttribute('rel','noopener noreferrer'); }
+          walk(c);
+        });
+      })(root);
+      return root.innerHTML;
+    }catch(e){ return esc(String(html||'')); }
+  }
   function ready(){ return window.FB_DB && window.FB_FN && typeof window.FB_FN.onSnapshot==='function'; }
   function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
   function fmtDate(iso){ try{ var d=new Date(iso); if(isNaN(d.getTime())) return ''; var p=function(n){return n<10?'0'+n:n;}; return d.getFullYear()+'.'+p(d.getMonth()+1)+'.'+p(d.getDate()); }catch(e){ return ''; } }
@@ -44,7 +68,7 @@
     var n=cache[id]; if(!n) return;
     var t=document.getElementById('notice-title'), b=document.getElementById('notice-body');
     if(t) t.textContent=n.title;
-    if(b) b.innerHTML = n.body ? n.body : ('<p>'+esc(n.title)+'</p>');
+    if(b) b.innerHTML = n.body ? sanitizeHtml(n.body) : ('<p>'+esc(n.title)+'</p>');   /* ★ FIX(H6): 허용 태그만 남김 (저장형 XSS 차단) */
     if(typeof window.openModal==='function') window.openModal('notice-modal');
   };
 

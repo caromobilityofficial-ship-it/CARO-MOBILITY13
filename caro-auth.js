@@ -391,6 +391,11 @@ window.caroPassAuth           = caroPassAuth;
 window.caroStartVerification  = caroStartVerification;
 window.caroAuthActive         = () => !!(CONFIG.phoneAuth || CONFIG.pass.enabled);
 window.caroHasPendingSms      = () => !!_confirm;
+/* caro-secure.js 등 일반 스크립트가 Cloud Functions 를 부를 수 있게 노출 */
+window.caroCallFn = (name, data) => {
+  if (!auth) return Promise.reject(Object.assign(new Error("firebase not ready"), { code: "functions/unavailable" }));
+  return httpsCallable(fns(), name)(data || {}).then((r) => r.data);
+};
 
 /* 기존 취소 버튼에 세션 정리 연결 */
 if (typeof window.cancelPassAuth === "function" && !window.cancelPassAuth.__caro) {

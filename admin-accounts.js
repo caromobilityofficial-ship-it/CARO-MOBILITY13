@@ -176,7 +176,15 @@
     var data={ email:email, name:name, role:role, position:position, perms:perms, active:active,
       updatedAt:(FN.serverTimestamp?FN.serverTimestamp():new Date().toISOString()) };
     if(!editingEmail) data.createdAt=(FN.serverTimestamp?FN.serverTimestamp():new Date().toISOString());
-    FN.setDoc(FN.doc(db,'admin_accounts',email), data, {merge:true}).then(function(){
+    /* ★ v100: 권한 부여는 서버(setAdminAccount → Custom Claims)가 정식 경로.
+       함수가 아직 배포되지 않았으면(not-found) 예전 방식(문서 직접 쓰기)으로 폴백 */
+    var viaServer = (typeof window.FB_CALL==='function')
+      ? window.FB_CALL('setAdminAccount',{ email:email, name:name, perms:perms, active:active, role:role, position:position })
+      : Promise.reject(Object.assign(new Error('no FB_CALL'),{code:'functions/not-found'}));
+    viaServer.catch(function(e){
+      if(e && /not-found|unavailable/.test(String(e.code||''))){ console.warn('[계정] 서버 함수 미배포 → 직접 쓰기 폴백'); return FN.setDoc(FN.doc(db,'admin_accounts',email), data, {merge:true}); }
+      throw e;
+    }).then(function(){
       T(editingEmail?'권한이 수정되었습니다':'직원 계정이 추가되었습니다'); closeModal();
       /* 즉시 반영 (onSnapshot 기다리지 않고 바로 목록 갱신) */
       try{
@@ -189,7 +197,8 @@
       }catch(e){}
     }).catch(function(e){
       console.error('[계정] 저장 실패', e);
-      T('저장 실패 — Firestore 규칙(admin_accounts)을 확인하세요');
+      var m=(e&&e.message)||'';
+      T(/not-found/.test(String(e&&e.code||'')) && /계정이 없습니다/.test(m) ? m : ('저장 실패 — '+(m||'권한을 확인하세요')));
     });
   };
 
@@ -198,15 +207,19 @@
     if(!ready()) return;
     if(!confirm('이 직원 계정의 권한을 삭제할까요?\n('+email+')')) return;
     var FN=window.FB_FN, db=window.FB_DB;
-    FN.deleteDoc(FN.doc(db,'admin_accounts',email)).then(function(){ T('삭제되었습니다'); })
-      .catch(function(e){ console.error(e); T('삭제 실패'); });
+    var viaServer=(typeof window.FB_CALL==='function')?window.FB_CALL('setAdminAccount',{email:email, remove:true}):Promise.reject({code:'functions/not-found'});
+    viaServer.catch(function(e){ if(e && /not-found|unavailable/.test(String(e.code||''))) return FN.deleteDoc(FN.doc(db,'admin_accounts',email)); throw e; })
+      .then(function(){ T('삭제되었습니다'); })
+      .catch(function(e){ console.error(e); T('삭제 실패 — '+((e&&e.message)||'')); });
   };
   window.toggleAcctActive=function(email,next){
     if(!ready()) return;
     var FN=window.FB_FN, db=window.FB_DB;
-    FN.setDoc(FN.doc(db,'admin_accounts',email),{active:!!next},{merge:true})
+    var a=(window.__caroAccts||[]).filter(function(x){return (x.id||x.email)===email;})[0]||{};
+    var viaServer=(typeof window.FB_CALL==='function')?window.FB_CALL('setAdminAccount',{email:email, name:a.name||'', perms:a.perms||{}, active:!!next}):Promise.reject({code:'functions/not-found'});
+    viaServer.catch(function(e){ if(e && /not-found|unavailable/.test(String(e.code||''))) return FN.setDoc(FN.doc(db,'admin_accounts',email),{active:!!next},{merge:true}); throw e; })
       .then(function(){ T(next?'활성화되었습니다':'정지되었습니다'); })
-      .catch(function(e){ console.error(e); T('변경 실패'); });
+      .catch(function(e){ console.error(e); T('변경 실패 — '+((e&&e.message)||'')); });
   };
   window.editAcct=function(email){
     var a=(window.__caroAccts||[]).filter(function(x){return (x.id||x.email)===email;})[0];

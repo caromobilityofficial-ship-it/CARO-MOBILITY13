@@ -527,7 +527,7 @@ document.addEventListener('DOMContentLoaded', function(){
           return;
         }
         var sid=localStorage.getItem('caro_saved_id');
-        var spw=localStorage.getItem('caro_saved_pw');
+        var spw=null; try{ localStorage.removeItem('caro_saved_pw'); localStorage.removeItem('caro_auto_pw'); }catch(e){}   /* ★ FIX(H2): 과거 저장분 정리 */
         if(sid){
           var idEl=document.getElementById('login-id');
           var pwEl=document.getElementById('login-pw');
@@ -1048,7 +1048,15 @@ function closeHomeMenu(){
 function toggleDrawer(){ openHomeMenu(); }
 function closeDrawer(){ closeHomeMenu(); }
 function drawerMyPage(){ closeHomeMenu(); goTo('mypage-screen'); }
-function drawerChangePw(){ closeHomeMenu(); showToast('비밀번호 변경 서비스 준비 중입니다 🔒'); }
+function drawerChangePw(){
+  closeHomeMenu();
+  /* ★ FIX(M2): '준비 중' → 현재 계정 이메일로 비밀번호 재설정 메일 발송 */
+  var em=(userInfo&&userInfo.email)||(window.FB_AUTH&&window.FB_AUTH.currentUser&&window.FB_AUTH.currentUser.email)||'';
+  if(!fbReady()||!em||em.indexOf('@')<0){ showToast('비밀번호 변경은 로그인 상태에서 이용할 수 있습니다.'); return; }
+  window.FB_FN.sendPasswordResetEmail(window.FB_AUTH, em)
+    .then(function(){ showToast('📧 '+em+' 로 비밀번호 재설정 메일을 보냈습니다.'); })
+    .catch(function(e){ showToast(e&&e.code==='auth/too-many-requests'?'요청이 많습니다. 잠시 후 다시 시도해 주세요.':'메일 발송에 실패했습니다. 잠시 후 다시 시도해 주세요.'); });
+}
 function drawerChat(){ closeHomeMenu(); showToast('채팅 상담 서비스 준비 중입니다 💬'); }
 
 var LANGS_META={ko:{flag:'🇰🇷',name:'한국어'},en:{flag:'🇺🇸',name:'English'},ja:{flag:'🇯🇵',name:'日本語'},zh:{flag:'🇨🇳',name:'中文'}};
@@ -1325,14 +1333,14 @@ function handleLogin(){
   /* 아이디 저장 */
   var saveIdChk=document.getElementById('save-id');
     if(saveIdChk&&saveIdChk.checked){
-      try{localStorage.setItem('caro_saved_id',id);localStorage.setItem('caro_saved_pw',pw);}catch(e){}
+      try{localStorage.setItem('caro_saved_id',id);localStorage.removeItem('caro_saved_pw');}catch(e){}   /* ★ FIX(H2): 비밀번호는 저장하지 않음 */
     } else {
       try{localStorage.removeItem('caro_saved_id');localStorage.removeItem('caro_saved_pw');}catch(e){}
     }
   /* 자동 로그인 저장 */
   var autoChk=document.getElementById('chk-auto-login');
   if(autoChk&&autoChk.checked){
-    try{localStorage.setItem('caro_auto_id',id);localStorage.setItem('caro_auto_pw',pw);}catch(e){}
+    try{localStorage.setItem('caro_auto_id',id);localStorage.removeItem('caro_auto_pw');}catch(e){}   /* ★ FIX(H2): 자동 로그인은 Firebase 세션으로만 */
   } else {
     try{localStorage.removeItem('caro_auto_id');localStorage.removeItem('caro_auto_pw');}catch(e){}
   }
@@ -1454,7 +1462,13 @@ function handleLogin(){
     return;
   }
 
-  /* ── 로컬 fallback (Firebase 미설정 시) ── */
+  /* ── ★ FIX(H4): 로컬 fallback 차단 — Firebase 미연결이면 로그인 불가 (개발용 폴백이 실서비스에서 가짜 로그인을 만들던 문제) ── */
+  if(!fbReady()){
+    if(err) err.textContent='서버에 연결할 수 없습니다. 네트워크를 확인한 뒤 앱을 다시 열어 주세요.';
+    if(btn) btn.disabled=false;
+    return;
+  }
+  /* ── 로컬 fallback (Firebase 미설정 시 — 위 차단으로 실행되지 않음, 개발 참고용) ── */
   sha256Async(pw).then(function(hash){
     var db=localLoadUsers();
     var user=db[id];
@@ -1531,7 +1545,9 @@ function handleSignup(){
     return;
   }
 
-  /* ── 로컬 fallback ── */
+  /* ── ★ FIX(H4): 로컬 fallback 차단 — Firebase 미연결이면 가입 불가 ── */
+  if(!fbReady()){ signupFail('서버에 연결할 수 없습니다. 네트워크를 확인한 뒤 다시 시도해 주세요.'); return; }
+  /* ── 로컬 fallback (위 차단으로 실행되지 않음) ── */
   var db = localLoadUsers();
   if(db[id]){ signupFail('이미 가입된 이메일입니다. 다른 이메일을 사용해 주세요.'); return; }
   sha256Async(pw).then(function(hash){
@@ -2372,7 +2388,7 @@ function handlePayment(){
     showToast('예약 정보가 올바르지 않습니다. 다시 시도해 주세요.'); return;
   }
   var bookNo='CR'+Date.now().toString().slice(-8);
-  var tossPayments=TossPayments('test_ck_6bJXmgo28eByJonkYwBE3LAnGKWx');
+  var tossPayments=TossPayments((window.CARO_CONFIG&&CARO_CONFIG.TOSS_CLIENT_KEY)||'test_ck_6bJXmgo28eByJonkYwBE3LAnGKWx');   /* ★ caro-config.js 에서 한 곳 관리 */
 /* 결제 전 데이터 localStorage에 저장 */
   try{
       localStorage.setItem('caro_pay_uid', userInfo.id||'');
@@ -2649,6 +2665,9 @@ window.sendDeviceCommand = sendDeviceCommand;
         if(cid!=null && fuelVal!=null && isFinite(fuelVal)){
           window.fuelLevels = window.fuelLevels || {};
           window.fuelLevels[cid] = Math.max(0,Math.min(100,Math.round(fuelVal)));
+          /* ★ 실기기가 보고한 값만 별도 보관 — 연료 보충요금 청구는 이 값으로만 판단 */
+          window.fuelRealLevels = window.fuelRealLevels || {};
+          window.fuelRealLevels[cid] = window.fuelLevels[cid];
           if(typeof window.caroRefreshFuel==='function') window.caroRefreshFuel();
         }
         /* 주행거리(odometer/drivenKm) — 예약에 누적, 반납 정산에 자동 합산 */
@@ -2840,7 +2859,9 @@ function doReturnCar(){
     /* ★ 반납 시점 연료/충전 잔량 확인 → 40% 이하면 청구 기록 */
     try{
       var carIdR=resR.car&&resR.car.id;
-      var pct=(carIdR!=null)?getFuelLevel(carIdR):null;
+      /* ★ FIX(C4): 예전엔 getFuelLevel()이 난수를 돌려줘 무작위로 1만원이 청구됐음.
+           실기기(IoT)가 실제로 보고한 값이 있을 때만 판단하고, 없으면 청구하지 않는다. */
+      var pct=(carIdR!=null && window.fuelRealLevels && window.fuelRealLevels[carIdR]!=null)?window.fuelRealLevels[carIdR]:null;
       if(pct!=null){
         resR.fuelAtReturn=pct;
         if(pct<=CARO_FUEL_POLICY.threshold){
@@ -5493,7 +5514,7 @@ function goToDoneHome(){
         setTimeout(function(){
           if(applied||fb.currentUser) return;
           var aid2=null,apw=null;
-          try{ aid2=localStorage.getItem('caro_auto_id'); apw=localStorage.getItem('caro_auto_pw'); }catch(e){}
+          try{ aid2=localStorage.getItem('caro_auto_id'); apw=null; }catch(e){}   /* ★ FIX(H2): 평문 비밀번호 재인증 제거 — Firebase persistence 가 세션을 복원함 */
           if(aid2&&apw&&typeof fn.signInWithEmailAndPassword==='function'){
             var em=aid2.indexOf('@')>=0?aid2:(aid2+'@caro.app');
             fn.signInWithEmailAndPassword(fb,em,apw)
@@ -5770,6 +5791,11 @@ function normalizeCarStatus(c){
     /* 이미지 필드 통일: 어드민은 image, 앱은 img */
     if(!c.img && c.image) c.img=c.image;
     if(!c.image && c.img) c.image=c.img;
+    /* ★ FIX(H10): 관제(admin-cars.js)는 price/plate 로 저장하고 앱은 pricePerHour/carNumber 를 읽어
+       관제에서 등록한 차량이 0원/시간으로 표시·청구되던 불일치 보정 */
+    if((c.pricePerHour==null || c.pricePerHour==='') && c.price!=null && c.price!=='') c.pricePerHour=+c.price||0;
+    if(!c.carNumber && c.plate) c.carNumber=c.plate;
+    if(!c.model && c.name) c.model=c.name;
   }catch(e){}
   return c;
 }
@@ -5784,7 +5810,7 @@ function startCarsListener(){
   try{
     fsCarsUnsub=fn.onSnapshot(fn.collection(db,FS_CARS_COL),function(snap){
       if(Date.now()-fsLastWriteTime<1000) return;
-      var nc=[]; snap.forEach(function(d){nc.push(normalizeCarStatus(d.data()));});
+      var nc=[]; snap.forEach(function(d){ var x=d.data()||{}; if(x.id==null||x.id==='') x.id=d.id; /* ★ 문서 id 보강 */ nc.push(normalizeCarStatus(x)); });
       CARS_DATA=nc;
       try{localStorage.setItem(CARS_STORAGE_KEY,JSON.stringify(CARS_DATA));}catch(e){}
       if(typeof renderCars==='function')renderCars();
@@ -5794,7 +5820,7 @@ function startCarsListener(){
     });
     fsBlUnsub=fn.onSnapshot(fn.collection(db,FS_BL_COL),function(snap){
       if(Date.now()-fsLastWriteTime<1000) return;
-      var nb=[]; snap.forEach(function(d){nb.push(normalizeCarStatus(d.data()));});
+      var nb=[]; snap.forEach(function(d){ var x=d.data()||{}; if(x.id==null||x.id==='') x.id=d.id; nb.push(normalizeCarStatus(x)); });
       BL_CARS=nb;
       try{localStorage.setItem(BL_STORAGE_KEY,JSON.stringify(BL_CARS));}catch(e){}
       if(typeof renderBLCars==='function')renderBLCars();
@@ -7680,26 +7706,100 @@ window.devUploadAllCars=function(){
     return 'CR-' + prefix + '-' + Date.now().toString().slice(-6);
   }
 
+  /* ★ 사고·문의 접수 Firestore 저장 (폴백 구현)
+     ※ 실제 실행되는 구현은 customer-redesign.js 5800행 부근의 window.csSubmitAccident/csSubmitInquiry 오버라이드다
+        (accident_reports / support_inquiries 컬렉션, userId·type 필드). 아래는 그 파일이 로드되지 않았을 때의 폴백이며
+        필드·컬렉션 이름을 동일하게 맞춰 firestore.rules 를 통과하도록 했다.
+     - 사진은 긴 변 900px / JPEG 0.5 로 압축해 문서 안에 저장(총 700KB 예산, Storage 없이 동작)
+     - 저장이 실패하면 '접수 완료'를 띄우지 않고 고객센터 연락처를 안내한다 */
+  function csCompressImage(file, maxDim, quality){
+    return new Promise(function(resolve){
+      try{
+        if(!file || !/^image\//.test(file.type)){ resolve(null); return; }
+        var url=URL.createObjectURL(file), img=new Image();
+        img.onload=function(){
+          try{
+            var w=img.naturalWidth||img.width, h=img.naturalHeight||img.height;
+            if(w>=h && w>maxDim){ h=Math.round(h*maxDim/w); w=maxDim; } else if(h>w && h>maxDim){ w=Math.round(w*maxDim/h); h=maxDim; }
+            var c=document.createElement('canvas'); c.width=w; c.height=h; c.getContext('2d').drawImage(img,0,0,w,h);
+            resolve(c.toDataURL('image/jpeg', quality));
+          }catch(e){ resolve(null); } finally { try{ URL.revokeObjectURL(url); }catch(e){} }
+        };
+        img.onerror=function(){ resolve(null); };
+        img.src=url;
+      }catch(e){ resolve(null); }
+    });
+  }
+  function csPackPhotos(files){
+    var budget=700000, out=[], list=(files||[]).slice(0,6);
+    return list.reduce(function(p,f){
+      return p.then(function(){
+        return csCompressImage(f, 900, 0.5).then(function(d){
+          if(d && d.length<=budget){ out.push(d); budget-=d.length; }
+        });
+      });
+    }, Promise.resolve()).then(function(){ return out; });
+  }
+  function csSaveReport(collectionName, payload, files){
+    if(typeof fbReady!=='function' || !fbReady()) return Promise.reject(new Error('offline'));
+    var fn=window.FB_FN, db=window.FB_DB;
+    var u=(window.FB_AUTH&&window.FB_AUTH.currentUser)||null;
+    return csPackPhotos(files).then(function(photos){
+      var ref=fn.doc(fn.collection(db, collectionName));
+      var _uid=(u&&u.uid)||(window.userInfo&&userInfo.uid)||'';
+      var data=Object.assign({}, payload, {
+        id: ref.id,
+        userId: _uid, uid: _uid,
+        type: payload.kind,
+        userEmail: (u&&u.email)||(window.userInfo&&(userInfo.email||userInfo.id))||'',
+        userName: (window.userInfo&&userInfo.name)||'',
+        userPhone: payload.phone||'',
+        photos: photos, photoCount: photos.length,
+        status: 'received',
+        createdAt: new Date().toISOString(), createdTs: Date.now(),
+        app: 'customer', appVersion: (window.CARO_CONFIG&&CARO_CONFIG.appVersion)||''
+      });
+      return fn.setDoc(ref, data).then(function(){ return ref.id; });
+    });
+  }
+  function csFormValues(form){
+    var o={};
+    try{ new FormData(form).forEach(function(v,k){ if(typeof v==='string') o[k]=v.trim(); }); }catch(e){}
+    return o;
+  }
+  function csSupportPhone(){ return (window.CARO_CONFIG&&CARO_CONFIG.supportPhone)||'고객센터'; }
+
   function csSubmitAccident(e) {
     e.preventDefault();
     var btn = document.querySelector('#accident-screen .submit-btn');
     btn.disabled = true;
     btn.textContent = '접수 처리 중...';
 
-    /* TODO: Firebase Firestore 연동 — 사고 접수 데이터 저장 */
-    setTimeout(function(){
+    var form=document.getElementById('cs-accident-form');
+    var v=csFormValues(form);
+    var injuryEl=document.querySelector('#accident-screen #cs-injury-detail');
+    var payload={
+      kind:'accident',
+      accidentType: v.type||'', location: v.location||'', datetime: v.datetime||'',
+      vehicle: v.vehicle||'', description: v.description||'', phone: v.phone||'',
+      injury: !!(injuryEl && injuryEl.classList.contains('csd-active')),
+      injuryDetail: v.injury||v['injury-detail']||'',
+      bookNo: (function(){ try{ var i=(typeof ctrlResIdx!=='undefined'&&ctrlResIdx>=0&&myReservations[ctrlResIdx])?myReservations[ctrlResIdx]:null; return i?i.bookNo:''; }catch(e){ return ''; } })()
+    };
+    csSaveReport('accident_reports', payload, csAccFiles).then(function(id){
       csShowSuccessModal(
         '사고 접수가 완료되었습니다',
-        '담당 상담원이 곧 연락드릴 예정입니다.<br>접수 번호를 보관해 주세요.',
-        csGenReceiptNum('A')
+        '접수 내용이 운영팀에 전달되었습니다.<br>담당자가 확인 후 연락드립니다. 접수 번호를 보관해 주세요.',
+        'A-'+id.slice(0,8).toUpperCase()
       );
+      form.reset(); csAccFiles=[]; csRenderAccFileList(); csToggleInjury(false);
+    }).catch(function(err){
+      console.error('[사고접수] 저장 실패', err);
+      alert('사고 접수가 저장되지 않았습니다.\n네트워크를 확인한 뒤 다시 시도하시거나, 긴급한 경우 '+csSupportPhone()+' 로 바로 연락해 주세요.\n(입력하신 내용은 화면에 그대로 남아 있습니다)');
+    }).then(function(){
       btn.disabled = false;
       btn.textContent = '사고 접수 제출하기';
-      document.getElementById('cs-accident-form').reset();
-      csAccFiles = [];
-      csRenderAccFileList();
-      csToggleInjury(false);
-    }, 1000);
+    });
   }
 
   /* ════════════════════════════════════════
@@ -7770,20 +7870,28 @@ window.devUploadAllCars=function(){
     btn.disabled = true;
     btn.textContent = '접수 처리 중...';
 
-    /* TODO: Firebase Firestore 연동 — 문의 데이터 저장 */
-    setTimeout(function(){
+    var form=document.getElementById('cs-inquiry-form');
+    var v=csFormValues(form);
+    var payload={
+      kind:'inquiry',
+      category: v.category||'', title: v.title||'', content: v.content||'',
+      name: v.name||'', phone: v.phone||'', email: v.email||'', replyMethod: v.replyMethod||'',
+      agree: v.agree==='on'||v.agree==='true'
+    };
+    csSaveReport('support_inquiries', payload, csInqFiles).then(function(id){
       csShowSuccessModal(
         '문의가 접수되었습니다',
         '영업일 기준 24시간 이내에<br>답변드릴 예정입니다.',
-        csGenReceiptNum('Q')
+        'Q-'+id.slice(0,8).toUpperCase()
       );
+      form.reset(); csInqFiles=[]; csRenderInqFileList(); csUpdateCharCount();
+    }).catch(function(err){
+      console.error('[문의접수] 저장 실패', err);
+      alert('문의가 저장되지 않았습니다.\n네트워크를 확인한 뒤 다시 시도해 주세요. (입력하신 내용은 화면에 그대로 남아 있습니다)');
+    }).then(function(){
       btn.disabled = false;
       btn.textContent = '문의 접수하기';
-      document.getElementById('cs-inquiry-form').reset();
-      csInqFiles = [];
-      csRenderInqFileList();
-      csUpdateCharCount();
-    }, 800);
+    });
   }
 
   /* ════════════════════════════════════════
@@ -8546,35 +8654,16 @@ window.devUploadAllCars=function(){
     html += `
       </div>
 
+      <!-- ★ FIX(H3): 앱 자체 카드번호·CVC 입력 폼 제거 (PCI-DSS·PG 계약 위반 소지, 실제 결제에도 쓰이지 않던 화면) -->
       <div class="apd-section">
-        <div class="apd-section-title"><span class="apd-section-title-icon">➕</span>새 카드 추가</div>
-        <div class="apd-input-group">
-          <label class="apd-input-label">카드 번호 <span class="req">*</span></label>
-          <input type="tel" id="apd-card-num" class="apd-input" placeholder="0000 0000 0000 0000" maxlength="19">
+        <div class="apd-section-title"><span class="apd-section-title-icon">💳</span>결제 방식 안내</div>
+        <div class="apd-info">
+          <strong>카드 정보는 결제 시점에 토스페이먼츠 결제창에서 입력합니다.</strong><br>
+          ▪ CARO 앱은 카드번호·유효기간·CVC를 수집하거나 저장하지 않습니다<br>
+          ▪ 결제대행사(PG): 토스페이먼츠 — 카드 정보는 PG사 보안 구간에서만 처리<br>
+          ▪ 카드 등록(자동결제) 기능은 PG 빌링키 계약 후 제공 예정입니다<br>
+          <span class="apd-legal">근거 — 「여신전문금융업법」 및 「전자금융거래법」 제21조</span>
         </div>
-        <div style="display:flex;gap:10px;">
-          <div class="apd-input-group" style="flex:1;">
-            <label class="apd-input-label">유효기간 <span class="req">*</span></label>
-            <input type="tel" id="apd-card-exp" class="apd-input" placeholder="MM/YY" maxlength="5">
-          </div>
-          <div class="apd-input-group" style="flex:1;">
-            <label class="apd-input-label">CVC <span class="req">*</span></label>
-            <input type="tel" id="apd-card-cvc" class="apd-input" placeholder="000(0)" maxlength="4">
-          </div>
-        </div>
-        <div class="apd-input-group">
-          <label class="apd-input-label">카드 별칭 (선택)</label>
-          <input type="text" id="apd-card-alias" class="apd-input" placeholder="예: 내 신한카드">
-        </div>
-        <button class="apd-btn apd-btn-primary" id="apd-card-add">카드 등록</button>
-      </div>
-
-      <div class="apd-info">
-        <strong>🔒 카드 정보는 안전하게 암호화되어 저장됩니다</strong><br>
-        ▪ PCI-DSS 표준에 따라 카드번호는 토큰화 저장<br>
-        ▪ CVC는 어떠한 경우에도 저장되지 않습니다<br>
-        ▪ 결제대행사(PG): 토스페이먼츠<br>
-        <span class="apd-legal">근거 — 「여신전문금융업법」 및 「전자금융거래법」 제21조</span>
       </div>
     `;
     return html;

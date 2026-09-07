@@ -1508,7 +1508,7 @@
 ═══════════════════════════════════════════════════════════ */
 (function(){
   'use strict';
-  var TOSS_KEY='test_ck_6bJXmgo28eByJonkYwBE3LAnGKWx';
+  var TOSS_KEY=(window.CARO_CONFIG&&CARO_CONFIG.TOSS_CLIENT_KEY)||'test_ck_6bJXmgo28eByJonkYwBE3LAnGKWx';   /* ★ caro-config.js 에서 한 곳 관리 */
   function won(n){ try{ return Number(n).toLocaleString('ko-KR'); }catch(e){ return n; } }
   function toast(m){ if(window.showToast) showToast(m); else alert(m); }
   function parseWon(s){ return parseInt((''+(s==null?'':s)).replace(/[^0-9]/g,''),10)||0; }
@@ -1572,11 +1572,10 @@
   function payCard(){
     var cards=window.savedCards||[];
     if(!cards.length){ toast('등록된 카드가 없습니다. 계정관리 → 결제수단에서 카드를 먼저 등록해 주세요.'); return; }
-    var c=cards[0]; var onCard=pending?pending.onCard:null;
-    closeSheet();
-    toast('\u2705 '+(c.alias||'카드')+' ····'+(c.last4||'')+' 결제 완료!');
-    pending=null;
-    if(onCard) setTimeout(onCard,200);
+    /* ★ FIX(C9): 예전엔 실제 결제 없이 '결제 완료!'를 띄우고 연장을 적용했음(무료 연장 구멍).
+         등록 카드 자동결제(빌링키)는 아직 계약 전이므로 토스 결제창으로 진행한다. */
+    toast('등록 카드 자동결제는 준비 중입니다. 토스 결제로 진행합니다.');
+    setTimeout(payToss, 300);
   }
 
   /* 토스페이먼츠 결제 (예약 결제와 동일 SDK · 리다이렉트) */
@@ -1603,6 +1602,7 @@
 
   /* 토스 결제 복귀 → 연장 적용 */
   function handleReturn(){
+    if(window.CARO_CONFIG&&CARO_CONFIG.SECURE_SERVER) return;   /* ★ 서버 모드: 결제 복귀는 caro-secure.js 가 서버 승인 후 처리 */
     var q=new URLSearchParams(window.location.search);
     var pay=q.get('payment');
     if(pay==='ext_fail'){ try{ history.replaceState(null,'',window.location.pathname); }catch(e){} return; }
@@ -2121,7 +2121,7 @@
 ═══════════════════════════════════════════════════════════ */
 (function(){
   'use strict';
-  var TOSS_KEY='test_ck_6bJXmgo28eByJonkYwBE3LAnGKWx';
+  var TOSS_KEY=(window.CARO_CONFIG&&CARO_CONFIG.TOSS_CLIENT_KEY)||'test_ck_6bJXmgo28eByJonkYwBE3LAnGKWx';   /* ★ caro-config.js 에서 한 곳 관리 */
   var PENALTY_UNIT=10000, PENALTY_PER_MIN=10; /* 10분당 10,000원 */
   function won(n){ try{ return Number(n||0).toLocaleString('ko-KR'); }catch(e){ return n; } }
   function toast(m){ if(window.showToast) showToast(m); else alert(m); }
@@ -2256,13 +2256,13 @@
     if(total>0){
       /* 등록 카드로 정산 결제 시도. 결제가 안 되면(카드 없음 등) 미결제(채권)로 넘기고
          반납은 그대로 완료한다 — 반납이 결제 때문에 막히면 안 됨 (분실물 회수 위해 10분 유예 후 차량 재사용). */
-      var cards=window.savedCards||[];
-      if(cards.length){
-        var c=cards[0];
-        toast('\u2705 '+(c.alias||'카드')+' ····'+(c.last4||'')+' '+won(total)+'원 결제 완료');
+      /* ★ FIX(C9): 예전엔 '등록 카드'만 있으면 결제 없이 '결제 완료'로 처리됐음.
+         서버 모드에서는 서버(completeReturn)가 정산액을 계산·청구하고, 테스트 모드에서는 미결제(채권)로 기록한다. */
+      if(window.CARO_CONFIG&&CARO_CONFIG.SECURE_SERVER){
+        /* 서버가 판단 — 여기서는 기록하지 않음 */
       } else {
         recordDebt(total, ST.res, ST.costs);
-        toast('등록된 카드가 없어 정산 '+won(total)+'원이 미결제(채권)로 처리됩니다. 반납은 정상 완료됩니다.');
+        toast('정산 '+won(total)+'원이 미결제 내역에 기록되었습니다. 마이페이지 › 미납 내역에서 결제해 주세요.');
       }
     }
     finish();   /* 결제 성공/실패와 무관하게 반납은 항상 완료 */
@@ -2305,9 +2305,9 @@
   function payCard(){
     var cards=window.savedCards||[];
     if(!cards.length){ toast('등록된 카드가 없습니다. 계정관리 → 결제수단에서 카드를 먼저 등록해 주세요.'); return; }
-    var c=cards[0], onCard=payPending?payPending.onCard:null;
-    closePay(); toast('\u2705 '+(c.alias||'카드')+' ····'+(c.last4||'')+' 결제 완료!'); payPending=null;
-    if(onCard) setTimeout(onCard,150);
+    /* ★ FIX(C9): 실제 결제 없이 '결제 완료!' 처리하던 구멍 제거 — 토스 결제창으로 진행 */
+    toast('등록 카드 자동결제는 준비 중입니다. 토스 결제로 진행합니다.');
+    setTimeout(payToss, 300);
   }
   function payToss(){
     if(!payPending) return; var amount=payPending.amount;
@@ -2324,6 +2324,7 @@
     }catch(e){ toast('토스페이먼츠 호출 오류'); }
   }
   function handleReturn(){
+    if(window.CARO_CONFIG&&CARO_CONFIG.SECURE_SERVER) return;   /* ★ 서버 모드: caro-secure.js 가 처리 */
     var q=new URLSearchParams(location.search); var pay=q.get('payment');
     if(pay==='ret_fail'){ try{ history.replaceState(null,'',location.pathname); }catch(e){} return; }
     if(pay!=='ret_success') return;
@@ -2989,7 +2990,7 @@
     ]},
     member:{ a:'회원·가입·인증 관련 안내예요.', subs:[
       {q:'가입 방법',a:'이메일로 회원가입 → 운전면허 등록·인증 → 결제수단 등록이면 이용 준비 완료예요.'},
-      {q:'운전면허 인증',a:'본인 명의 운전면허를 등록하면 진위·자격이 자동 확인돼요.'},
+      {q:'운전면허 인증',a:'본인 명의 운전면허를 등록하면 운영팀이 확인한 뒤 이용이 가능해요. (면허 진위확인 자동 연동은 준비 중)'},
       {q:'이용 자격',a:'만 21세 이상 + 운전면허 취득 1년 이상 + 본인 명의 결제수단이 필요해요(여객자동차 운수사업법 기준).'},
       {q:'비밀번호 재설정',a:'로그인 화면의 “아이디/비밀번호 찾기”에서 가입 이메일로 재설정할 수 있어요.'},
       {q:'회원 탈퇴',a:'계정관리 → 회원 탈퇴에서 가능해요. 진행 중인 예약이 없어야 해요.'}
@@ -3191,7 +3192,7 @@
       {label:'취소 수수료가 궁금해요', node:{say:'취소 수수료는 이용 시작까지 남은 시간에 따라 달라져요. 정확한 금액은 예약 취소 화면에서 안내돼요.', end:'resolve'}}
     ]},
     member:{ say:'회원·가입·인증 관련해서 도와드릴게요. 무엇이 궁금하세요?', quick:[
-      {label:'가입/면허 인증 방법', node:{say:'이메일 가입 → 본인 명의 운전면허 등록·인증 → 결제수단 등록이면 이용 준비 완료예요. 면허는 등록 시 진위·자격이 자동 확인돼요.', end:'resolve'}},
+      {label:'가입/면허 인증 방법', node:{say:'이메일 가입 → 본인 명의 운전면허 등록·인증 → 결제수단 등록이면 이용 준비 완료예요. 면허는 등록 후 운영팀이 확인해요.', end:'resolve'}},
       {label:'이용 자격(나이/경력)', node:{say:'만 21세 이상 + 운전면허 취득 1년 이상 + 본인 명의 결제수단이 필요해요(여객자동차 운수사업법 기준).', end:'resolve'}},
       {label:'로그인/비밀번호 문제', node:{say:'로그인 화면의 “아이디/비밀번호 찾기”에서 가입 이메일로 재설정할 수 있어요.', quick:[
         {label:'그래도 안 돼요', node:{say:'상담사에게 연결해 드릴게요.', end:'escalate'}},
@@ -3279,7 +3280,7 @@
 (function(){ 'use strict';
   var DATA=[
     {c:'회원·가입·인증', items:[
-      {q:`운전면허는 어떻게 등록·인증하나요?`, a:`가입 시 본인 명의 운전면허증을 등록하면 진위·운전자격이 자동으로 확인됩니다. 면허 정보가 바뀌면 계정관리에서 다시 등록해 주세요.`},
+      {q:`운전면허는 어떻게 등록·인증하나요?`, a:`가입 시 본인 명의 운전면허증을 등록하면 운영팀이 확인한 뒤 이용이 가능합니다. (면허 진위확인 자동 연동은 준비 중) 면허 정보가 바뀌면 계정관리에서 다시 등록해 주세요.`},
       {q:`해외(외국) 운전면허로도 이용할 수 있나요?`, a:`국내에서 인정되는 유효한 운전면허가 필요합니다. 외국 면허만으로는 이용이 제한될 수 있으니, 이용 전 고객센터로 확인해 주세요.`},
       {q:`비밀번호를 잊어버렸어요.`, a:`로그인 화면의 「아이디·비밀번호 찾기」에서 가입 이메일로 재설정할 수 있습니다.`},
       {q:`회원 탈퇴는 어떻게 하나요?`, a:`계정관리 → 회원 탈퇴에서 가능합니다. 진행 중인 예약이나 미정산 금액이 없어야 탈퇴할 수 있습니다.`}
@@ -6555,6 +6556,18 @@
     }
 
     /* ── v5: LLM(AI) 연동 슬롯 — API 키가 설정된 경우에만 사용 ── */
+    /* ★ 서버 경유 AI 답변 (caro-secure.js 의 caroAskBot → Cloud Function askBot). 키는 서버 Secret 에만 존재 */
+    function askLLMServer(t){
+      addBot('잠시만요, 확인하고 있어요…');
+      var done=false;
+      var timer=setTimeout(function(){ if(!done){ done=true; toAgent(t); } }, 12000);
+      Promise.resolve().then(function(){ return window.caroAskBot(t); }).then(function(a){
+        if(done) return; done=true; clearTimeout(timer);
+        if(a){ addBot(String(a).replace(/\n/g,'<br>')); log(null,t,'LLM 답변(서버)'); CTX.t=t; endButtons(); }
+        else { toAgent(t); }
+      }).catch(function(){ if(done) return; done=true; clearTimeout(timer); toAgent(t); });
+    }
+    /* (구) 브라우저 직접 호출 — 더 이상 호출되지 않음. 키가 노출되므로 사용 금지 */
     function askLLM(t,key){
       addBot('잠시만요, 확인하고 있어요…');
       var sys='너는 한국 카셰어링 서비스 CARO MOBILITY(카로 모빌리티)의 고객 상담원이다. 정중한 한국어 존댓말로, 3문장 이내로 간결하게 답한다. 확실하지 않으면 추측하지 말고 1:1 문의 접수를 권한다. 예약/결제 변경 등 실제 처리는 앱 화면(내 예약, 결제·면허, 고객센터)을 안내한다.';
@@ -6648,8 +6661,9 @@
       }
 
       /* v5: AI(LLM) 키가 있으면 AI가 직접 답변 */
-      var __k=''; try{ __k=(localStorage.getItem('caro_ai_key')||window.CARO_AI_KEY||'').trim(); }catch(e){}
-      if(__k){ askLLM(t,__k); return; }
+      /* ★ FIX(H9): AI 키를 브라우저에 두고 직접 호출하던 경로 제거. 서버(Cloud Function) 경유 caroAskBot 이 있을 때만 AI 답변 */
+      try{ localStorage.removeItem('caro_ai_key'); }catch(e){}
+      if(typeof window.caroAskBot==='function'){ askLLMServer(t); return; }
 
       /* 정말 모름 → 솔직히 말하고 바로 사람에게 (입력 내용 그대로 전달) */
       addBot('죄송해요, 제가 정확히 이해하지 못했어요. 😥<br>'
@@ -6704,7 +6718,7 @@
     return true;
   }
 
-  window.caroSetAiKey=function(k){ try{ if(k) localStorage.setItem('caro_ai_key', String(k).trim()); else localStorage.removeItem('caro_ai_key'); }catch(e){} return '설정 완료'; };
+  window.caroSetAiKey=function(){ return 'AI 키는 앱에 저장하지 않습니다 — Cloud Functions Secret(GEMINI_API_KEY)에 설정하세요.'; };
   if(!hook()){
     var n=0, iv=setInterval(function(){ n++; if(hook()||n>60) clearInterval(iv); }, 500);
   }
