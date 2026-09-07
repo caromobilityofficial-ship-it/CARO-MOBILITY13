@@ -500,6 +500,7 @@ document.addEventListener('DOMContentLoaded', function(){
   var shortcut  = urlParams.get('shortcut');
 
   setTimeout(function(){
+           window.__caroBootTimerDone=true;   /* ★ [v101] 부팅 타이머 완료 표시 (세션 만료 처리가 이 뒤에 오도록) */
            /* done-screen이 활성화 중이거나 이미 홈 진입했으면 스킵 */
            if(window._caroLoggedIn) return;
            var doneEl=document.getElementById('done-screen');
@@ -537,7 +538,8 @@ document.addEventListener('DOMContentLoaded', function(){
           if(schk) schk.checked=true;
         }
       }catch(e){}
-      goTo('main-screen');
+      var _cur=document.querySelector('.screen.active');
+      if(!_cur||_cur.id!=='main-screen') goTo('main-screen');   /* ★ [v101] 이미 main 이면 같은 화면 재전환(활성 화면 사라짐) 방지 */
       if(shortcut) window._pendingShortcut = shortcut;
     }, 4500);
 
@@ -1166,6 +1168,52 @@ function clearSession(){
 document.addEventListener('click',    function(){ if(userInfo.id) startSessionTimer(); });
 document.addEventListener('touchstart',function(){ if(userInfo.id) startSessionTimer(); });
 
+/* ★ [v101] 운전면허 정보 표준형
+   ─ 문제: 면허가 4곳에서 4가지 모양(마스킹 문자열 / number 빈 객체 / licenseText / JSON 문자열)으로 저장돼
+           마이페이지·면허증 화면·홈 '이용 준비' 카드가 서로 다른 말을 했다.
+   ─ 해결: 서버 users.license = {number,name,birth,type,expiry,verified} 한 가지.
+           로컬 caro_license(객체) + caro_license_registered + userInfo.license(번호) 는 항상 이 함수로만 갱신. */
+function caroNormLicense(v, ctx){
+  ctx=ctx||{};
+  var o=null;
+  if(v&&typeof v==='object'){
+    o={number:String(v.number||'').trim(), name:v.name||'', birth:v.birth||'', type:v.type||'', expiry:v.expiry||'', verified:!!v.verified};
+  }else if(typeof v==='string'){
+    var s=v.trim();
+    if(s&&s.indexOf('*')===-1) o={number:s, name:'', birth:'', type:'', expiry:'', verified:false};  /* 마스킹된 옛 값(12-0****)은 무효 */
+  }
+  if(o){ if(!o.name&&ctx.name) o.name=ctx.name; if(!o.birth&&ctx.birth) o.birth=ctx.birth; }
+  return (o&&o.number)?o:null;
+}
+function caroApplyLicenseLocal(lic){
+  try{
+    if(lic&&lic.number){
+      userInfo.license=lic.number;
+      localStorage.setItem('caro_license', JSON.stringify(lic));
+      localStorage.setItem('caro_license_registered','true');
+    }else{
+      userInfo.license='';
+      localStorage.removeItem('caro_license'); localStorage.removeItem('caro_license_registered');
+    }
+    var mpLic=document.getElementById('mp-license'); if(mpLic) mpLic.textContent=(lic&&lic.number)?lic.number:'';
+    var piLic=document.getElementById('pi-license'); if(piLic&&document.activeElement!==piLic) piLic.value=(lic&&lic.number)?lic.number:'';
+  }catch(e){}
+  try{ if(window.__caroRR) window.__caroRR(); }catch(e){}
+}
+/* 서버에 저장(표준형) → 성공 시 로컬 반영. Promise<boolean> */
+function caroSaveLicense(lic){
+  lic=caroNormLicense(lic,{name:userInfo.name, birth:userInfo.birth});
+  if(!lic) return Promise.resolve(false);
+  var uid=userInfo.uid||(window.FB_AUTH&&window.FB_AUTH.currentUser&&window.FB_AUTH.currentUser.uid)||'';
+  if(!fbReady()||!uid) return Promise.resolve(false);
+  var fn=window.FB_FN;
+  return fn.setDoc(fn.doc(window.FB_DB,'users',uid),
+      {license:lic, licenseText:lic.number, licenseRegisteredAt:new Date().toISOString()},{merge:true})
+    .then(function(){ caroApplyLicenseLocal(lic); return true; })
+    .catch(function(e){ console.error('🔴 면허 저장 실패:',e&&e.code||e); return false; });
+}
+window.caroNormLicense=caroNormLicense; window.caroApplyLicenseLocal=caroApplyLicenseLocal; window.caroSaveLicense=caroSaveLicense;
+
 /* Firestore에서 사용자 프로필 불러오기 */
 function loadUserProfile(uid){
   if(!fbReady()) return;
@@ -1175,8 +1223,12 @@ function loadUserProfile(uid){
       var d=snap.data();
       userInfo.name    = d.name    || userInfo.id;
       userInfo.email   = d.email   || '';
-      userInfo.license = d.license || '';
-      userInfo.phone   = d.phone   || '';
+      userInfo.phone   = d.phoneFull || d.phone || '';
+      userInfo.birth   = d.birthFull || d.birth || '';
+      /* ★ [v101] 면허: 서버값이 진실 — 표준형으로 userInfo.license(번호)+caro_license(객체) 동시 갱신 */
+      var lic = caroNormLicense(d.license,{name:d.name,birth:userInfo.birth}) || caroNormLicense(d.licenseText,{name:d.name,birth:userInfo.birth});
+      caroApplyLicenseLocal(lic);
+      window._caroProfileLoaded=true;
       /* 홈 환영 메시지 갱신 */
       var wn=document.getElementById('home-welcome-name');
       if(wn) wn.textContent=(userInfo.name||userInfo.id)+' 님, 안녕하세요 👋';
@@ -1499,7 +1551,9 @@ function handleSignup(){
   if(btn){ btn.disabled=true; btn.textContent='가입 처리 중...'; }
 
   function signupDone(){
-    userInfo.id=id; userInfo.email=email; userInfo.name=name;
+    userInfo.id=id; userInfo.email=email; userInfo.name=name; userInfo.phone=phone||''; userInfo.birth=birth||'';
+    /* ★ [v101] 가입 때 입력한 면허를 즉시 로컬에도 표준형으로 반영 (서버에는 아래 setDoc 으로 저장됨) */
+    try{ caroApplyLicenseLocal(license?{number:license,name:name,birth:birth,type:'',expiry:'',verified:false}:null); }catch(e){}
     if(btn){ btn.disabled=false; btn.textContent='가입 완료'; }
     goSignupStep(4);
   }
@@ -1521,11 +1575,15 @@ function handleSignup(){
       .then(function(cred){
         var uid=cred.user.uid;
         fn.updateProfile(cred.user, {displayName: name}).catch(console.error);
+        /* ★ [v101] 예전엔 전화·생년월일·면허를 마스킹(12-0****)해서 저장 → 실제 값이 어디에도 남지 않아
+           면허증 화면엔 "없음", 홈 카드엔 "완료" 로 엇갈렸다. 본인 문서(users/{uid})는 규칙으로 본인·관리자만
+           읽으므로 실제 값을 저장하고, 화면에서만 마스킹한다. */
         return fn.setDoc(fn.doc(dbRef,'users',uid), {
           id:id, name:name, email:email,
-          phone: phone ? phone.replace(/(\d{3})-(\d{4})-(\d{4})/, '$1-****-$3') : '',
-          birth: birth ? birth.slice(0,4)+'****' : '',
-          license: license ? license.slice(0,4)+'**********' : '',
+          phone: phone || '',
+          birth: birth || '',
+          license: license ? {number:license, name:name, birth:birth||'', type:'', expiry:'', verified:false} : '',
+          licenseText: license || '',
           phoneVerified: !!window._caroPhoneVerified,
           phoneE164: (cred.user && cred.user.phoneNumber) || '',
           certCI: window._caroCertCI || '',
@@ -1849,6 +1907,21 @@ function showDevLoginTransition(){
     },2000);
   });});
 }
+/* ★ [v101] 계정별 로컬 데이터 제거 (로그아웃 / 다른 계정 로그인 감지 시). 미러 훅이 서버로 올리지 않도록 조용히 지운다 */
+function caroClearUserLocal(prevId){
+  try{
+    window.__caroSilentStorage = true;
+    var rm=['caro_apd_cards','caro_apd_credit','caro_apd_credit_history','caro_apd_coupons','caro_apd_unpaid','caro_apd_sns',
+            'caro_apd_plan','caro_apd_notif','caro_apd_phone','caro_apd_phone_full','caro_apd_init_v3',
+            'caro_license','caro_license_registered','caro_extra_driver','caro_plan_v1','caro_suspension_v1',
+            'caro_mirror_ts','caro_res_pending','caro_pay_data','caro_pay_uid','caro_ext_pending','caro_ret_pending'];
+    if(prevId) rm.push('caro_data_'+prevId);
+    try{ for(var i=localStorage.length-1;i>=0;i--){ var k=localStorage.key(i); if(k&&(k.indexOf('caro_nf_')===0||k.indexOf('caro_nfx_')===0)) rm.push(k); } }catch(e){}
+    rm.forEach(function(k){ try{ localStorage.removeItem(k); }catch(e){} });
+  }catch(e){}
+  finally{ window.__caroSilentStorage = false; }
+}
+window.caroClearUserLocal=caroClearUserLocal;
 function handleLogout(){
    var id=document.getElementById('login-id'),pw=document.getElementById('login-pw'),er=document.getElementById('login-error');
    if(er) er.textContent='';
@@ -1859,15 +1932,21 @@ function handleLogout(){
     if(pw) pw.value='';
   }catch(e){if(id)id.value='';if(pw)pw.value='';}
   clearSession();
+  /* ★ [v101] 진짜 로그아웃 — 예전엔 화면 플래그만 지우고 Firebase 세션은 그대로 둬서
+     ① 다음 실행 때 이전 계정으로 서버 동기화가 계속 돌고 ② 카드 목록을 지운 직후 2초 폴링이
+     '카드 0개'를 이전 계정 서버 문서에 써 버렸다(로그아웃 → 재로그인 시 카드 증발). */
+  window.__caroLoggingOut = true;
+  var _prevId = userInfo.id;
+  try{ if(window.caroSyncCancel) window.caroSyncCancel(); }catch(e){}
+  try{ if(fbReady()&&window.FB_FN.signOut) window.FB_FN.signOut(window.FB_AUTH).catch(function(){}); }catch(e){}
   window._caroLoggedIn = false;   /* 하단바 숨김 */
   userInfo={id:'',email:'',license:'',name:''};
+  window.__caroResFromServer = null;
   /* 🔒 보안: 로그아웃 시 이전 계정의 예약·이용내역·카드 정보 메모리/캐시 완전 제거 */
   myReservations=[]; cancelledHistory=[]; savedCards=[];
-  try{
-    localStorage.removeItem('caro_apd_cards');
-    localStorage.removeItem('caro_pay_data');
-    localStorage.removeItem('caro_pay_uid');
-  }catch(e){}
+  /* 기기에 남는 '계정별' 로컬 데이터 전부 제거 (다음 계정에 섞여 들어가던 문제) — 서버 백업(미러)에는 건드리지 않음 */
+  caroClearUserLocal(_prevId);
+  setTimeout(function(){ window.__caroLoggingOut = false; }, 4000);
   /* 컨트롤러 버튼 숨김 */
   var sw=document.getElementById('home-ctrl-switch');
   if(sw) sw.classList.remove('visible');
@@ -5018,6 +5097,12 @@ function saveUserData(){
 }
 
 function loadUserData(uid){
+  /* ★ [v101] 서버(Firestore) 예약 데이터가 이미 이 계정으로 로드돼 있으면 로컬 캐시로 되돌리지 않는다.
+     (예전엔 1.6초·2.8초·4.5초 타이머가 서버 데이터 도착 '뒤'에 로컬 캐시를 다시 덮어써 옛 상태가 보였다) */
+  if(window.__caroResFromServer && userInfo && userInfo.uid && window.__caroResFromServer===userInfo.uid){
+    try{ if(userInfo.id && typeof _origSaveUserData==='function') _origSaveUserData(); }catch(e){}   /* 캐시를 서버 상태로 갱신 */
+    return;
+  }
   /* 🔒 보안: 계정 전환 시 이전 계정 데이터를 먼저 완전 초기화(빈 계정이어도 남지 않도록) */
   myReservations=[]; cancelledHistory=[]; savedCards=[];
   var key='caro_data_'+uid;
@@ -5026,7 +5111,7 @@ function loadUserData(uid){
     /* ★ FIX: 저장은 아이디 키(caro_data_아이디)로 되는데 복원은 uid 키로 시도하던
        키 불일치 해결 — 못 찾으면 아이디 키로도 찾아본다 */
     if(!raw && userInfo && userInfo.id && userInfo.id!==uid) raw=localStorage.getItem('caro_data_'+userInfo.id);
-    if(!raw) return;
+    if(!raw){ try{ if(window.__caroResBaseline) window.__caroResBaseline('local'); }catch(e){} return; }
     var d=JSON.parse(raw);
     if(d.myReservations) myReservations=d.myReservations.map(function(r){
       return Object.assign({},r,{
@@ -5044,6 +5129,8 @@ function loadUserData(uid){
     });
     if(d.savedCards) savedCards=d.savedCards;
   }catch(e){}
+  /* ★ [v101] 방금 로드한 로컬 캐시를 '기준선'으로 기록 → 이후 saveUserData 는 기준선과 달라진 예약만 서버에 올린다 */
+  try{ if(window.__caroResBaseline) window.__caroResBaseline('local'); }catch(e){}
 }
 function val(id){ var e=document.getElementById(id); return e?e.value.trim():''; }
 
@@ -5330,11 +5417,14 @@ function deletePICard(idx){
 function saveLicenseFromPI(){
   var inp=document.getElementById('pi-license');
   if(!inp||!inp.value.trim()){showToast('운전면허 번호를 입력해 주세요.');return;}
-  userInfo.license=inp.value.trim();
-  var mpLic=document.getElementById('mp-license');
-  if(mpLic) mpLic.textContent=userInfo.license;
-  saveUserData();
-  showToast('운전면허가 저장되었습니다 ✅');
+  /* ★ [v101] 서버(users.license 표준형)에 먼저 저장하고, 성공했을 때만 '저장됨' 안내.
+     예전엔 메모리에만 넣고 성공 토스트 → 앱을 다시 켜면 사라졌다. */
+  var lic={number:inp.value.trim(), name:userInfo.name||'', birth:userInfo.birth||'', type:'', expiry:'', verified:false};
+  if(!fbReady()||!userInfo.uid){ showToast('로그인 상태를 확인할 수 없어 저장하지 못했어요. 잠시 후 다시 시도해 주세요.'); return; }
+  caroSaveLicense(lic).then(function(ok){
+    if(ok){ showToast('운전면허가 저장되었습니다 ✅'); try{ renderPaymentInfoScreen(); }catch(e){} }
+    else showToast('면허 저장에 실패했어요. 네트워크를 확인한 뒤 다시 시도해 주세요.');
+  });
 }
 
 window.renderPayMethods=renderPayMethods;
@@ -5474,6 +5564,7 @@ function goToDoneHome(){
                     });
                     if(d.savedCards) savedCards=d.savedCards;
         }
+        try{ if(window.__caroResBaseline) window.__caroResBaseline('local'); }catch(e3){}   /* ★ [v101] 기준선 */
       }catch(e2){}
       startSessionTimer();
       /* 홈 화면 텍스트 즉시 업데이트 */
@@ -5502,8 +5593,10 @@ function goToDoneHome(){
           if(!u||applied) return; applied=true;
           userInfo.uid=u.uid;
           try{ if(userInfo.id) loadUserData(userInfo.id); }catch(e){}
+          /* ★ [v101] 순서: ① 아직 서버에 못 올린 예약(대기열)만 올리고 ② 서버 리스너 시작.
+             예전엔 로컬 캐시 '전부'를 서버에 덮어쓴 뒤 리스너를 켜서, 관제에서 바꾼 상태가 되돌아갔다. */
+          try{ if(typeof flushPendingReservations==='function') flushPendingReservations(); }catch(e){}
           try{ startReservationsListener(); }catch(e){}
-          try{ if(typeof syncAllReservationsToFirestore==='function') syncAllReservationsToFirestore(); }catch(e){}
           try{ if(window.caroSyncPull) window.caroSyncPull(u.uid); }catch(e){}
           try{ renderMyReservations(); renderCars(); }catch(e){}
           console.log('✅ 세션 재확립 완료 — 서버 동기화 시작 (uid:'+u.uid.slice(0,6)+'…)');
@@ -5817,7 +5910,7 @@ function startCarsListener(){
       if(typeof updateMapMarkers==='function')updateMapMarkers();
       if(typeof devRenderCarOverview==='function')devRenderCarOverview();
       console.log('🔄 일반 차량 수신:',nc.length,'대');
-    });
+    },function(err){ console.error('차량 리스너 오류:',(err&&err.code)||err); if(window.carsListenerRetry) carsListenerRetry(); });   /* ★ [v101] 오류 시 재시도 (예전엔 조용히 죽어 차량 목록이 비었음) */
     fsBlUnsub=fn.onSnapshot(fn.collection(db,FS_BL_COL),function(snap){
       if(Date.now()-fsLastWriteTime<1000) return;
       var nb=[]; snap.forEach(function(d){ var x=d.data()||{}; if(x.id==null||x.id==='') x.id=d.id; nb.push(normalizeCarStatus(x)); });
@@ -5826,7 +5919,7 @@ function startCarsListener(){
       if(typeof renderBLCars==='function')renderBLCars();
       if(typeof devRenderBlOverview==='function')devRenderBlOverview();
       console.log('🔄 BL 차량 수신:',nb.length,'대');
-    });
+    },function(err){ console.error('BL 차량 리스너 오류:',(err&&err.code)||err); if(window.carsListenerRetry) carsListenerRetry(); });
   }catch(e){console.error('차량 리스너 실패:',e);}
 }
 window.startCarsListener=startCarsListener;
@@ -5919,14 +6012,35 @@ window.recordLoginEvent=recordLoginEvent;
   },300);
 })();
 
-/* 3. 예약 데이터 동기화 */
-function syncReservationToFirestore(res, isCancelled){
-  if(!fbReady()||!userInfo.uid||!res.bookNo) return Promise.resolve();
-  var fn=window.FB_FN, db=window.FB_DB;
-  if(typeof fn.setDoc!=='function') return Promise.resolve();
-  fsResLastWrite=Date.now();
-  var data={
-    bookNo:res.bookNo, userId:userInfo.uid,
+/* 3. 예약 데이터 동기화
+   ★ [v101] 원칙: 서버(Firestore reservations/*)가 진실, 로컬(caro_data_*)은 화면용 캐시.
+   ─ 서버로 올리는 것은 "이 기기에서 방금 바뀐 예약"뿐 (기준선 대비 달라진 것 + 대기열).
+   ─ 앱 시작 때 로컬 캐시 전체를 서버에 덮어쓰던 syncAll 은 폐기
+     → 관제(강제반납·취소)나 다른 기기에서 바꾼 상태가 이 폰의 옛 캐시로 되돌아가지 않는다.
+   ─ 리스너의 "쓰기 후 1.5초 스냅샷 무시" 도 폐기 (첫 서버 응답을 버리던 원인). Firestore 는 내 쓰기를
+     스냅샷에 즉시 반영하므로(latency compensation) 무시할 필요가 없다.
+   ─ 로그인 전(uid 없음)·전송 실패 시엔 대기열(caro_res_pending)에 넣고, 로그인 직후 올린다.
+     대기열 항목은 서버 문서가 더 진행된 상태(반납·취소됨)면 절대 되돌리지 않는다.
+   ─ 서버 모드(SECURE_SERVER=true)에서는 Functions 가 예약을 쓰므로 클라이언트는 올리지 않는다. */
+var RES_PENDING_KEY='caro_res_pending';
+var __resBase={}, __resBaseFrom='';
+window.__caroResFromServer=null;
+
+function resToIso(v){
+  if(!v) return null;
+  if(v instanceof Date) return isNaN(v.getTime())?null:v.toISOString();
+  if(typeof v.toDate==='function'){ try{ return v.toDate().toISOString(); }catch(e){ return null; } }
+  if(typeof v==='number') return new Date(v).toISOString();
+  return String(v);
+}
+function resFromServerDate(v){
+  if(!v) return null;
+  if(typeof v.toDate==='function'){ try{ return v.toDate(); }catch(e){ return null; } }
+  var d=new Date(v); return isNaN(d.getTime())?null:d;
+}
+function resPayload(res, isCancelled){
+  return {
+    bookNo:res.bookNo, userId:userInfo.uid||'',
     userEmail:userInfo.email||userInfo.id||'', userName:userInfo.name||userInfo.id||'',
     car:res.car?{
       id:res.car.id||'', name:res.car.name||'', nameen:res.car.nameen||res.car.name||'',
@@ -5936,64 +6050,161 @@ function syncReservationToFirestore(res, isCancelled){
       carNumber:res.car.carNumber||''
     }:null,
     ins:res.ins?{id:res.ins.id||'',name:res.ins.name||'',pricePerHour:res.ins.pricePerHour||0}:null,
-    start:res.start instanceof Date?res.start.toISOString():(res.start||null),
-    end:res.end instanceof Date?res.end.toISOString():(res.end||null),
+    start:resToIso(res.start), end:resToIso(res.end),
     hrs:res.hrs||0, total:res.total||0,
-    returned:!!res.returned,
-    returnedAt:res.returnedAt instanceof Date?res.returnedAt.toISOString():(res.returnedAt||null),
-    extendedMins:res.extendedMins||0,
-    extensionHistory:res.extensionHistory||[],
-    cancelled:!!isCancelled||res.status==='cancelled',
-    cancelledAt:res.cancelledAt instanceof Date?res.cancelledAt.toISOString():(res.cancelledAt||null),
+    returned:!!res.returned, returnedAt:resToIso(res.returnedAt),
+    extendedMins:res.extendedMins||0, extensionHistory:res.extensionHistory||[],
+    cancelled:!!isCancelled||res.status==='cancelled', cancelledAt:resToIso(res.cancelledAt),
     refundPct:res.refundPct||0, refundAmt:res.refundAmt||0
   };
-  return fn.setDoc(fn.doc(db,FS_RES_COL,res.bookNo),data,{merge:true}).catch(function(e){console.error('🔴 예약 동기화 실패:',res.bookNo,e);});
+}
+function resFingerprint(p){
+  return JSON.stringify([p.bookNo, p.car&&p.car.id, p.ins&&p.ins.id, p.start, p.end, p.hrs, p.total,
+    p.returned, p.returnedAt, p.extendedMins, p.extensionHistory, p.cancelled, p.cancelledAt, p.refundPct, p.refundAmt]);
+}
+function resCurrentMap(){
+  var m={};
+  (myReservations||[]).forEach(function(r){ if(r&&r.bookNo){ var p=resPayload(r,false); m[r.bookNo]={p:p,fp:resFingerprint(p)}; } });
+  (cancelledHistory||[]).forEach(function(r){ if(r&&r.bookNo){ var p=resPayload(r,true); m[r.bookNo]={p:p,fp:resFingerprint(p)}; } });
+  return m;
+}
+/* 기준선 = "서버와 같다고 믿는 마지막 상태". 로컬 캐시 로드 직후('local') / 서버 스냅샷 직후('server') 기록 */
+window.__caroResBaseline=function(from){
+  var m=resCurrentMap(); __resBase={};
+  Object.keys(m).forEach(function(k){ __resBase[k]=m[k].fp; });
+  __resBaseFrom=from||'local';
+};
+
+function resQueueLoad(){ try{ var q=JSON.parse(localStorage.getItem(RES_PENDING_KEY)||'{}'); return (q&&typeof q==='object')?q:{}; }catch(e){ return {}; } }
+function resQueueSave(q){ try{ if(Object.keys(q).length) localStorage.setItem(RES_PENDING_KEY,JSON.stringify(q)); else localStorage.removeItem(RES_PENDING_KEY); }catch(e){} }
+function resEnqueue(p){ var q=resQueueLoad(); q[p.bookNo]={p:p, ts:Date.now()}; resQueueSave(q); }
+function resDequeue(bookNo){ var q=resQueueLoad(); if(q[bookNo]){ delete q[bookNo]; resQueueSave(q); } }
+function resSecureMode(){ return !!(window.CARO_CONFIG&&window.CARO_CONFIG.SECURE_SERVER); }
+
+var __resFailToastAt=0;
+function resWrite(p){
+  var fn=window.FB_FN, db=window.FB_DB;
+  p.userId=userInfo.uid;
+  if(!p.userEmail) p.userEmail=userInfo.email||userInfo.id||'';
+  if(!p.userName)  p.userName=userInfo.name||userInfo.id||'';
+  p.clientUpdatedAt=new Date().toISOString();
+  fsResLastWrite=Date.now();
+  return fn.setDoc(fn.doc(db,FS_RES_COL,p.bookNo),p,{merge:true})
+    .then(function(){ resDequeue(p.bookNo); __resBase[p.bookNo]=resFingerprint(p); return true; })
+    .catch(function(e){
+      console.error('🔴 예약 동기화 실패:',p.bookNo,(e&&e.code)||e);
+      resEnqueue(p);
+      if(Date.now()-__resFailToastAt>15000){
+        __resFailToastAt=Date.now();
+        try{ showToast('서버 저장에 실패했어요. 네트워크가 연결되면 자동으로 다시 올립니다.'); }catch(e2){}
+      }
+      return false;
+    });
 }
 
-function syncAllReservationsToFirestore(){
-  if(!fbReady()||!userInfo.uid) return;
-  myReservations.forEach(function(r){syncReservationToFirestore(r,false);});
-  cancelledHistory.forEach(function(r){syncReservationToFirestore(r,true);});
+function syncReservationToFirestore(res, isCancelled){
+  if(resSecureMode()||!res||!res.bookNo) return Promise.resolve(false);
+  var p=resPayload(res,isCancelled);
+  if(!fbReady()||!userInfo.uid||typeof window.FB_FN.setDoc!=='function'){ resEnqueue(p); return Promise.resolve(false); }
+  return resWrite(p);
 }
+/* 기준선과 달라진 예약만 올린다 (saveUserData 때마다 호출) */
+function syncDirtyReservations(){
+  if(resSecureMode()) return;
+  var m=resCurrentMap(), n=0;
+  Object.keys(m).forEach(function(k){
+    if(__resBase[k]===m[k].fp) return;
+    n++;
+    if(fbReady()&&userInfo.uid&&typeof window.FB_FN.setDoc==='function') resWrite(m[k].p); else resEnqueue(m[k].p);
+  });
+  if(n) console.log('☁️ 변경된 예약 '+n+'건 서버 반영');
+}
+/* 대기열 처리 — 로그인 직후 호출. 서버 문서가 더 진행된 상태면 건드리지 않는다 */
+function flushPendingReservations(){
+  if(resSecureMode()){ resQueueSave({}); return Promise.resolve(); }
+  if(!fbReady()||!userInfo.uid) return Promise.resolve();
+  var q=resQueueLoad(), keys=Object.keys(q); if(!keys.length) return Promise.resolve();
+  var fn=window.FB_FN, db=window.FB_DB, myUid=userInfo.uid;
+  return Promise.all(keys.map(function(k){
+    var item=q[k];
+    if(!item||!item.p||!item.p.bookNo){ resDequeue(k); return null; }
+    if(Date.now()-(item.ts||0)>7*86400000){ resDequeue(k); return null; }   /* 7일 지난 대기건은 폐기 */
+    return fn.getDoc(fn.doc(db,FS_RES_COL,k)).then(function(s){
+      if(userInfo.uid!==myUid) return null;
+      var d=(s&&typeof s.exists==='function'&&s.exists())?s.data():null;
+      if(d){
+        if(d.userId && d.userId!==myUid){ resDequeue(k); return null; }                                              /* 남의 예약 */
+        if(d.clientUpdatedAt && item.ts && Date.parse(d.clientUpdatedAt)>=item.ts){ resDequeue(k); return null; }    /* 이미 반영됨 */
+        if((d.returned&&!item.p.returned)||(d.cancelled&&!item.p.cancelled)){ resDequeue(k); return null; }          /* 서버가 더 진행됨 */
+      }
+      return resWrite(item.p);
+    }).catch(function(){ return (userInfo.uid===myUid)?resWrite(item.p):null; });
+  })).then(function(){ console.log('☁️ 예약 대기열 처리 완료 ('+keys.length+'건)'); });
+}
+/* 호환용 이름 — 이제 '대기열 + 달라진 것'만 */
+function syncAllReservationsToFirestore(){ flushPendingReservations(); syncDirtyReservations(); }
+window.syncDirtyReservations=syncDirtyReservations; window.flushPendingReservations=flushPendingReservations;
 
 function startReservationsListener(){
   if(!fbReady()||!userInfo.uid) return;
   var fn=window.FB_FN, db=window.FB_DB;
   if(typeof fn.onSnapshot!=='function'||typeof fn.query!=='function'||typeof fn.where!=='function') return;
   if(fsResUnsub) try{fsResUnsub();}catch(e){}
+  var listenUid=userInfo.uid;
   try{
-    var q=fn.query(fn.collection(db,FS_RES_COL),fn.where('userId','==',userInfo.uid));
+    var q=fn.query(fn.collection(db,FS_RES_COL),fn.where('userId','==',listenUid));
     fsResUnsub=fn.onSnapshot(q,function(snap){
       window._caroResLoaded=true;   /* 예약 데이터 최초 응답 도착 — 홈 스켈레톤 해제 신호 */
-      if(Date.now()-fsResLastWrite<1500) return;
-      var act=[],can=[];
+      if(userInfo.uid!==listenUid) return;   /* 계정이 바뀐 뒤 늦게 온 스냅샷 무시 */
+      var act=[],can=[],seen={};
       snap.forEach(function(doc){
-        var d=doc.data();
+        var d=doc.data()||{};
         var res={
-          bookNo:d.bookNo, car:d.car, ins:d.ins,
-          start:d.start?new Date(d.start):null, end:d.end?new Date(d.end):null,
+          bookNo:d.bookNo||doc.id, car:d.car, ins:d.ins,
+          start:resFromServerDate(d.start), end:resFromServerDate(d.end),
           hrs:d.hrs||0, total:d.total||0,
-          returned:!!d.returned, returnedAt:d.returnedAt?new Date(d.returnedAt):null,
+          returned:!!d.returned, returnedAt:resFromServerDate(d.returnedAt),
           extendedMins:d.extendedMins||0, extensionHistory:d.extensionHistory||[],
           refundPct:d.refundPct||0, refundAmt:d.refundAmt||0,
-          cancelledAt:d.cancelledAt?new Date(d.cancelledAt):null,
+          cancelledAt:resFromServerDate(d.cancelledAt),
           status:d.cancelled?'cancelled':'active'
         };
+        seen[res.bookNo]=true;
         if(res.car&&!res.car.img){
           var o=(CARS_DATA||[]).find(function(c){return c.id===res.car.id;})||(BL_CARS||[]).find(function(c){return c.id===res.car.id;});
           if(o&&o.img) res.car.img=o.img;
         }
         if(d.cancelled)can.push(res); else act.push(res);
       });
+      /* 아직 서버에 못 올린 대기열 예약(방금 결제 등)은 화면에서 사라지지 않게 덧붙인다 */
+      try{
+        var pq=resQueueLoad();
+        Object.keys(pq).forEach(function(k){
+          if(seen[k]||!pq[k]||!pq[k].p) return;
+          var p=pq[k].p;
+          var r={ bookNo:p.bookNo, car:p.car, ins:p.ins, start:resFromServerDate(p.start), end:resFromServerDate(p.end),
+            hrs:p.hrs||0, total:p.total||0, returned:!!p.returned, returnedAt:resFromServerDate(p.returnedAt),
+            extendedMins:p.extendedMins||0, extensionHistory:p.extensionHistory||[], refundPct:p.refundPct||0, refundAmt:p.refundAmt||0,
+            cancelledAt:resFromServerDate(p.cancelledAt), status:p.cancelled?'cancelled':'active', _pending:true };
+          if(p.cancelled) can.push(r); else act.push(r);
+        });
+      }catch(e){}
       act.sort(function(a,b){return (b.start?b.start.getTime():0)-(a.start?a.start.getTime():0);});
       can.sort(function(a,b){return (b.cancelledAt?b.cancelledAt.getTime():0)-(a.cancelledAt?a.cancelledAt.getTime():0);});
       myReservations=act; cancelledHistory=can;
+      window.__caroResFromServer=listenUid;
+      try{ window.__caroResBaseline('server'); }catch(e){}
+      try{ if(typeof _origSaveUserData==='function') _origSaveUserData(); }catch(e){}   /* 로컬 캐시 = 서버 상태 */
       if(typeof renderMyReservations==='function')renderMyReservations();
       if(typeof renderUsageHistory==='function')renderUsageHistory();
       if(typeof renderCars==='function')renderCars();
       if(typeof updateMapMarkers==='function')updateMapMarkers();
       console.log('🔄 예약 동기화:',act.length,'활성 +',can.length,'취소');
-    },function(err){console.error('예약 리스너 오류:',err);});
+    },function(err){
+      console.error('예약 리스너 오류:',err&&err.code||err);
+      /* 일시 오류면 5초 뒤 재시도 (권한 오류는 규칙 문제이므로 재시도 안 함) */
+      if(!(err&&err.code==='permission-denied')) setTimeout(function(){ if(userInfo.uid===listenUid) startReservationsListener(); },5000);
+    });
   }catch(e){console.error('예약 리스너 실패:',e);}
 }
 window.startReservationsListener=startReservationsListener;
@@ -6001,39 +6212,65 @@ window.startReservationsListener=startReservationsListener;
 var _origSaveUserData=saveUserData;
 saveUserData=function(){
   if(typeof _origSaveUserData==='function')_origSaveUserData();
-  if(fbReady()&&userInfo.uid)syncAllReservationsToFirestore();
+  syncDirtyReservations();   /* ★ [v101] 전체가 아니라 '달라진 예약'만 서버로 */
 };
 window.saveUserData=saveUserData;
 
-/* 4. 앱 시작 시 자동 시작 */
+/* 4. 앱 시작 시 자동 시작 — ★ [v101] 폴링 시간 제한 제거 (caroOnAuth) */
+var __carsRetryN=0;
+function carsListenerRetry(){ if(__carsRetryN++>5) return; setTimeout(function(){ try{ startCarsListener(); }catch(e){} }, 3000*__carsRetryN); }
+window.carsListenerRetry=carsListenerRetry;
+var __caroBootT=Date.now();
 document.addEventListener('DOMContentLoaded',function(){
+  /* 차량 목록: Firebase 준비 즉시 (공개 읽기) */
   var t1=0;
   var c1=setInterval(function(){
     t1++;
     if(fbReady()){clearInterval(c1);console.log('🌐 Firestore 차량 리스너 시작');startCarsListener();}
-    if(t1>20)clearInterval(c1);
+    if(t1>240)clearInterval(c1);
   },500);
-  var t2=0;
-  var c2=setInterval(function(){
-    t2++;
-    if(fbReady()&&window.FB_FN&&typeof window.FB_FN.onAuthStateChanged==='function'){
-      clearInterval(c2);
-      window.FB_FN.onAuthStateChanged(window.FB_AUTH,function(user){
-        if(user){
-          if(!userInfo.uid)userInfo.uid=user.uid;
-          setTimeout(function(){
-            console.log('🔐 인증됨 — 예약 동기화 시작');
-            syncAllReservationsToFirestore();
-            setTimeout(startReservationsListener,800);
-          },1000);
-        }else{
-          if(fsResUnsub)try{fsResUnsub();fsResUnsub=null;}catch(e){}
-          console.log('🔓 로그아웃 — 예약 리스너 종료');
+  /* 로그인 상태: caroOnAuth — Firebase 가 상태를 확정하면(그리고 바뀔 때마다) 호출. 시간 제한 없음 */
+  var firstAuth=true;
+  function onAuth(user){
+    var wasFirst=firstAuth; firstAuth=false;
+    if(user){
+      if(userInfo.uid!==user.uid){ window.__caroResFromServer=null; }
+      /* 이 기기에서 직전에 '다른' 계정이 로그인돼 있었다면 그 계정의 로컬 데이터를 먼저 비운다 (계정 간 섞임 방지) */
+      var lastUid=null; try{ lastUid=localStorage.getItem('caro_last_uid'); }catch(e){}
+      if(lastUid && lastUid!==user.uid){ console.log('👤 다른 계정 로그인 감지 → 이전 계정 로컬 데이터 정리'); caroClearUserLocal(null); myReservations=[]; cancelledHistory=[]; savedCards=[]; }
+      try{ localStorage.setItem('caro_last_uid', user.uid); }catch(e){}
+      userInfo.uid=user.uid;
+      console.log('🔐 인증됨 — 예약 동기화 시작');
+      try{ loadUserProfile(user.uid); }catch(e){}                 /* 이름·전화·면허 최신화 (재시작 후에도) */
+      try{ startReservationsListener(); }catch(e){}
+      try{ flushPendingReservations(); }catch(e){}                 /* 로그인 전에 쌓인 예약(결제 직후 등) 올리기 */
+    }else{
+      if(fsResUnsub)try{fsResUnsub();fsResUnsub=null;}catch(e){}
+      window.__caroResFromServer=null;
+      console.log('🔓 로그아웃 — 예약 리스너 종료');
+      /* 저장된 '자동 로그인' 표시는 있는데 Firebase 세션이 없으면(세션 만료·계정 삭제 등)
+         화면만 로그인된 척하며 아무것도 저장되지 않는 상태가 된다 → 로그인 화면으로 */
+      if(wasFirst && !window.__caroLoggingOut){
+        var flag=null; try{ flag=localStorage.getItem('caro_auto_login'); }catch(e){}
+        if(flag==='1'){
+          console.warn('⚠️ 자동로그인 표시는 있으나 Firebase 세션 없음 → 다시 로그인 필요');
+          /* 부팅 타이머(4.5초, 스플래시→자동로그인 판정)가 끝난 뒤에 처리해야 화면 전환이 꼬이지 않는다 */
+          var _w=0, _wiv=setInterval(function(){
+            _w++;
+            if(!window.__caroBootTimerDone && _w<60) return;
+            clearInterval(_wiv);
+            setTimeout(function(){
+              try{ if(window.FB_AUTH&&window.FB_AUTH.currentUser) return; }catch(e){}   /* 그 사이 로그인됐으면 취소 */
+              try{ handleLogout(); }catch(e){}
+              try{ showToast('로그인이 만료되었어요. 다시 로그인해 주세요.'); }catch(e){}
+            }, 350);
+          }, 250);
         }
-      });
+      }
     }
-    if(t2>20)clearInterval(c2);
-  },500);
+  }
+  if(window.caroOnAuth) window.caroOnAuth(onAuth);
+  else { var t3=0; var c3=setInterval(function(){ t3++; if(window.caroOnAuth){ clearInterval(c3); window.caroOnAuth(onAuth); } if(t3>240) clearInterval(c3); },250); }
 });
 
 window.devUploadAllCars=function(){
@@ -7673,7 +7910,11 @@ window.devUploadAllCars=function(){
   }
 
   var csAccFiles = [];
+  /* ★ [v101] 첨부 배열을 window 와 동기화 — 실제 접수 함수(customer-redesign.js 의 csSubmitAccident 오버라이드)가
+     window.csAccFiles 를 읽는데, 예전엔 이 배열이 파일 안에만 있어서 사진이 항상 0장으로 접수됐다. */
+  function csSyncAcc(){ if (window.csAccFiles && window.csAccFiles !== csAccFiles) csAccFiles = window.csAccFiles; window.csAccFiles = csAccFiles; }
   function csHandleAccFiles(e) {
+    csSyncAcc();
     var files = Array.from(e.target.files);
     files.forEach(function(f){
       if (csAccFiles.length >= 10) return;
@@ -7687,6 +7928,7 @@ window.devUploadAllCars=function(){
     e.target.value = '';
   }
   function csRenderAccFileList() {
+    csSyncAcc();
     var list = document.getElementById('cs-acc-file-list');
     if (!list) return;
     list.innerHTML = '';
@@ -7698,6 +7940,7 @@ window.devUploadAllCars=function(){
     });
   }
   function csRemoveAccFile(i) {
+    csSyncAcc();
     csAccFiles.splice(i, 1);
     csRenderAccFileList();
   }
@@ -7822,7 +8065,9 @@ window.devUploadAllCars=function(){
   }
 
   var csInqFiles = [];
+  function csSyncInq(){ if (window.csInqFiles && window.csInqFiles !== csInqFiles) csInqFiles = window.csInqFiles; window.csInqFiles = csInqFiles; }   /* ★ [v101] */
   function csHandleInqFiles(e) {
+    csSyncInq();
     var files = Array.from(e.target.files);
     files.forEach(function(f){
       if (csInqFiles.length >= 5) return;
@@ -7836,6 +8081,7 @@ window.devUploadAllCars=function(){
     e.target.value = '';
   }
   function csRenderInqFileList() {
+    csSyncInq();
     var list = document.getElementById('cs-inq-file-list');
     if (!list) return;
     list.innerHTML = '';
@@ -7847,6 +8093,7 @@ window.devUploadAllCars=function(){
     });
   }
   function csRemoveInqFile(i) {
+    csSyncInq();
     csInqFiles.splice(i, 1);
     csRenderInqFileList();
   }
@@ -8171,6 +8418,9 @@ window.devUploadAllCars=function(){
   window.csConfirmExitChat     = csConfirmExitChat;
   window.csAttachChatFile      = csAttachChatFile;
   window.csCloseSuccess        = csCloseSuccess;
+  window.csRenderAccFileList   = csRenderAccFileList;   /* ★ [v101] 접수 후 첨부 목록 초기화용 */
+  window.csRenderInqFileList   = csRenderInqFileList;
+  csSyncAcc(); csSyncInq();
 
 }());
 /* ═══════════════════════════════════════════════════════════════
@@ -9972,8 +10222,15 @@ window.devUploadAllCars=function(){
       if(!exists) return null;
 
       const data = typeof docSnap.data === 'function' ? docSnap.data() : docSnap.data;
-      if(Array.isArray(data.cards)){
+      /* ★ [v101] cards 가 비어 있어도(옛 로그아웃 버그로 []가 써진 경우) savedCards 에 남아 있으면 그것으로 복원 */
+      let srvCards = null;
+      if(Array.isArray(data.cards) && data.cards.length) srvCards = data.cards;
+      else if(Array.isArray(data.savedCards) && data.savedCards.length) srvCards = data.savedCards;
+      else if(Array.isArray(data.cards)) srvCards = data.cards;
+      if(Array.isArray(srvCards)){
+        data.cards = srvCards;
         localStorage.setItem('caro_apd_cards', JSON.stringify(data.cards));
+        try{ if(Array.isArray(window.savedCards)) window.savedCards = data.cards.slice(); }catch(e){}
         console.log('[CARO] ✅ 카드 Firestore 불러오기:', data.cards.length, '개');
 
         // UI 갱신
@@ -9993,6 +10250,9 @@ window.devUploadAllCars=function(){
     const db = getDb();
     const uid = getCurrentUid();
     if(!db || !uid) return false;
+    /* ★ [v101] 표준형만 저장 (번호 없는 객체는 저장하지 않음) */
+    licenseData = window.caroNormLicense ? caroNormLicense(licenseData, {name: window.userInfo && userInfo.name, birth: window.userInfo && userInfo.birth}) : licenseData;
+    if(!licenseData || !licenseData.number) return false;
 
     try{
       if(window.FB_FN && window.FB_FN.setDoc && window.FB_FN.doc){
@@ -10000,6 +10260,7 @@ window.devUploadAllCars=function(){
           window.FB_FN.doc(db, 'users', uid),
           {
             license: licenseData,
+            licenseText: licenseData.number,
             licenseRegisteredAt: new Date().toISOString()
           },
           { merge: true }
@@ -10007,13 +10268,13 @@ window.devUploadAllCars=function(){
       } else {
         await db.collection('users').doc(uid).set({
           license: licenseData,
+          licenseText: licenseData.number,
           licenseRegisteredAt: new Date().toISOString()
         }, { merge: true });
       }
 
-      // 로컬에도 저장
-      localStorage.setItem('caro_license', JSON.stringify(licenseData));
-      localStorage.setItem('caro_license_registered', 'true');
+      // 로컬에도 저장 (표준형)
+      if(window.caroApplyLicenseLocal) caroApplyLicenseLocal(licenseData);
       console.log('[CARO] ✅ 면허증 정보 저장 완료');
       return true;
     }catch(e){
@@ -10040,11 +10301,12 @@ window.devUploadAllCars=function(){
       if(!exists) return null;
 
       const data = typeof docSnap.data === 'function' ? docSnap.data() : docSnap.data;
-      if(data.license){
-        localStorage.setItem('caro_license', JSON.stringify(data.license));
-        localStorage.setItem('caro_license_registered', 'true');
+      /* ★ [v101] 서버값을 표준형으로만 로컬 반영 (문자열/빈 객체/마스킹 값이 그대로 저장되던 문제) */
+      const lic = (window.caroNormLicense && (caroNormLicense(data.license,{name:data.name,birth:data.birth}) || caroNormLicense(data.licenseText,{name:data.name,birth:data.birth}))) || null;
+      if(window.caroApplyLicenseLocal) caroApplyLicenseLocal(lic);
+      if(lic){
         console.log('[CARO] ✅ 면허증 정보 불러오기 완료');
-        return data.license;
+        return lic;
       }
     }catch(e){
       console.error('[CARO] ❌ 면허증 불러오기 실패:', e.message);
@@ -10052,10 +10314,17 @@ window.devUploadAllCars=function(){
     return null;
   }
 
-  /* ─── 5. 카드 변경 감지 → Firestore 자동 동기화 ─── */
+  /* ─── 5. 카드 변경 감지 → Firestore 자동 동기화 ───
+     ★ [v101] ① 로그인 직후 서버 카드를 먼저 내려받은 뒤(cardsSynced) 그 이후의 '이 기기 변경'만 올린다.
+                (예전엔 앱을 켤 때마다 이 폰의 옛 카드 목록을 서버에 덮어써 다른 기기에서 지운 카드가 되살아났다)
+              ② 로그아웃 중이거나 로그인 표시가 없으면 절대 쓰지 않는다 (로그아웃 시 '카드 0개'가 서버에 써지던 문제) */
   let lastCardsJson = '';
+  let cardsSynced = false;
   setInterval(() => {
     try{
+      if(!cardsSynced || window.__caroLoggingOut) return;
+      if(localStorage.getItem('caro_auto_login') !== '1') return;
+      if(!getCurrentUid()) return;
       const current = localStorage.getItem('caro_apd_cards') || '[]';
       if(current !== lastCardsJson && current !== '[]'){
         lastCardsJson = current;
@@ -10069,56 +10338,32 @@ window.devUploadAllCars=function(){
     }catch(e){}
   }, 2000);
 
-  /* ─── 6. 로그인 시 자동 데이터 불러오기 ─── */
+  /* ─── 6. 로그인 시 자동 데이터 불러오기 ───
+     ★ [v101] caroOnAuth 사용 — 예전엔 이 코드가 Firebase 로드 '전'에 실행돼 리스너가 아예 등록되지 않았고,
+              1.5초 뒤 한 번만 시도해서 그 안에 로그인 복원이 안 되면 카드·면허가 복원되지 않았다. */
   function setupAuthListener(){
-    const auth = getAuth();
-    if(!auth) return;
-
-    auth.onAuthStateChanged(async (user) => {
+    const sub = () => window.caroOnAuth(async (user) => {
       if(user){
         console.log('[CARO] 사용자 로그인 감지 - 데이터 불러오기 시작');
-        // 카드 불러오기
-        await loadCardsFromFirestore();
-        // 면허증 불러오기
-        await loadLicenseFromFirestore();
+        cardsSynced = false;
+        try{ await loadCardsFromFirestore(); }catch(e){}
+        try{ await loadLicenseFromFirestore(); }catch(e){}
+        try{ lastCardsJson = localStorage.getItem('caro_apd_cards') || '[]'; }catch(e){ lastCardsJson=''; }
+        cardsSynced = true;
       } else {
         console.log('[CARO] 로그아웃 감지');
         lastCardsJson = ''; // 동기화 리셋
+        cardsSynced = false;
       }
     });
+    if(window.caroOnAuth) sub();
+    else { let n=0; const iv=setInterval(() => { n++; if(window.caroOnAuth){ clearInterval(iv); sub(); } if(n>240) clearInterval(iv); }, 250); }
   }
 
-  /* ─── 7. handleSignup 후킹 - 면허증 자동 저장 ─── */
-  function setupSignupHook(){
-    if(typeof window.handleSignup === 'function'){
-      const origSignup = window.handleSignup;
-      window.handleSignup = async function(){
-        const result = origSignup.apply(this, arguments);
-
-        // 회원가입 폼에서 면허증 정보 수집
-        setTimeout(async () => {
-          try{
-            const licenseData = {
-              number: document.getElementById('su-license-num')?.value ||
-                     document.getElementById('license-num')?.value || '',
-              name: document.getElementById('su-name')?.value || '',
-              birth: document.getElementById('su-birth')?.value || '',
-              expiry: document.getElementById('su-license-exp')?.value || '',
-              type: document.getElementById('su-license-type')?.value || '2종 보통'
-            };
-
-            if(licenseData.number || licenseData.name){
-              await saveLicenseToFirestore(licenseData);
-            }
-          }catch(e){
-            console.error('[CARO] 면허증 저장 중 오류:', e);
-          }
-        }, 1000);
-
-        return result;
-      };
-    }
-  }
+  /* ─── 7. handleSignup 후킹 — ★ [v101] 제거.
+     가입 폼에는 su-license-num 이 없어(su-license 뿐) 이 후킹이 항상 {number:''} 빈 면허 객체를 서버에 덮어쓰고
+     '등록 완료' 표시만 켜던 원인이었다. 면허는 이제 handleSignup 이 users.license 표준형으로 직접 저장한다. */
+  function setupSignupHook(){ /* no-op */ }
 
   /* ─── 8. 면허증 이미 등록됨 확인 함수 (전역) ─── */
   window.caroIsLicenseRegistered = function(){
@@ -10136,14 +10381,6 @@ window.devUploadAllCars=function(){
   /* ─── 9. 초기 실행 ─── */
   setupAuthListener();
   setupSignupHook();
-
-  // 즉시 시도 (이미 로그인된 상태인 경우)
-  setTimeout(async () => {
-    if(getCurrentUid()){
-      await loadCardsFromFirestore();
-      await loadLicenseFromFirestore();
-    }
-  }, 1500);
 
   console.log('[CARO] 카드 + 면허증 영구 저장 패치 v1 적용');
 })();
@@ -11075,16 +11312,10 @@ window.devUploadAllCars=function(){
       window._caroProfileLoaded=true;   /* ★ 서버 조회 완료(데이터 유무 무관) → 홈 '이용 준비' 카드 판단 시작 허용 */
       if(!d) return;
       try{
-        /* 면허 복원 → userInfo.license (있으면 덮지 않음: 로컬 최신 우선) */
-        var lic = d.licenseText
-               || (typeof d.license==='string' && d.license.indexOf('*')===-1 ? d.license : '')
-               || (d.license && typeof d.license==='object' && d.license.number ? d.license.number : '')
-               || (typeof d.license==='string' ? d.license : '');
-        if(lic && window.userInfo && !String(window.userInfo.license||'').trim()){
-          window.userInfo.license=lic;
-          try{ localStorage.setItem('caro_license', JSON.stringify(lic)); localStorage.setItem('caro_license_registered','true'); }catch(e){}
-          var mpLic=document.getElementById('mp-license'); if(mpLic) mpLic.textContent=lic;
-        }
+        /* ★ [v101] 면허 복원 — 서버값(표준형)이 진실. userInfo.license(번호)+caro_license(객체)를 함께 갱신 */
+        var licObj = (window.caroNormLicense && (caroNormLicense(d.license,{name:d.name,birth:d.birth}) || caroNormLicense(d.licenseText,{name:d.name,birth:d.birth}))) || null;
+        var lic = licObj ? licObj.number : '';
+        if(window.caroApplyLicenseLocal) caroApplyLicenseLocal(licObj);
         /* 카드 복원 → savedCards + caro_apd_cards (로컬이 비어있을 때만) */
         var cards = (Array.isArray(d.savedCards)&&d.savedCards.length)?d.savedCards
                   : (Array.isArray(d.cards)&&d.cards.length)?d.cards : null;
@@ -11100,11 +11331,16 @@ window.devUploadAllCars=function(){
     });
   }
 
-  /* uid 준비되면 복원(자동로그인/수동로그인 모두 대응) + 백업 */
-  var _rt=0, _riv=setInterval(function(){ _rt++; if(uid()){ restore(); if(_restored){ clearInterval(_riv); } } if(_rt>60) clearInterval(_riv); }, 800);
-  try{ if(window.FB_AUTH && typeof window.FB_AUTH.onAuthStateChanged==='function'){
-    window.FB_AUTH.onAuthStateChanged(function(u){ if(u){ _restored=false; setTimeout(restore,800); } });
-  } }catch(e){}
+  /* ★ [v101] 로그인 확정 때마다 복원 — caroOnAuth (시간 제한 없음).
+     예전엔 48초(60×0.8초) 안에 로그인이 안 되면 영영 복원되지 않았고, 아래 onAuthStateChanged 는
+     이 시점에 FB_AUTH 가 없어서 등록조차 되지 않았다. */
+  var _restoredUid='';
+  function onAuthRestore(u){
+    if(u){ if(_restoredUid!==u.uid){ _restored=false; _restoredUid=u.uid; } if(!window.userInfo.uid) window.userInfo.uid=u.uid; restore(); }
+    else { _restored=false; _restoredUid=''; }
+  }
+  if(window.caroOnAuth) window.caroOnAuth(onAuthRestore);
+  else { var _rt=0, _riv=setInterval(function(){ _rt++; if(window.caroOnAuth){ clearInterval(_riv); window.caroOnAuth(onAuthRestore); } if(_rt>240) clearInterval(_riv); }, 250); }
 
   console.log('[CARO] 카드·면허 영구저장 보강 v2 로드');
 })();

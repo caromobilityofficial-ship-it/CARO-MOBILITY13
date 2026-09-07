@@ -11,16 +11,24 @@
 (function(){
 'use strict';
 
-/* ═══ 1. localStorage ↔ Firestore 미러 ═══ */
-var MIRROR_RE=/^caro_(pay_data|pay_uid|apd_|license|license_registered|data_|plan_v1|bl_cars_v1|extra_driver)/;
+/* ═══ 1. localStorage ↔ Firestore 미러 ═══
+   ★ [v101] 범위 축소 + 삭제 반영 + 로그아웃 보호
+   ─ 예전엔 예약 캐시(caro_data_*)·결제 임시값(caro_pay_*)·차량 캐시까지 미러해서, 재설치 후 옛 예약 캐시가
+     서버에서 되살아나 다음 실행 때 서버 예약을 덮어쓰는 고리를 만들었다. 이제 '기기에만 있는 계정 설정'만 미러한다.
+   ─ 카드(caro_apd_cards)는 카드 모듈이 users.cards 로 따로 동기화하므로 미러에서 제외 (두 경로가 서로 되살리던 문제).
+   ─ 미납(caro_apd_unpaid)은 서버 unpaid_debts 가 진실이므로 제외.
+   ─ removeItem(삭제)도 기록해(tombstone) 다른 기기·재설치에서 지운 항목이 되살아나지 않게 한다.
+   ─ 로그아웃 중(__caroLoggingOut / __caroSilentStorage)에는 기록·전송하지 않는다. */
+var MIRROR_RE=/^caro_(apd_credit|apd_credit_history|apd_coupons|apd_sns|apd_plan|apd_notif|apd_phone|apd_phone_full|license|license_registered|plan_v1|extra_driver)$/;
 var SKIP_RE=/(pw|ai_key|auto_login|saved_id|auto_id|auto_name|android_banner)/;
 var TS_KEY='caro_mirror_ts';
-var pushTimer=null, pulling=false;
+var pushTimer=null, pulling=false, blocked=false;
 
 function uid(){ try{ return (window.FB_AUTH&&window.FB_AUTH.currentUser)?window.FB_AUTH.currentUser.uid:null; }catch(e){ return null; } }
 function fbOK(){ return !!(window.FB_DB&&window.FB_FN&&window.FB_FN.setDoc&&window.FB_FN.doc&&window.FB_FN.getDoc); }
 function tsMap(){ try{ return JSON.parse(localStorage.getItem(TS_KEY)||'{}'); }catch(e){ return {}; } }
 function setTs(k,t){ try{ var m=tsMap(); m[k]=t; localStorage.setItem(TS_KEY,JSON.stringify(m)); }catch(e){} }
+function silent(){ return !!(window.__caroSilentStorage||window.__caroLoggingOut); }
 
 function collect(){
   var out={}, m=tsMap();
@@ -32,22 +40,29 @@ function collect(){
       if(v==null||v.length>180000) continue;   /* Firestore 문서 1MB 제한 보호 */
       out[k]={v:v,t:m[k]||Date.now()};
     }
+    /* 삭제 표시(tombstone): 타임스탬프는 있는데 값이 없는 키 */
+    Object.keys(m).forEach(function(k){
+      if(!MIRROR_RE.test(k)||SKIP_RE.test(k)||out[k]) return;
+      var has=null; try{ has=localStorage.getItem(k); }catch(e){}
+      if(has==null) out[k]={v:null,t:m[k]};
+    });
   }catch(e){}
   return out;
 }
 
 function push(){
-  var u=uid(); if(!u||!fbOK()||pulling) return;
+  var u=uid(); if(!u||!fbOK()||pulling||blocked||silent()) return;
   var fn=window.FB_FN, db=window.FB_DB;
   var data=collect();
   if(!Object.keys(data).length) return;
   fn.setDoc(fn.doc(db,'users',u),{ caroMirror:data, caroMirrorAt:Date.now() },{merge:true})
-    .then(function(){ console.log('☁️ 내 데이터 서버 백업 완료 ('+Object.keys(data).length+'개)'); })
+    .then(function(){ console.log('☁️ 내 설정 서버 백업 완료 ('+Object.keys(data).length+'개)'); })
     .catch(function(e){ console.warn('☁️ 서버 백업 실패:',e&&e.code); });
 }
-function schedulePush(){ if(pushTimer)clearTimeout(pushTimer); pushTimer=setTimeout(push,1500); }
+function schedulePush(){ if(silent()) return; if(pushTimer)clearTimeout(pushTimer); pushTimer=setTimeout(push,1500); }
 
 window.caroSyncPush=push;
+window.caroSyncCancel=function(){ if(pushTimer){ clearTimeout(pushTimer); pushTimer=null; } blocked=true; };   /* 로그아웃 직전 호출 */
 window.caroSyncPull=function(u){
   if(!u||!fbOK()) return Promise.resolve(false);
   var fn=window.FB_FN, db=window.FB_DB;
@@ -57,51 +72,65 @@ window.caroSyncPull=function(u){
     if(!snap||typeof snap.data!=='function') return false;
     var d=snap.data(); if(!d||!d.caroMirror) return false;
     var mir=d.caroMirror, m=tsMap(), applied=0;
-    Object.keys(mir).forEach(function(k){
-      if(!MIRROR_RE.test(k)||SKIP_RE.test(k)) return;
-      var srv=mir[k]; if(!srv||typeof srv.v!=='string') return;
-      var localT=m[k]||0;
-      var has=null;
-      try{ has=localStorage.getItem(k); }catch(e){}
-      if(has==null || (srv.t||0)>localT){
-        try{ localStorage.setItem(k,srv.v); setTs(k,srv.t||Date.now()); applied++; }catch(e){}
-      }
-    });
+    window.__caroSilentStorage=true;   /* 복원 중 setItem/removeItem 은 다시 서버로 올리지 않음 */
+    try{
+      Object.keys(mir).forEach(function(k){
+        if(!MIRROR_RE.test(k)||SKIP_RE.test(k)) return;
+        var srv=mir[k]; if(!srv||typeof srv!=='object') return;
+        var localT=m[k]||0;
+        var has=null;
+        try{ has=localStorage.getItem(k); }catch(e){}
+        if(srv.v===null){                                   /* 서버의 삭제 표시 */
+          if(has!=null && (srv.t||0)>localT){ try{ localStorage.removeItem(k); setTs(k,srv.t||Date.now()); applied++; }catch(e){} }
+          return;
+        }
+        if(typeof srv.v!=='string') return;
+        if(has==null || (srv.t||0)>localT){
+          try{ localStorage.setItem(k,srv.v); setTs(k,srv.t||Date.now()); applied++; }catch(e){}
+        }
+      });
+    }finally{ window.__caroSilentStorage=false; }
     if(applied>0){
-      console.log('☁️ 서버에서 내 데이터 복원: '+applied+'개');
-      ['renderMyReservations','renderUsageHistory','renderCars','updateMapMarkers'].forEach(function(f){
+      console.log('☁️ 서버에서 내 설정 복원: '+applied+'개');
+      ['renderMyReservations','renderUsageHistory','renderCars','updateMapMarkers','renderPaymentInfoScreen','renderPICardList'].forEach(function(f){
         try{ if(typeof window[f]==='function') window[f](); }catch(e){}
       });
+      try{ if(window.__caroRR) window.__caroRR(); }catch(e){}
       try{ document.dispatchEvent(new CustomEvent('caro-sync-applied')); }catch(e){}
     }
     return applied>0;
   }).catch(function(e){ pulling=false; console.warn('☁️ 서버 복원 실패:',e&&e.code); return false; });
 };
 
-/* localStorage 쓰기를 감지해 자동으로 서버 백업 예약 */
+/* localStorage 쓰기·삭제를 감지해 자동으로 서버 백업 예약 */
 try{
-  var _set=Storage.prototype.setItem;
+  var _set=Storage.prototype.setItem, _rm=Storage.prototype.removeItem;
   Storage.prototype.setItem=function(k,v){
     _set.apply(this,arguments);
     try{
-      if(this===window.localStorage && MIRROR_RE.test(k) && !SKIP_RE.test(k)){
+      if(this===window.localStorage && MIRROR_RE.test(k) && !SKIP_RE.test(k) && !silent()){
+        setTs(k,Date.now()); schedulePush();
+      }
+    }catch(e){}
+  };
+  Storage.prototype.removeItem=function(k){
+    _rm.apply(this,arguments);
+    try{
+      if(this===window.localStorage && MIRROR_RE.test(k) && !SKIP_RE.test(k) && !silent()){
         setTs(k,Date.now()); schedulePush();
       }
     }catch(e){}
   };
 }catch(e){}
 
-/* 로그인(세션 복원) 시 자동 복원 + 앱 숨김/종료 직전 마지막 백업 */
+/* 로그인(세션 복원) 시 자동 복원 + 앱 숨김/종료 직전 마지막 백업 — ★ [v101] caroOnAuth (시간 제한 없음) */
 (function(){
-  var t=setInterval(function(){
-    if(window.FB_AUTH&&window.FB_FN&&typeof window.FB_FN.onAuthStateChanged==='function'){
-      clearInterval(t);
-      window.FB_FN.onAuthStateChanged(window.FB_AUTH,function(u){
-        if(u) setTimeout(function(){ window.caroSyncPull(u.uid); },600);
-      });
-    }
-  },500);
-  setTimeout(function(){ clearInterval(t); },15000);
+  function onAuth(u){
+    if(u){ blocked=false; setTimeout(function(){ if(uid()===u.uid) window.caroSyncPull(u.uid); },300); }
+    else { blocked=true; if(pushTimer){ clearTimeout(pushTimer); pushTimer=null; } }
+  }
+  if(window.caroOnAuth) window.caroOnAuth(onAuth);
+  else { var t=setInterval(function(){ if(window.caroOnAuth){ clearInterval(t); window.caroOnAuth(onAuth); } },250); setTimeout(function(){ clearInterval(t); },60000); }
 })();
 document.addEventListener('visibilitychange',function(){ if(document.visibilityState==='hidden') push(); });
 window.addEventListener('beforeunload',push);

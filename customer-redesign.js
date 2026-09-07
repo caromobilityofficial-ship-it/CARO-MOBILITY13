@@ -441,7 +441,9 @@
 
     /* 로그인 시각 기록 / 로그아웃 시 로드 플래그 리셋 */
     if(window._caroLoggedIn){ if(!_loginT){ _loginT=Date.now(); window._caroLoginT=_loginT; } }
-    else { _loginT=0; window._caroLoginT=0; window._caroResLoaded=false; window._caroProfileLoaded=false; }
+    else { _loginT=0; window._caroLoginT=0;
+      /* ★ [v101] 서버 데이터는 화면 로그인 표시(1.6초)보다 먼저 도착할 수 있다 → Firebase 세션이 없을 때만 로드 플래그 리셋 */
+      if(!(window.caroAuthState&&window.caroAuthState.user)){ window._caroResLoaded=false; window._caroProfileLoaded=false; } }
     var act=getActive();
     var bk=getBooking();
     /* 로그인했는데 예약 데이터가 아직 로드 안 됨(파이어스토어 응답 전) → '예약 없음' 대신 스켈레톤 → 빈화면 방지.
@@ -4906,15 +4908,18 @@
   };
 
   /* ── 관리자 처리결과를 고객 앱에 반영 (FS → 로컬 동기화) ── */
+  var _debtUnsubs=[];
+  function stopDebtSync(){ _debtUnsubs.forEach(function(f){ try{ f(); }catch(e){} }); _debtUnsubs=[]; }
   function startDebtSync(){
     if(!fsReady()) return;
+    stopDebtSync();
     var fn=window.FB_FN, db=window.FB_DB, u=userIdentity();
     if(!u.uid||!fn.onSnapshot) return;
     /* 미납 동기화 (FS를 진실원본으로) */
     try{
       if(fn.query&&fn.where){
         var q=fn.query(fn.collection(db,'unpaid_debts'),fn.where('userId','==',u.uid),fn.where('status','==','unpaid'));
-        fn.onSnapshot(q,function(snap){
+        _debtUnsubs.push(fn.onSnapshot(q,function(snap){
           var list=[];
           snap.forEach(function(d){ var x=d.data()||{};
             list.push({ id:x.id||d.id, title:'차량 반납 정산 미결제 — '+(x.carName||'차량'),
@@ -4924,12 +4929,12 @@
           try{ localStorage.setItem(UNPAID_KEY, JSON.stringify(list)); }catch(e){}
           syncUnpaidBar();
           try{ if(window.renderCars) renderCars(); }catch(e){}
-        },function(){});
+        },function(){}));
       }
     }catch(e){}
     /* 정지 동기화 (관리자 해제 시 로컬도 해제) */
     try{
-      fn.onSnapshot(fn.doc(db,'suspensions',u.uid),function(ds){
+      _debtUnsubs.push(fn.onSnapshot(fn.doc(db,'suspensions',u.uid),function(ds){
         var s=(ds&&ds.exists)?ds.data():null;
         var activeHold = !!(s && s.active!==false && (s.requiresApproval===true || s.habitual===true));
         var activeTimed = !!(s && s.active!==false && (s.untilTs>Date.now()));
@@ -4940,12 +4945,17 @@
         }
         syncUnpaidBar();
         try{ if(window.renderCars) renderCars(); }catch(e){}
-      },function(){});
+      },function(){}));
     }catch(e){}
   }
-  (function waitAuth(){ var t=0; var iv=setInterval(function(){ t++;
-    if(fsReady() && window.FB_AUTH && FB_AUTH.currentUser){ clearInterval(iv); startDebtSync(); }
-    else if(t>60){ clearInterval(iv); } },500); })();
+  /* ★ [v101] 로그인 확정 때마다 (시간 제한 없이) 구독 — 예전엔 30초(60×0.5초) 안에 로그인 안 되면 미납·정지 동기화가 영영 안 됐다 */
+  var _debtUid='';
+  function onAuthDebt(u){
+    if(u && u.uid){ if(_debtUid===u.uid) return; _debtUid=u.uid; if(fsReady()) startDebtSync(); }
+    else { _debtUid=''; stopDebtSync(); }
+  }
+  if(window.caroOnAuth) window.caroOnAuth(onAuthDebt);
+  else { var _dt=0, _div=setInterval(function(){ _dt++; if(window.caroOnAuth){ clearInterval(_div); window.caroOnAuth(onAuthDebt); } if(_dt>240) clearInterval(_div); },250); }
 
   /* ── 이용 정지 ── */
   function readSusp(){ try{ return JSON.parse(localStorage.getItem(SUSP_KEY)||'null'); }catch(e){ return null; } }
@@ -5812,7 +5822,9 @@
     var u={uid:'',email:'',name:'',phone:''};
     try{
       if(window.FB_AUTH && FB_AUTH.currentUser) u.uid=FB_AUTH.currentUser.uid||'';
+      if(!u.uid && window.userInfo && userInfo.uid) u.uid=userInfo.uid;   /* ★ [v101] */
       if(window.userInfo){ u.email=userInfo.email||userInfo.id||''; u.name=userInfo.name||''; u.phone=userInfo.phone||''; }
+      if(!u.phone){ try{ var pf=localStorage.getItem('caro_apd_phone_full'); if(pf) u.phone=JSON.parse(pf); }catch(e){} }
     }catch(e){}
     return u;
   }
@@ -5892,7 +5904,9 @@
     packPhotos(files).then(function(photos){
       var rec = {
         id:no, type:'accident', status:'received',
-        userId:u.uid, userEmail:u.email, userName:u.name, userPhone:u.phone,
+        userId:u.uid, userEmail:u.email, userName:u.name,
+        userPhone: (d.phone||u.phone||''), phone: (d.phone||u.phone||''),   /* ★ [v101] 폼의 '연락받을 번호'가 저장되지 않던 문제 */
+        bookNo: (d.bookNo||d.reservation||''),
         occurredAt: d.datetime || '', location: d.location || '',
         vehicle: d.vehicle || '', accidentType: d.type || '',
         injury: d.injury || '', injuryDetail: d.injuryDetail || '',
@@ -5938,7 +5952,8 @@
     packPhotos(files).then(function(photos){
       var rec = {
         id:no, type:'inquiry', status:'received',
-        userId:u.uid, userEmail:u.email, userName:u.name, userPhone:u.phone,
+        userId:u.uid, userEmail:u.email, userName:u.name,
+        userPhone: (d.phone||u.phone||''), phone: (d.phone||u.phone||''),   /* ★ [v101] 폼의 '연락처'가 저장되지 않던 문제 */
         category: d.category || '', title: d.title || d.subject || '',
         content: d.content || d.message || d.description || '',
         photos: photos, photoCount: photos.length,

@@ -123,5 +123,26 @@ window.FB_FN = {
 const __fns = getFunctions(app, "asia-northeast3");
 window.FB_CALL = function (name, data) { return httpsCallable(__fns, name)(data || {}).then(function (r) { return r.data; }); };
 window.FB_READY = true;
+
+/* ★ [v101] 로그인 상태 공용 알림 — caroOnAuth(cb) (정의는 caro-config.js, 여기서 실제 상태를 흘려보냄)
+   관리자 페이지처럼 caro-config.js 가 없는 화면을 위해 같은 스텁을 한 번 더 둔다. */
+if (!window.caroOnAuth) {
+  (function () {
+    var subs = [], state = { resolved: false, user: null };
+    window.caroAuthState = state;
+    window.caroOnAuth = function (cb) {
+      if (typeof cb !== 'function') return;
+      subs.push(cb);
+      if (state.resolved) { try { cb(state.user); } catch (e) { console.warn('[caroOnAuth]', e); } }
+    };
+    window.__caroAuthEmit = function (user) {
+      state.resolved = true; state.user = user || null;
+      subs.slice().forEach(function (cb) { try { cb(state.user); } catch (e) { console.warn('[caroOnAuth]', e); } });
+    };
+  })();
+}
+onAuthStateChanged(auth, function (u) {
+  try { window.__caroAuthEmit(u || null); } catch (e) { console.warn('[caroOnAuth emit]', e); }
+});
 console.log('🔥 Firebase 초기화 완료 (caro-mobility-prod)' +
   (__isAdminPage ? ' — 관리자 세션(caroAdmin) 분리 적용' : ''));

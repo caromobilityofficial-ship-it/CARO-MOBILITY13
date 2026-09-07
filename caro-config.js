@@ -9,7 +9,7 @@
    이 파일 외에는 아무것도 바꾸지 않아도 된다.
    ═══════════════════════════════════════════════════════════════ */
 window.CARO_CONFIG = {
-  appVersion: "2026.09.06-v100",
+  appVersion: "2026.09.07-v101",
 
   /* ── 서버 모드 ── */
   SECURE_SERVER: false,
@@ -35,3 +35,27 @@ window.CARO_CONFIG = {
   CONTROL_BEFORE_START_MIN: 10,
   CONTROL_AFTER_END_MIN: 30
 };
+
+/* ═══════════════════════════════════════════════════════════════
+   [v101] 로그인 상태 공용 알림 — window.caroOnAuth(cb)
+   ───────────────────────────────────────────────────────────────
+   문제: script.js 등은 Firebase(모듈, 나중에 로드)보다 먼저 실행되어
+         "FB_AUTH 가 생길 때까지 0.5초마다 N번 확인" 하는 폴링을 파일마다 따로 두었고,
+         제한 시간(30~48초) 안에 로그인이 안 되면 카드·면허·미납 복원이 영영 안 됐다.
+   해결: 어떤 파일에서든 caroOnAuth(cb) 를 부르면, Firebase 가 로그인 상태를 확정한
+         뒤(그리고 바뀔 때마다) cb(user|null) 가 호출된다. 시간 제한 없음.
+         (firebase-config.js 가 __caroAuthEmit 으로 실제 상태를 흘려보낸다) */
+(function(){
+  if (window.caroOnAuth) return;
+  var subs = [], state = { resolved: false, user: null };
+  window.caroAuthState = state;
+  window.caroOnAuth = function(cb){
+    if (typeof cb !== 'function') return;
+    subs.push(cb);
+    if (state.resolved) { try { cb(state.user); } catch (e) { console.warn('[caroOnAuth]', e); } }
+  };
+  window.__caroAuthEmit = function(user){
+    state.resolved = true; state.user = user || null;
+    subs.slice().forEach(function(cb){ try { cb(state.user); } catch (e) { console.warn('[caroOnAuth]', e); } });
+  };
+})();
