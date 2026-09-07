@@ -1584,9 +1584,9 @@ function handleSignup(){
           birth: birth || '',
           license: license ? {number:license, name:name, birth:birth||'', type:'', expiry:'', verified:false} : '',
           licenseText: license || '',
-          phoneVerified: !!window._caroPhoneVerified,
+          /* ★ [v101] phoneVerified·certCI 는 서버(verifyCertification 함수)만 기록 — 규칙이 클라이언트 쓰기를 막는다.
+             전화 인증 여부는 Firebase 계정에 연결된 번호(phoneE164)로 알 수 있다. */
           phoneE164: (cred.user && cred.user.phoneNumber) || '',
-          certCI: window._caroCertCI || '',
           createdAt: fn.serverTimestamp(), uid:uid
         }, {merge:true});
       })
@@ -2596,11 +2596,18 @@ window.caroResolveDeviceId = caroResolveDeviceId;
 
 /* devices 컬렉션 실시간 스캔 → carId→deviceId 매핑 자동 구성
    (관리자 대시보드에서 기기에 carId 또는 carName을 지정해 두면 자동 반영) */
+var _devMapUnsub=null;
 function caroLoadDeviceMap(){
   try{
     if(!(typeof fbReady==='function' && fbReady())){ setTimeout(caroLoadDeviceMap,1500); return; }
+    /* ★ [v101] devices 는 보안 규칙상 로그인한 사용자만 읽을 수 있다 → 로그인 확정 뒤에 구독 (예전엔 로그인 전에 붙어 조용히 죽었음) */
+    if(!(window.FB_AUTH && window.FB_AUTH.currentUser)){
+      if(window.caroOnAuth && !window.__devMapAuthHooked){ window.__devMapAuthHooked=true; window.caroOnAuth(function(u){ if(u) caroLoadDeviceMap(); else if(_devMapUnsub){ try{ _devMapUnsub(); }catch(e){} _devMapUnsub=null; } }); }
+      return;
+    }
     var fn=window.FB_FN, db=window.FB_DB;
-    fn.onSnapshot(fn.collection(db,'devices'), function(snap){
+    if(_devMapUnsub){ try{ _devMapUnsub(); }catch(e){} _devMapUnsub=null; }
+    _devMapUnsub=fn.onSnapshot(fn.collection(db,'devices'), function(snap){
       var map={};
       snap.forEach(function(ds){
         var d=ds.data()||{};
@@ -2612,7 +2619,7 @@ function caroLoadDeviceMap(){
         }
       });
       window.CARO_DEVICE_MAP=map;
-    }, function(){ /* 권한/네트워크 오류 무시 */ });
+    }, function(e){ console.warn('기기 목록 구독 오류:', e&&e.code); _devMapUnsub=null; if(!(e&&e.code==='permission-denied')) setTimeout(caroLoadDeviceMap, 5000); });
   }catch(e){}
 }
 setTimeout(caroLoadDeviceMap, 2000);
