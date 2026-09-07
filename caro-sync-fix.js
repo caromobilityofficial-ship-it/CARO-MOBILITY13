@@ -162,7 +162,7 @@ window.caroOpenExtraDriver=function(){
   ov.id='caro-xdrv-ov';
   ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:99999;display:flex;align-items:flex-end;justify-content:center;';
   ov.innerHTML=
-    '<div style="background:#fff;width:100%;max-width:520px;border-radius:18px 18px 0 0;padding:22px 20px 26px;box-shadow:0 -6px 30px rgba(0,0,0,.18);font-family:inherit;">'
+    '<div style="background:#fff;width:100%;max-width:520px;border-radius:18px 18px 0 0;padding:22px 20px calc(26px + var(--sab,0px));box-shadow:0 -6px 30px rgba(0,0,0,.18);font-family:inherit;max-height:calc(100vh - 40px);overflow-y:auto;box-sizing:border-box;">'
     +'<div style="font-size:1.05rem;font-weight:700;margin-bottom:4px;">추가운전자 등록</div>'
     +'<div style="font-size:.8rem;color:#777;margin-bottom:14px;">대여자 외 1명까지 등록할 수 있어요. 추가운전자도 면허 정보 확인이 필요합니다.</div>'
     +'<label style="font-size:.75rem;color:#555;">이름</label>'
@@ -171,7 +171,7 @@ window.caroOpenExtraDriver=function(){
     +'<input id="xdrv-birth" inputmode="numeric" maxlength="6" style="width:100%;padding:11px;border:1px solid #ddd;border-radius:9px;margin:4px 0 10px;font-size:.9rem;" placeholder="900101" value="'+(saved&&saved.birth?saved.birth:'')+'">'
     +'<label style="font-size:.75rem;color:#555;">운전면허번호</label>'
     +'<input id="xdrv-lic" inputmode="numeric" maxlength="15" style="width:100%;padding:11px;border:1px solid #ddd;border-radius:9px;margin:4px 0 4px;font-size:.9rem;" placeholder="12-34-567890-12" value="'+(saved&&saved.license?saved.license:'')+'">'
-    +'<div style="font-size:.72rem;color:#999;margin-bottom:14px;">형식: 2-2-6-2 자리 (지역코드-연도-일련번호-체크)</div>'
+    +'<div style="font-size:.72rem;color:#999;margin-bottom:14px;line-height:1.5;word-break:keep-all;">형식: 2-2-6-2 자리 (지역코드-연도-일련번호-체크)</div>'
     +'<div style="display:flex;gap:9px;">'
     +'<button id="xdrv-cancel" style="flex:1;padding:13px;border:1px solid #ddd;background:#fff;border-radius:10px;font-size:.9rem;">닫기</button>'
     +'<button id="xdrv-save" style="flex:2;padding:13px;border:none;background:#111;color:#fff;border-radius:10px;font-size:.9rem;font-weight:600;">등록하기</button>'

@@ -4675,3 +4675,45 @@ select:focus{
   display:flex !important; align-items:center !important; justify-content:center !important;
   text-align:center !important; pointer-events:none;
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   v4 (2026-09-07) — 시스템바 · 글자 넘침 보정
+   ─ 상태바 높이: 앱(MainActivity v7)이 실제 값을 --sat-native 로 넣어 준다. 없으면(브라우저·옛 앱) 36px 유지.
+   ─ 아래쪽(내비게이션바·키보드)은 앱이 네이티브 여백으로 비우므로 CSS 는 손대지 않는다.
+   ═══════════════════════════════════════════════════════════════ */
+:root{ --sat: max(env(safe-area-inset-top, 0px), var(--sat-native, 36px)); }
+
+/* 계정관리 상세(면허증·크레딧·쿠폰·내 정보…) — 제목이 상태바 안에 그려지던 문제.
+   뒤로(←) 버튼과 같은 줄(상태바 아래 20px)에 제목을 놓는다. */
+#account-detail-screen .mpd-header{ padding-top: calc(20px + var(--sat)) !important; }
+#account-detail-screen .mpd-title-row{
+  top: calc(20px + var(--sat)) !important;
+  height: 40px !important;
+  padding: 0 56px !important;            /* 좌우 뒤로 버튼 자리만큼 비워 긴 제목도 겹치지 않게 */
+  box-sizing: border-box !important;
+}
+#account-detail-screen .mpd-title{ white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+/* 내 정보(마이페이지) 상단바도 같은 기준 */
+#mypage-screen .mpn-topbar{ padding-top: calc(20px + var(--sat)) !important; }
+
+/* 토스트 — 긴 문장이 한 줄로 잘려 나가던 문제: 화면 폭 안에서 줄바꿈 */
+.toast{
+  white-space: normal !important;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+  line-height: 1.45;
+  width: max-content;
+  max-width: min(calc(100vw - 32px), 480px) !important;
+  bottom: calc(90px + var(--sab, 0px)) !important;
+}
+
+/* 계정관리 상세 행 — 값이 길면 줄바꿈(칸 밖으로 나가지 않게) */
+#account-detail-screen .apd-row{ align-items: flex-start; gap: 12px; }
+#account-detail-screen .apd-row-label{ flex: 0 0 auto; }
+#account-detail-screen .apd-row-value{ flex: 1 1 auto; min-width: 0; text-align: right; word-break: keep-all; overflow-wrap: anywhere; }
+
+/* 폼 도움말·안내문 — 칸 안에서 줄바꿈 */
+.apd-input-hint, .apd-help, .input-hint, .form-hint, .csd-hint, .awz-hint{ word-break: keep-all; overflow-wrap: anywhere; white-space: normal; }
+
+/* 결제 카드 아이콘 칸 — 은행명이 길어도 칸 밖으로 나가지 않게 (최소 36px, 내용에 맞춰 늘어남) */
+.apd-card-icon{ width: auto !important; min-width: 36px; padding: 0 6px; white-space: nowrap; }

@@ -8890,10 +8890,10 @@ window.devUploadAllCars=function(){
         html += `
           <div class="apd-card-item ${c.isDefault?'default':''}">
             <div class="apd-card-left">
-              <div class="apd-card-icon">${c.bank}</div>
+              <div class="apd-card-icon">${(c.bank||c.brand||'CARD')}</div>
               <div>
                 <div class="apd-card-num">**** **** **** ${c.last4} ${c.isDefault?'<span class="apd-card-default-badge">DEFAULT</span>':''}</div>
-                <div class="apd-card-alias">${c.alias}</div>
+                <div class="apd-card-alias">${(c.alias||('카드 ****'+(c.last4||'')))}</div>
               </div>
             </div>
             <button class="apd-sns-btn" data-card-del="${c.id}">삭제</button>
@@ -9376,7 +9376,7 @@ window.devUploadAllCars=function(){
     h+='<div class="apd-section-title"><span class="apd-section-title-icon">🪪</span>등록된 운전면허증</div>';
     if(lic&&(lic.number||lic.name)){
       h+='<div class="apd-row"><span class="apd-row-label">상태</span><span class="apd-row-value" style="color:#1d7a3a;font-weight:700;">'+(reg?'등록 완료':'확인 중')+'</span></div>';
-      h+='<div class="apd-row"><span class="apd-row-label">이름</span><span class="apd-row-value">'+(lic.name||'—')+'</span></div>';
+      h+='<div class="apd-row"><span class="apd-row-label">이름</span><span class="apd-row-value">'+(lic.name||(window.userInfo&&userInfo.name)||'—')+'</span></div>';   /* ★ [v101] 면허에 이름이 없으면 계정 이름 */
       h+='<div class="apd-row"><span class="apd-row-label">면허번호</span><span class="apd-row-value">'+_licMask(lic.number)+'</span></div>';
       h+='<div class="apd-row"><span class="apd-row-label">면허종류</span><span class="apd-row-value">'+(lic.type||'—')+'</span></div>';
       if(lic.birth) h+='<div class="apd-row"><span class="apd-row-label">생년월일</span><span class="apd-row-value">'+lic.birth+'</span></div>';
@@ -9961,10 +9961,10 @@ window.devUploadAllCars=function(){
     list.innerHTML = cards.map(c => `
       <label style="display:flex;align-items:center;gap:12px;padding:14px 0;border-bottom:1px solid var(--border);cursor:pointer;">
         <input type="radio" name="pay-card" value="${c.id}" ${c.isDefault?'checked':''} style="width:18px;height:18px;accent-color:#c8a96e;">
-        <div style="width:40px;height:26px;border-radius:4px;background:linear-gradient(135deg,#3a3f47,#2e3138);display:flex;align-items:center;justify-content:center;font-size:.66rem;font-weight:700;color:#c8a96e;flex-shrink:0;">${c.bank}</div>
+        <div style="width:40px;height:26px;border-radius:4px;background:linear-gradient(135deg,#3a3f47,#2e3138);display:flex;align-items:center;justify-content:center;font-size:.66rem;font-weight:700;color:#c8a96e;flex-shrink:0;">${(c.bank||c.brand||'CARD')}</div>
         <div style="flex:1;min-width:0;">
           <div style="font-family:'Oswald',sans-serif;font-size:.88rem;color:var(--text-1);letter-spacing:.04em;">**** ${c.last4}</div>
-          <div style="font-size:.74rem;color:var(--text-m);margin-top:2px;">${c.alias}</div>
+          <div style="font-size:.74rem;color:var(--text-m);margin-top:2px;">${(c.alias||('카드 ****'+(c.last4||'')))}</div>
         </div>
       </label>
     `).join('');
@@ -10026,13 +10026,13 @@ window.devUploadAllCars=function(){
 
     list.innerHTML = cards.map(c => `
       <div style="display:flex;align-items:center;gap:12px;padding:14px;background:rgba(255,255,255,.7);border:1.5px solid ${c.isDefault?'#c8a96e':'var(--border)'};border-radius:var(--r);margin-bottom:8px;">
-        <div style="width:40px;height:26px;border-radius:4px;background:linear-gradient(135deg,#3a3f47,#2e3138);display:flex;align-items:center;justify-content:center;font-size:.66rem;font-weight:700;color:#c8a96e;flex-shrink:0;">${c.bank}</div>
+        <div style="width:40px;height:26px;border-radius:4px;background:linear-gradient(135deg,#3a3f47,#2e3138);display:flex;align-items:center;justify-content:center;font-size:.66rem;font-weight:700;color:#c8a96e;flex-shrink:0;">${(c.bank||c.brand||'CARD')}</div>
         <div style="flex:1;min-width:0;">
           <div style="font-family:'Oswald',sans-serif;font-size:.88rem;color:var(--text-1);letter-spacing:.04em;">
             **** ${c.last4}
             ${c.isDefault?'<span style="font-family:Oswald,sans-serif;font-size:.6rem;letter-spacing:.1em;color:#c8a96e;font-weight:700;background:rgba(200,169,110,.12);padding:3px 8px;border-radius:4px;margin-left:6px;">DEFAULT</span>':''}
           </div>
-          <div style="font-size:.74rem;color:var(--text-m);margin-top:2px;">${c.alias}</div>
+          <div style="font-size:.74rem;color:var(--text-m);margin-top:2px;">${(c.alias||('카드 ****'+(c.last4||'')))}</div>
         </div>
         <button onclick="caroSyncDeleteCard(${c.id})" style="padding:6px 12px;background:rgba(178,58,58,.08);border:1px solid rgba(178,58,58,.25);border-radius:6px;color:#b23a3a;font-family:var(--font);font-size:.74rem;font-weight:700;cursor:pointer;">삭제</button>
       </div>
