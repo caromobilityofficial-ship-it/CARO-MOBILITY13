@@ -3582,6 +3582,7 @@
       map.invalidateSize=function(){ try{ this.relayout(); }catch(e){} }; // Leaflet 호환 shim
       // 줌 컨트롤 제거 — 핀치 줌만 사용 (모바일)
       window.caroMap=map; window.caroMapReady=true;
+      try{ map.setMaxLevel(9); }catch(e){}   /* 최대 축소 4km — 와드 보이는 선 */
       kakao.maps.event.addListener(map,'idle',function(){
         try{ if(window.renderCars) window.renderCars(); if(window.updateCarSheetCount) window.updateCarSheetCount(); }catch(e){}
       });
@@ -3973,14 +3974,16 @@
                   else if(__lv === 4) __sc = 0.9;
                   else if(__lv === 5) __sc = 0.85;
                   else if(__lv === 6) __sc = 0.78;
-                  else __sc = 0.7;
+                  else if(__lv === 7) __sc = 0.7;
+                  else if(__lv === 8) __sc = 0.62;
+                  else __sc = 0.55;   /* 레벨9(≈4km) 더 작게 */
           if(!drawZoneWards.__zoomBound && window.kakao && window.kakao.maps && window.kakao.maps.event){
             window.kakao.maps.event.addListener(window.caroMap,'zoom_changed',function(){ drawZoneWards(); });
             drawZoneWards.__zoomBound = true;
           }
         }
       }catch(e){ __lv = null; __sc = 1; }
-      if(__lv !== null && __lv >= 9) return;   /* 레벨9(≈4km)부터 숨김 — 2km(레벨8) 화면에서도 와드 표시 */
+      if(__lv !== null && __lv >= 10) return;   /* 레벨10(8km)+ 만 숨김 — 4km(레벨9)까지 와드 계속 표시 */
     Object.keys(window.CARO_ZONES).forEach(function(zone){
       var Z=window.CARO_ZONES[zone];
       if(!Z || Z.lat==null || Z.lng==null) return;
@@ -4235,7 +4238,7 @@
       myOv=new kakao.maps.CustomOverlay({position:pos,content:el,yAnchor:0.5,xAnchor:0.5,zIndex:9999});
       myOv.setMap(map);
       try{ map.setCenter(pos); }catch(e){}
-      try{ map.setLevel(6); }catch(e){}   /* ≈500m */
+      try{ map.setLevel(5); }catch(e){}   /* ≈250m — 예약화면 진입 시 내 위치 확대 */
       return true;
     }
     /* OSM(Leaflet) 폴백 지도 */
