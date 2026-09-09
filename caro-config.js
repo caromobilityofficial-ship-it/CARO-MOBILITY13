@@ -9,10 +9,10 @@
    이 파일 외에는 아무것도 바꾸지 않아도 된다.
    ═══════════════════════════════════════════════════════════════ */
 window.CARO_CONFIG = {
-  appVersion: "2026.09.09-v101 (회사 토스 키)",
+  appVersion: "2026.09.09-v104 (서버 모드 ON)",
 
   /* ── 서버 모드 ── */
-  SECURE_SERVER: false,
+  SECURE_SERVER: true,
   FUNCTIONS_REGION: "asia-northeast3",
 
   /* ── 결제 (토스페이먼츠) — ★ 회사 계정 키 (2026-09-09 교체) ──
