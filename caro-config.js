@@ -9,16 +9,17 @@
    이 파일 외에는 아무것도 바꾸지 않아도 된다.
    ═══════════════════════════════════════════════════════════════ */
 window.CARO_CONFIG = {
-  appVersion: "2026.09.07-v101",
+  appVersion: "2026.09.09-v101 (회사 토스 키)",
 
   /* ── 서버 모드 ── */
   SECURE_SERVER: false,
   FUNCTIONS_REGION: "asia-northeast3",
 
-  /* ── 결제 (토스페이먼츠) ──
+  /* ── 결제 (토스페이먼츠) — ★ 회사 계정 키 (2026-09-09 교체) ──
      클라이언트 키는 공개값이다. 시크릿 키는 절대 여기 넣지 않는다 (Functions Secret: TOSS_SECRET_KEY).
+     시크릿 키는 회사 계정의 test_sk_... 를 Firebase 금고에만 넣는다 (클라이언트 키와 같은 상점의 짝이어야 함).
      라이브 전환 시 test_ck_ → live_ck_ 로 교체. 한 곳만 바꾸면 결제 3경로(예약·연장·정산)에 모두 적용된다. */
-  TOSS_CLIENT_KEY: "test_ck_6bJXmgo28eByJonkYwBE3LAnGKWx",
+  TOSS_CLIENT_KEY: "test_ck_oEjb0gm23P5NmQq577KkVpGwBJn5",
 
   /* ── 고객센터 ── (사고·문의 저장 실패 시 안내에 사용) */
   supportPhone: "010-6872-9807",
