@@ -4235,7 +4235,7 @@
       myOv=new kakao.maps.CustomOverlay({position:pos,content:el,yAnchor:0.5,xAnchor:0.5,zIndex:9999});
       myOv.setMap(map);
       try{ map.setCenter(pos); }catch(e){}
-      try{ map.setLevel(6); }catch(e){}   /* ≈500m */
+      try{ map.setLevel(5); }catch(e){}   /* ≈250m — 예약화면 진입 시 내 위치 확대 */
       return true;
     }
     /* OSM(Leaflet) 폴백 지도 */
