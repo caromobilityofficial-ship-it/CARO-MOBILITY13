@@ -602,7 +602,7 @@ function bindMapDrag(){
 function render(){
   /* KPI */
   var onl=0,mov=0;
-  FLEET.forEach(function(v){ if(v.online)onl++; if(v.moving)mov++; });
+  FLEET.forEach(function(v){ if(v.online)onl++; if(v.online && v.moving)mov++; });   /* ★오프라인 차는 '주행 중' 으로 세지 않는다 */
   $('k-total').innerHTML=FLEET.length+'<small>대</small>';
   $('k-online').innerHTML=onl+'<small>대</small>';
   $('k-moving').innerHTML=mov+'<small>대</small>';
@@ -711,7 +711,11 @@ function renderDiag(v){
   }
   if(v.station) rows.push(['가까운 거점', '<span class="'+(v.station.d>v.station.s.radiusM?'y':'g')+'">'+v.station.s.name+' '+Math.round(v.station.d)+'m'+(v.station.d>v.station.s.radiusM?' (거점 밖)':' (거점 안)')+'</span>']);
   var rv=resvOf(v); rows.push(['현재 예약', rv?('<span class="'+(rv.live==='반납지연'?'y':'g')+'">'+rv.live+' · '+rv.user+(rv.phone?' '+rv.phone:'')+' · ~'+new Date(rv.eMs).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})+'</span>'):'<span class="gd">없음</span>']);
-  var ist=$('immobst'); if(ist) ist.textContent='시동차단 상태: '+(v.immob?'⛔ 차단 중':'해제')+(v.acc||v.moving?' · 주행/시동 중이라 차단 불가':'')+(v.hazUnknown?' · ⚠ 비상등 상태 모름 — 눈으로 확인 후 "비상등 꺼짐 확인"':'');
+  var ist=$('immobst');
+  if(ist) ist.textContent='시동차단 상태: '+(v.immob?'⛔ 차단 중':'해제')
+    + (!v.online ? ' · 오프라인 — 명령이 전달되지 않습니다'
+       : ((v.acc||v.moving) ? ' · 주행/시동 중이라 차단 불가' : ''))
+    + (v.hazUnknown?' · ⚠ 비상등 상태 모름 — 눈으로 확인 후 "비상등 꺼짐 확인"':'');
   var hab=$('hazackbtn'); if(hab) hab.style.display=v.hazUnknown?'':'none';   /* [v9.7] 단말이 비상등 상태를 모를 때만 확인 버튼 */
   $('diagt').innerHTML=rows.map(function(r){return '<tr><td>'+r[0]+'</td><td>'+r[1]+'</td></tr>';}).join('');
 }
