@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>CARO MOBILITY · 관제센터</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&family=Saira:wght@500;600;700&display=swap" rel="stylesheet">
 <script type="module" src="firebase-config.js?v=5"></script>
 <style>
@@ -18,19 +19,19 @@
   --shadow:0 8px 28px -14px rgba(0,0,0,.55);
 }
 *{margin:0;padding:0;box-sizing:border-box;}
-html,body{background:var(--bg);color:var(--txt);font-family:'Noto Sans KR',sans-serif;font-size:14px;}
+html,body{background:var(--bg);color:var(--txt);font-family:'Noto Sans KR',system-ui,'Malgun Gothic','Apple SD Gothic Neo',sans-serif;font-size:14px;}
 ::-webkit-scrollbar{width:8px;height:8px;} ::-webkit-scrollbar-thumb{background:var(--border2);border-radius:4px;}
 button{font-family:inherit;cursor:pointer;}
 
 /* ── 상단바 ── */
 .topbar{display:flex;align-items:center;gap:16px;padding:14px 22px;background:var(--panel);
   border-bottom:1px solid var(--border);position:sticky;top:0;z-index:50;}
-.logo{font-family:'Saira';font-weight:700;font-size:19px;letter-spacing:2px;color:var(--gold);}
+.logo{font-family:'Saira','Noto Sans KR',system-ui,'Malgun Gothic','Apple SD Gothic Neo',sans-serif;font-weight:700;font-size:19px;letter-spacing:2px;color:var(--gold);}
 .logo small{color:var(--muted);font-weight:500;letter-spacing:4px;font-size:10px;display:block;margin-top:-2px;}
 .sync{font-size:11px;letter-spacing:1px;color:var(--ok);background:rgba(77,177,131,.09);
-  border:1px solid rgba(77,177,131,.25);padding:4px 10px;border-radius:20px;font-family:'Saira';}
+  border:1px solid rgba(77,177,131,.25);padding:4px 10px;border-radius:20px;font-family:'Saira','Noto Sans KR',system-ui,'Malgun Gothic','Apple SD Gothic Neo',sans-serif;}
 .sync.off{color:var(--bad);background:rgba(224,112,94,.09);border-color:rgba(224,112,94,.3);}
-.clock{margin-left:auto;font-family:'Saira';font-size:15px;color:var(--gold-soft);letter-spacing:1px;}
+.clock{margin-left:auto;font-family:'Saira','Noto Sans KR',system-ui,'Malgun Gothic','Apple SD Gothic Neo',sans-serif;font-size:15px;color:var(--gold-soft);letter-spacing:1px;}
 .adm{font-size:12px;color:var(--muted);}
 .lgout{background:none;border:1px solid var(--border2);color:var(--muted);border-radius:8px;padding:6px 14px;font-size:12px;}
 .lgout:hover{border-color:var(--bad);color:var(--bad);}
@@ -44,7 +45,7 @@ button{font-family:inherit;cursor:pointer;}
 .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;padding:18px 22px 0;}
 .kpi{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:16px 20px;box-shadow:var(--shadow);}
 .kpi .lb{font-size:11px;letter-spacing:2px;color:var(--muted);text-transform:uppercase;}
-.kpi .vl{font-family:'Saira';font-size:28px;font-weight:600;margin-top:4px;color:var(--txt);}
+.kpi .vl{font-family:'Saira','Noto Sans KR',system-ui,'Malgun Gothic','Apple SD Gothic Neo',sans-serif;font-size:28px;font-weight:600;margin-top:4px;color:var(--txt);}
 .kpi .vl small{font-size:13px;color:var(--muted);font-weight:500;margin-left:2px;}
 .kpi.gold .vl{color:var(--gold-soft);} .kpi.bad .vl{color:var(--bad);}
 
@@ -72,6 +73,14 @@ button{font-family:inherit;cursor:pointer;}
 /* ── 지도 + 라이브 ── */
 .mapbox{position:relative;height:56vh;min-height:420px;background:var(--panel2);}
 #map{width:100%;height:100%;}
+/* ★지도 상태 배지 — 어느 지도를 쓰는지, 카카오가 왜 안 뜨는지 알려 준다 */
+.mapstat{position:absolute;left:12px;bottom:12px;z-index:21;font-size:11px;line-height:1.5;max-width:min(92%,420px);
+  background:rgba(24,26,30,.94);border:1px solid var(--border2);padding:7px 11px;border-radius:9px;
+  color:var(--muted);backdrop-filter:blur(4px);display:none;}
+.mapstat.show{display:block;}
+.mapstat b{color:var(--gold-soft);}
+.mapstat .why{color:var(--warn);display:block;margin-top:3px;}
+.mapstat code{background:rgba(255,255,255,.07);padding:1px 5px;border-radius:4px;color:var(--txt);}
 .mappill{position:absolute;left:12px;top:12px;z-index:20;font-size:12px;background:rgba(24,26,30,.88);
   border:1px solid var(--border2);padding:6px 12px;border-radius:9px;color:var(--gold-soft);backdrop-filter:blur(4px);}
 /* ★ 차량 따라가기(추적) 토글 버튼 */
@@ -84,7 +93,7 @@ button{font-family:inherit;cursor:pointer;}
 .lv{padding:12px 8px;text-align:center;border-right:1px solid var(--border);}
 .lv:last-child{border-right:none;}
 .lv .k{font-size:10px;letter-spacing:1.5px;color:var(--muted);}
-.lv .v{font-family:'Saira';font-size:17px;font-weight:600;margin-top:3px;color:var(--txt);}
+.lv .v{font-family:'Saira','Noto Sans KR',system-ui,'Malgun Gothic','Apple SD Gothic Neo',sans-serif;font-size:17px;font-weight:600;margin-top:3px;color:var(--txt);}
 .lv .v.gold{color:var(--gold-soft);} .lv .v.ok{color:var(--ok);} .lv .v.bad{color:var(--bad);} .lv .v.use{color:var(--use);}
 
 /* ── 우측 패널 ── */
@@ -128,7 +137,7 @@ button{font-family:inherit;cursor:pointer;}
 .ev .tag.drive{background:rgba(224,162,96,.15);color:var(--warn);border:1px solid rgba(224,162,96,.45);}
 .ev .tag.park{background:rgba(224,64,64,.18);color:#ff7a68;border:1px solid rgba(224,64,64,.55);}
 .ev.danger{background:rgba(224,64,64,.06);border-left:3px solid #e04040;}
-.ev .ts{margin-left:auto;color:var(--muted2);font-size:11px;font-family:'Saira';}
+.ev .ts{margin-left:auto;color:var(--muted2);font-size:11px;font-family:'Saira','Noto Sans KR',system-ui,'Malgun Gothic','Apple SD Gothic Neo',sans-serif;}
 /* ★ 일자 선택 바 (이벤트/주행기록 공통) */
 .logdate{grid-column:1/-1;display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:2px;}
 .logdate input[type=date]{background:var(--panel2);border:1px solid var(--border2);color:var(--txt);
@@ -138,12 +147,12 @@ button{font-family:inherit;cursor:pointer;}
   font-size:11.5px;font-weight:700;cursor:pointer;font-family:inherit;transition:.15s;}
 .dnav:hover{border-color:var(--gold);color:var(--gold-soft);}
 .dnav.today{border-color:var(--gold);color:var(--gold-soft);}
-.dsum{margin-left:auto;font-size:12px;color:var(--muted2);font-family:'Noto Sans KR';}
+.dsum{margin-left:auto;font-size:12px;color:var(--muted2);font-family:'Noto Sans KR',system-ui,'Malgun Gothic','Apple SD Gothic Neo',sans-serif;}
 .tlog{width:100%;border-collapse:collapse;font-size:12px;}
 .tlog th{position:sticky;top:0;background:var(--panel2);color:var(--muted);font-size:10.5px;letter-spacing:1px;
   padding:9px 10px;text-align:left;border-bottom:1px solid var(--border2);}
-.tlog td{padding:8px 10px;border-bottom:1px solid var(--border);color:var(--txt);font-family:'Saira';font-weight:500;}
-.tlog td:first-child{font-family:'Noto Sans KR';color:var(--muted);}
+.tlog td{padding:8px 10px;border-bottom:1px solid var(--border);color:var(--txt);font-family:'Saira','Noto Sans KR',system-ui,'Malgun Gothic','Apple SD Gothic Neo',sans-serif;font-weight:500;}
+.tlog td:first-child{font-family:'Noto Sans KR',system-ui,'Malgun Gothic','Apple SD Gothic Neo',sans-serif;color:var(--muted);}
 .tscroll{max-height:300px;overflow-y:auto;}
 .csvbtn{margin-left:auto;background:none;border:1px solid var(--border2);color:var(--muted);
   border-radius:7px;padding:4px 12px;font-size:11px;}
@@ -191,7 +200,7 @@ button{font-family:inherit;cursor:pointer;}
 .ward.sel .lb{background:var(--gold);color:#15161a;border-color:var(--gold);}
 .ward.stale{opacity:.45;filter:grayscale(.7);}
 .ward.stale .lb{background:#3a2020;color:#e0705e;border-color:#5a2d2d;}
-.leaflet-container{background:var(--panel2);font-family:'Noto Sans KR';}
+.leaflet-container{background:var(--panel2);font-family:'Noto Sans KR',system-ui,'Malgun Gothic','Apple SD Gothic Neo',sans-serif;}
 
 @media (max-width:1100px){
   .main{grid-template-columns:1fr;}
@@ -275,7 +284,7 @@ html,body{max-width:100%;overflow-x:hidden;}
 
   <!-- 중앙: 지도 + 라이브 -->
   <div class="card">
-    <div class="mapbox"><div id="map"></div><div class="mappill" id="mappill">차량 선택</div><button class="followbtn on" id="followBtn" onclick="toggleFollow()">🎯 따라가기 ON</button></div>
+    <div class="mapbox"><div id="map"></div><div class="mapstat" id="mapstat"></div><div class="mappill" id="mappill">차량 선택</div><button class="followbtn on" id="followBtn" onclick="toggleFollow()">🎯 따라가기 ON</button></div>
     <div class="livebar">
       <div class="lv"><div class="k">상태</div><div class="v" id="lv-move">—</div></div>
       <div class="lv"><div class="k">속도</div><div class="v gold" id="lv-spd">—</div></div>
@@ -346,7 +355,12 @@ html,body{max-width:100%;overflow-x:hidden;}
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
-<script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=905e7fbf530218a38e0b0871fa7d1471&autoload=false"></script>
+<script>window.__kakaoSdkErr=null;</script>
+<!-- 카카오맵 SDK — 고객앱(index.html)과 **같은** 도메인 등록 키를 쓴다.
+     예전엔 관제만 다른 키(905e7fbf…)를 쓰고 있어 카카오가 거부 → 조용히 OSM 으로 떨어졌다 (12차 검수) -->
+<script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=932e79971e43cfe8bab8710f6190897b&autoload=false"
+        onerror="window.__kakaoSdkErr='script'"></script>
+<script>window.__leafletOk = (typeof L !== 'undefined');</script>
 <script>
 /* ═══════════ CARO 관제센터 v1.0 — 데이터 도착 시에만 렌더(상시 루프 없음) ═══════════ */
 var ADMIN_EMAIL='caro.mobility.official@gmail.com';
@@ -461,12 +475,65 @@ function wardHtml(v,sel){
   var stale=(typeof v.lat==='number' && !v.gpsLive);   /* GPS 끊김 → 마커를 흐리게(옛 위치 표시) */
   return '<div class="ward'+(sel?' sel':'')+(stale?' stale':'')+'"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C8.1 2 5 5.1 5 9c0 5.2 7 13 7 13s7-7.8 7-13c0-3.9-3.1-7-7-7zm0 9.5A2.5 2.5 0 1 1 12 6a2.5 2.5 0 0 1 0 5.5z"/></svg><span class="lb">'+(v.name||v.id)+(stale?' · GPS끊김':'')+'</span></div>';
 }
+/* ═══ 지도 상태 알림 ═══════════════════════════════════════════════════
+   예전엔 카카오가 실패하면 **아무 말 없이** OSM 지도로 바뀌었다.
+   그래서 "카카오 지도가 왜 안 나오지?" 를 알 수가 없었다. 이제는 이유를 화면에 적는다. */
+function mapStat(html, keep){
+  var el=$('mapstat'); if(!el) return;
+  el.innerHTML=html; el.className='mapstat show';
+  if(!keep) setTimeout(function(){ el.className='mapstat'; }, 6000);
+}
+function kakaoFailHtml(why){
+  var host=location.hostname||'(파일로 직접 열림)';
+  var proto=location.protocol;
+  var hint;
+  if(proto==='file:')      hint='주소가 <code>file://</code> 입니다 — 카카오 지도는 파일을 직접 열면 동작하지 않습니다. 웹 주소로 여세요.';
+  else if(why==='script')  hint='카카오 지도 파일을 못 받았습니다 — 인터넷 차단(사내망·광고차단 확장) 또는 앱키 문제입니다.';
+  else if(why==='domain')  hint='카카오 개발자 콘솔에 이 주소가 등록돼 있지 않습니다.';
+  else                     hint='카카오 지도가 응답하지 않습니다.';
+  return '<b>지금은 일반 지도(OSM)로 보고 있습니다</b>'
+       + '<span class="why">' + hint + '</span>'
+       + '현재 주소: <code>' + proto + '//' + host + '</code><br>'
+       + 'developers.kakao.com → 내 애플리케이션 → 플랫폼 → Web 에 위 주소를 등록하고 새로고침하세요.';
+}
+function useLeaflet(why){
+  if(mapKind) return;
+  if(typeof L === 'undefined'){                       /* ★Leaflet CDN 까지 막힌 경우 — 예전엔 여기서 화면이 죽었다 */
+    mapStat('<b>지도를 불러오지 못했습니다</b><span class="why">지도 파일(카카오·Leaflet)이 둘 다 차단됐습니다.</span>'
+          + '인터넷 연결과 광고 차단 확장을 확인해 주세요. 지도 말고 나머지 기능은 정상 동작합니다.', true);
+    mapKind='none'; return;
+  }
+  lmap=L.map('map').setView([37.4663,126.678],15);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OSM',maxZoom:19}).addTo(lmap);
+  mapKind='leaflet'; mapDraw(); bindMapDrag();
+  if(why) mapStat(kakaoFailHtml(why), true);
+}
 function mapInit(){
-  if(window.kakao&&kakao.maps){ kakao.maps.load(function(){
-    kmap=new kakao.maps.Map($('map'),{center:new kakao.maps.LatLng(37.4663,126.678),level:4}); mapKind='kakao'; mapDraw(); bindMapDrag(); });
-  } else { lmap=L.map('map').setView([37.4663,126.678],15);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OSM'}).addTo(lmap);
-    mapKind='leaflet'; mapDraw(); bindMapDrag(); }
+  if(mapKind) return;                                  /* 두 번 부르면 지도가 겹친다 */
+  /* ★카카오 우선. 스크립트가 아직 안 왔을 수도 있으니 잠깐 기다려 본다(최대 4초).
+       예전 코드는 그 자리에서 한 번만 확인하고 없으면 바로 OSM 으로 넘어갔다. */
+  var t0=Date.now();
+  (function wait(){
+    if(mapKind) return;
+    if(window.__kakaoSdkErr){ useLeaflet('script'); return; }
+    if(window.kakao && kakao.maps && typeof kakao.maps.load==='function'){
+      var done=false;
+      var guard=setTimeout(function(){ if(!done){ useLeaflet('domain'); } }, 6000);   /* 도메인 미등록이면 콜백이 안 온다 */
+      try{
+        kakao.maps.load(function(){
+          if(done||mapKind) return; done=true; clearTimeout(guard);
+          try{
+            kmap=new kakao.maps.Map($('map'),{center:new kakao.maps.LatLng(37.4663,126.678),level:4});
+            mapKind='kakao'; mapDraw(); bindMapDrag();
+            mapStat('<b>카카오 지도</b> 사용 중');
+          }catch(e){ console.warn('[지도] 카카오 생성 실패:', e); useLeaflet('domain'); }
+        });
+      }catch(e){ clearTimeout(guard); console.warn('[지도] 카카오 로드 실패:', e); useLeaflet('domain'); }
+      return;
+    }
+    if(Date.now()-t0 > 4000){ useLeaflet('script'); return; }
+    setTimeout(wait, 150);
+  })();
 }
 var lastSel=null;
 function mapDraw(){
@@ -970,22 +1037,41 @@ function csvExport(){
 /* ═══════════ 로그인 게이트 ═══════════ */
 function doLogin(){
   var A=window.FB_AUTH, FN=window.FB_FN;
+  /* ★[12차 검수] 예전엔 여기서 Firebase 준비 여부를 보지 않았다.
+     인터넷이 막혀 Firebase 가 안 올라오면 FN 이 없어서 그냥 오류로 죽고,
+     버튼은 '로그인 중…' 에서 멈춘 채 **아무 일도 일어나지 않았다.**
+     "관제가 작동을 안 한다" 로 보이던 자리. 이제는 이유를 말해 준다. */
+  if(!window.FB_READY || !A || !FN || typeof FN.signInWithEmailAndPassword!=='function'){
+    $('g-err').innerHTML='서버(Firebase)에 연결하지 못했습니다.<br>'
+      + '인터넷 연결과 광고 차단 확장을 확인한 뒤 새로고침(Ctrl+Shift+R) 해 주세요.';
+    $('g-btn').textContent='로그인'; return;
+  }
   var em=$('g-em').value.trim(), pw=$('g-pw').value;
   if(em.toUpperCase()==='CAROMOBILITY') em=ADMIN_EMAIL;   /* 앱과 동일한 최고관리자 별명 지원 */
   if(!em||!pw){ $('g-err').textContent='이메일과 비밀번호를 입력하세요'; return; }
-  $('g-btn').textContent='로그인 중…';
+  $('g-btn').textContent='로그인 중…'; $('g-err').textContent='';
   FN.signInWithEmailAndPassword(A,em,pw).catch(function(e){
     $('g-btn').textContent='로그인';
     var m=(e&&e.code)||'';
-    $('g-err').textContent=(m.indexOf('wrong-password')>=0||m.indexOf('invalid-cred')>=0)?'비밀번호가 올바르지 않습니다':
-      (m.indexOf('user-not-found')>=0)?'존재하지 않는 계정입니다':'로그인 실패';
+    $('g-err').textContent=
+      (m.indexOf('wrong-password')>=0||m.indexOf('invalid-cred')>=0) ? '비밀번호가 올바르지 않습니다':
+      (m.indexOf('user-not-found')>=0)                               ? '존재하지 않는 계정입니다':
+      (m.indexOf('invalid-email')>=0)                                ? '이메일 형식이 올바르지 않습니다':
+      (m.indexOf('too-many-requests')>=0)                            ? '시도가 너무 잦습니다 — 잠시 후 다시':
+      (m.indexOf('network-request-failed')>=0)                       ? '네트워크 오류 — 인터넷 연결을 확인하세요':
+      (m.indexOf('user-disabled')>=0)                                ? '사용 중지된 계정입니다':
+      '로그인 실패' + (m?(' ('+m+')'):'');
   });
 }
 var started=false;
 function waitAuth(n){
   n=n||0; var A=window.FB_AUTH, FN=window.FB_FN;
-  if(!window.FB_READY||!A||!FN){ if(n>60){ $('g-err').textContent='Firebase 미연결'; return; }
+  if(!window.FB_READY||!A||!FN){
+    if(n===10) $('g-err').textContent='서버에 연결하는 중…';      /* 2초 넘게 걸리면 멈춘 게 아니라고 알려 준다 */
+    if(n>60){ $('g-err').innerHTML='서버(Firebase)에 연결하지 못했습니다.<br>'
+        + '인터넷 연결과 광고 차단 확장을 확인한 뒤 새로고침(Ctrl+Shift+R) 해 주세요.'; return; }
     return setTimeout(function(){waitAuth(n+1);},200); }
+  $('g-err').textContent='';
   FN.onAuthStateChanged(A,function(u){
     if(u&&u.email===ADMIN_EMAIL){                       /* 최고관리자: 두 탭 모두 */
       enter('최고관리자', {control:true,cars:true,pricing:true,notices:true,resv:true}, true);
@@ -1017,7 +1103,12 @@ function waitAuth(n){
     $('nt-live').style.display = canCtrl?'':'none';
     $('nt-ops').style.display  = canOps?'':'none';
     /* 라이브 모니터링(지도·구독)은 관제 권한자에게만 시작 → 운영팀 로그인 시 자원 낭비/노출 없음 */
-    if(canCtrl && !started){ started=true; mapInit(); startFS(); }
+    if(canCtrl && !started){ started=true;
+      /* ★[12차 검수] 예전엔 mapInit() 이 한 줄에 같이 있어서, 지도 파일(Leaflet CDN)이 막히면
+         여기서 오류가 나 **startFS() 가 아예 실행되지 않았다** — 차량 목록도, 실시간 갱신도 안 떴다.
+         지도는 실패해도 나머지는 살아 있어야 한다. */
+      try{ mapInit(); }catch(e){ console.warn('[지도] 초기화 실패 — 나머지 기능은 계속합니다:', e); }
+      try{ startFS(); }catch(e){ console.error('[관제] 실시간 구독 시작 실패:', e); } }
     /* 기본 탭: 관제 권한 있으면 실시간 관제, 없으면(운영팀) 운영 관리 */
     switchView(canCtrl?'live':'ops');
   }
