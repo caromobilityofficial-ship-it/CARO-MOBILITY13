@@ -13,7 +13,10 @@
   function T(m){ try{ if(window.toast) toast(m); }catch(e){} }
   function num(x){ return (typeof x==='number'&&!isNaN(x))?x:null; }
   function esc(s){ return (''+(s==null?'':s)).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
-  function mapStatus(s){
+   /* ★[14차] onclick="f('…')" 처럼 글자가 다시 '코드' 로 읽히는 자리에는 esc 만으로는 부족하다
+     (HTML 규칙상 &#39; 는 읽히는 순간 ' 로 돌아와 문자열을 끊는다) → 코드 문자열 규칙으로 먼저 막고 나서 HTML 로 막는다 */
+  function jsa(s){ return esc(String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\n/g,'\\n').replace(/\r/g,'\\r').replace(/\u2028/g,'\\u2028').replace(/\u2029/g,'\\u2029')); }
+ function mapStatus(s){
     if(!s) return '이용가능'; s=(''+s).toLowerCase();
     if(s.indexOf('busy')>=0||s.indexOf('use')>=0||s.indexOf('rent')>=0||s.indexOf('이용중')>=0) return '이용중';
     if(s.indexOf('maint')>=0||s.indexOf('unavail')>=0||s.indexOf('점검')>=0||s.indexOf('off')>=0||s.indexOf('disable')>=0) return '점검';
@@ -213,7 +216,7 @@
         +'<td style="color:var(--gold-soft);font-family:\'Saira\',sans-serif">'+(mp==null?'<span style="color:var(--muted)">미설정</span>':mp.toLocaleString()+'원')+'</td>'
         +'<td>'+(bat==null?'<span style="color:var(--muted)">—</span>':bat+'%')+'</td>'
         +'<td style="color:var(--muted)">'+esc(place)+'</td>'
-        +'<td style="text-align:right"><button class="blk-del" onclick="delBlack(\''+c.id+'\')">삭제</button></td>'
+        +'<td style="text-align:right"><button class="blk-del" onclick="delBlack(\''+jsa(c.id)+'\')">삭제</button></td>'
       +'</tr>';
     }).join('');
     body.innerHTML = rows || '<tr><td colspan="7" class="blk-empty">아직 등록된 CARO THE BLACK 차량이 없습니다. <b>+ 블랙 차량 등록</b>으로 추가하세요.</td></tr>';

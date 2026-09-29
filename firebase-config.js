@@ -23,6 +23,9 @@ import {
   signOut,
   onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/12.12.1/firebase-auth.js";
+/* ★[14차] 2단계 인증(TOTP) 부품 — 이름 하나씩 import 하면 없는 이름이 있을 때 파일 전체가 죽으므로
+   네임스페이스로 받아 쓴다(없으면 undefined → 화면이 "미지원" 으로 안내). */
+import * as __AUTHNS from "https://www.gstatic.com/firebasejs/12.12.1/firebase-auth.js";
 import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/12.12.1/firebase-functions.js";
 import {
   getFirestore,
@@ -104,6 +107,11 @@ window.FB_FN = {
   onAuthStateChanged: onAuthStateChanged,
   setPersistence: setPersistence,
   browserSessionPersistence: browserSessionPersistence,
+  /* 2단계 인증 (caro-mfa.js 가 사용) */
+  multiFactor: __AUTHNS.multiFactor,
+  getMultiFactorResolver: __AUTHNS.getMultiFactorResolver,
+  TotpMultiFactorGenerator: __AUTHNS.TotpMultiFactorGenerator,
+  sendEmailVerification: __AUTHNS.sendEmailVerification,
   /* === Firestore === */
   doc: doc,
   setDoc: setDoc,

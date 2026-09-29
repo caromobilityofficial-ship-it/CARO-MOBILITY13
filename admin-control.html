@@ -260,6 +260,7 @@ html,body{max-width:100%;overflow-x:hidden;}
   <span class="sync off" id="sync">CONNECTING…</span>
   <span class="clock" id="clock">--:--:--</span>
   <span class="adm" id="adm">—</span>
+  <button class="lgout" id="mfabtn" onclick="if(window.CaroMFA)CaroMFA.openSetup()">🔐 2단계 인증</button>
   <button class="lgout" id="lgout">나가기</button>
 </div>
 
@@ -353,8 +354,8 @@ html,body{max-width:100%;overflow-x:hidden;}
 
 <div id="toast"></div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="lib/leaflet/leaflet.js"></script>   <!-- ★13차: 외부 CDN 대신 자체 파일(변조·차단 방지) -->
+<link rel="stylesheet" href="lib/leaflet/leaflet.css">
 <script>window.__kakaoSdkErr=null;</script>
 <!-- 카카오맵 SDK — 고객앱(index.html)과 **같은** 도메인 등록 키를 쓴다.
      예전엔 관제만 다른 키(905e7fbf…)를 쓰고 있어 카카오가 거부 → 조용히 OSM 으로 떨어졌다 (12차 검수) -->
@@ -364,6 +365,11 @@ html,body{max-width:100%;overflow-x:hidden;}
 <script>
 /* ═══════════ CARO 관제센터 v1.0 — 데이터 도착 시에만 렌더(상시 루프 없음) ═══════════ */
 var ADMIN_EMAIL='caro.mobility.official@gmail.com';
+/* ★[13차 보안] 화면에 끼워 넣는 모든 '바깥에서 온 글자'는 esc() 를 거친다.
+   예전엔 예약자 이름·명령 기록의 보낸 사람·기기가 적은 오류 문구가 innerHTML 에 그대로 들어가서,
+   고객이 자기 이름이나 명령 문서에 <img onerror=…> 를 적어 두면 관리자가 그 화면을 여는 순간
+   관리자 권한으로 실행됐다(다른 차 시동차단 명령 전송 가능). */
+function esc(s){ return (s==null?'':String(s)).replace(/[&<>"'`]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','`':'&#96;'}[c];}); }
 var FLEET=[], DEV={}, IDMAP={}, selId=null;
 var soundOn=false, alertsToday=0, evPrev={};
 var TELE=[], EVTS=[];
@@ -473,7 +479,7 @@ function floorStr(f){ if(f==null) return '—'; return f>=1?f+'F':'B'+(1-f); }
 var mapKind=null,kmap=null,lmap=null,markers=[];
 function wardHtml(v,sel){
   var stale=(typeof v.lat==='number' && !v.gpsLive);   /* GPS 끊김 → 마커를 흐리게(옛 위치 표시) */
-  return '<div class="ward'+(sel?' sel':'')+(stale?' stale':'')+'"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C8.1 2 5 5.1 5 9c0 5.2 7 13 7 13s7-7.8 7-13c0-3.9-3.1-7-7-7zm0 9.5A2.5 2.5 0 1 1 12 6a2.5 2.5 0 0 1 0 5.5z"/></svg><span class="lb">'+(v.name||v.id)+(stale?' · GPS끊김':'')+'</span></div>';
+  return '<div class="ward'+(sel?' sel':'')+(stale?' stale':'')+'"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C8.1 2 5 5.1 5 9c0 5.2 7 13 7 13s7-7.8 7-13c0-3.9-3.1-7-7-7zm0 9.5A2.5 2.5 0 1 1 12 6a2.5 2.5 0 0 1 0 5.5z"/></svg><span class="lb">'+esc(v.name||v.id)+(stale?' · GPS끊김':'')+'</span></div>';
 }
 /* ═══ 지도 상태 알림 ═══════════════════════════════════════════════════
    예전엔 카카오가 실패하면 **아무 말 없이** OSM 지도로 바뀌었다.
@@ -612,17 +618,17 @@ function render(){
   var h='';
   FLEET.forEach(function(v){
     var dev=IDMAP[v.id];
-    h+='<div class="vcard'+(v.id===selId?' sel':'')+'" data-id="'+v.id+'">'
-      +'<div class="nm"><span class="on'+(v.online?' live':'')+'"></span>'+(v.name||v.id)
+    h+='<div class="vcard'+(v.id===selId?' sel':'')+'" data-id="'+esc(v.id)+'">'
+      +'<div class="nm"><span class="on'+(v.online?' live':'')+'"></span>'+esc(v.name||v.id)
       +(v.impact?'<span class="alerttag">⚠ 충격</span>':'')+(v.over?'<span class="alerttag">과속</span>':'')
       +(v.immob?'<span class="alerttag">⛔ 차단</span>':'')+(v.doorOpen&&!v.acc?'<span class="alerttag">🚪 문열림</span>':'')
       +(typeof v.vbat==='number'&&v.vbat<11.6?'<span class="alerttag">🔋 저전압</span>':'')
       +'</div><div class="sub">'
-      +(dev?('<b>'+dev+'</b>'):'<span>기기 미연결</span>')
+      +(dev?('<b>'+esc(dev)+'</b>'):'<span>기기 미연결</span>')
       +(v.floor!=null?('<span>'+floorStr(v.floor)+'</span>'):'')
       +(typeof v.speed==='number'?('<span>'+Math.round(v.speed)+'km/h</span>'):'')
-      +(v.fw?('<span>'+v.fw+'</span>'):'')
-      +(function(){ var r=resvOf(v); return r?('<span style="color:'+(r.live==='반납지연'?'var(--warn)':'var(--gold-soft)')+'">'+r.live+' · '+r.user+'</span>'):'<span>예약 없음</span>'; })()
+      +(v.fw?('<span>'+esc(v.fw)+'</span>'):'')
+      +(function(){ var r=resvOf(v); return r?('<span style="color:'+(r.live==='반납지연'?'var(--warn)':'var(--gold-soft)')+'">'+esc(r.live)+' · '+esc(r.user)+'</span>'):'<span>예약 없음</span>'; })()
       +'</div></div>';
   });
   $('flist').innerHTML=h||'<div style="padding:20px;color:var(--muted);font-size:12px;">차량 데이터 대기 중…</div>';
@@ -666,7 +672,7 @@ function renderDiag(v){
     ['기압계(층)', (typeof v.alt==='number')?'<span class="g">정상</span>':'<span class="r">응답없음</span>'],
     ['지상기준 학습', v.groundSet?'<span class="g">완료</span>':'<span class="y">대기</span>'],
     ['자이로(충격)', (typeof v.heading==='number')?'<span class="g">정상</span>':'<span class="r">응답없음</span>'],
-    ['펌웨어', '<span class="gd">'+(v.fw||'—')+'</span>'],
+    ['펌웨어', '<span class="gd">'+esc(v.fw||'—')+'</span>'],
   ];
   /* [v9 단말] 전원·입력·신호 */
   if(typeof v.vbat==='number'){
@@ -709,8 +715,8 @@ function renderDiag(v){
     if(typeof v.heap==='number'&&v.heap>0)
       rows.push(['메모리 여유', '<span class="'+(v.heap<40000?'r':'gd')+'">'+Math.round(v.heap/1024)+' KB'+(v.heap<40000?' · ⚠ 부족':'')+'</span>']);
   }
-  if(v.station) rows.push(['가까운 거점', '<span class="'+(v.station.d>v.station.s.radiusM?'y':'g')+'">'+v.station.s.name+' '+Math.round(v.station.d)+'m'+(v.station.d>v.station.s.radiusM?' (거점 밖)':' (거점 안)')+'</span>']);
-  var rv=resvOf(v); rows.push(['현재 예약', rv?('<span class="'+(rv.live==='반납지연'?'y':'g')+'">'+rv.live+' · '+rv.user+(rv.phone?' '+rv.phone:'')+' · ~'+new Date(rv.eMs).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})+'</span>'):'<span class="gd">없음</span>']);
+  if(v.station) rows.push(['가까운 거점', '<span class="'+(v.station.d>v.station.s.radiusM?'y':'g')+'">'+esc(v.station.s.name)+' '+Math.round(v.station.d)+'m'+(v.station.d>v.station.s.radiusM?' (거점 밖)':' (거점 안)')+'</span>']);
+  var rv=resvOf(v); rows.push(['현재 예약', rv?('<span class="'+(rv.live==='반납지연'?'y':'g')+'">'+esc(rv.live)+' · '+esc(rv.user)+(rv.phone?' '+esc(rv.phone):'')+' · ~'+new Date(rv.eMs).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})+'</span>'):'<span class="gd">없음</span>']);
   var ist=$('immobst');
   if(ist) ist.textContent='시동차단 상태: '+(v.immob?'⛔ 차단 중':'해제')
     + (!v.online ? ' · 오프라인 — 명령이 전달되지 않습니다'
@@ -734,10 +740,21 @@ function sendCmd(type,extra){
   if(!dev){ toast('이 차량은 IoT 기기 미연결'); return; }
   if(CMD_BUSY[dev+type]){ toast('같은 명령이 아직 진행 중입니다 — 기기 응답을 기다려 주세요'); return; }
   CMD_BUSY[dev+type]=true;
-  var id='cmd-'+Date.now();
   var who=(window.FB_AUTH&&window.FB_AUTH.currentUser&&window.FB_AUTH.currentUser.email)||'admin';
-  var pl=Object.assign({type:type,status:'pending',by:who,at:FN.serverTimestamp?FN.serverTimestamp():new Date(),timestamp:Date.now()},extra||{});
-  FN.setDoc(FN.doc(db,'devices',dev,'commands',id),pl).then(function(){
+  /* ★[14차] 명령은 서버 함수(staffCommand)가 권한·2단계 인증·값 형식을 확인한 뒤 만든다.
+     서버 함수가 아직 배포 전이면(function not-found) 예전처럼 직접 쓴다 — 배포 순서 때문에 관제가 멈추지 않게. */
+  function direct(){
+    var id0='cmd-'+Date.now();
+    var pl=Object.assign({type:type,status:'pending',by:who,at:FN.serverTimestamp?FN.serverTimestamp():new Date(),timestamp:Date.now()},extra||{});
+    return FN.setDoc(FN.doc(db,'devices',dev,'commands',id0),pl).then(function(){ return id0; });
+  }
+  var queued = (typeof window.FB_CALL==='function')
+    ? window.FB_CALL('staffCommand',Object.assign({},extra||{},{deviceId:dev,type:type})).then(function(r){ return r.cmdId; },function(e){
+        var c=(e&&e.code)||'';
+        if(/not-found|unimplemented/.test(c)) return direct();      /* 함수 미배포 → 예전 방식 */
+        throw e; })
+    : direct();
+  queued.then(function(id){
     toast('명령 전송: '+type+' — 기기 응답 대기…');
     var ref=FN.doc(db,'devices',dev,'commands',id), un=null, to=null;
     function done_(){ if(un)un(); clearTimeout(to); CMD_BUSY[dev+type]=false; }   /* ★어떤 이유로 끝나든 잠금을 반드시 푼다 */
@@ -769,7 +786,10 @@ function sendCmd(type,extra){
        예전 45초는 80초보다 짧아, **주차 중인 정상 차량이 매번 '응답 없음'** 으로 보였다. */
     to=setTimeout(function(){ if(un)un(); CMD_BUSY[dev+type]=false;
       toast('⏱ 100초 동안 기기 응답이 없습니다 — 통신 상태를 확인하세요 (주차 절전 중이면 최대 80초까지는 정상)'); },100000);
-  }).catch(function(e){ toast('전송 실패: '+e.message); });
+  }).catch(function(e){
+    CMD_BUSY[dev+type]=false;   /* ★예전엔 전송이 거부되면 이 잠금이 풀리지 않아, 새로고침 전까지 같은 명령을 다시 못 보냈다 */
+    var c=(e&&e.code)||'', m=(e&&e.message)||'';
+    toast(/permission-denied/.test(c)?('전송 거부: '+(m||'권한이 없습니다')):('전송 실패: '+m)); });
 }
 function calSet(f){ sendCmd('setfloor',{value:String(f)}); }
 function calReset(){ sendCmd('resetfloor'); }
@@ -933,9 +953,9 @@ function subLogs(){
   if(unT){unT();unT=null;} if(unE){unE();unE=null;} if(unC){unC();unC=null;}
   if(dev&&FN.query){ try{ unC=FN.onSnapshot(FN.query(FN.collection(db,'devices',dev,'commands'),FN.orderBy('timestamp','desc'),FN.limit(30)),
     function(s){ var h=''; s.forEach(function(d){ var c=d.data()||{}; var t=c.timestamp?new Date(c.timestamp):null;
-      var nm={unlock:'문 열기',lock:'문 잠금',hazard:'비상등',hazard_off:'비상등 끄기',horn:'경적',immobilize:'시동 차단',release:'차단 해제',setfloor:'층 보정',resetfloor:'기준 초기화',setinmode:'입력 극성 설정',update:'OTA',reboot:'재부팅'}[c.type]||c.type;
-      var st=c.status==='done'?'<span class="g">완료</span>':c.status==='failed'?'<span class="r">실패'+(c.error?' · '+c.error:'')+'</span>':c.status==='acked'?'<span class="y">실행중</span>':'<span class="gd">대기</span>';
-      h+='<div class="ev"><span class="tag flr">'+nm+'</span><span>'+(c.by||'앱/고객')+' · '+st+'</span><span class="ts">'+(t?(t.getMonth()+1)+'/'+t.getDate()+' '+t.toTimeString().slice(0,5):'—')+'</span></div>'; });
+      var nm={unlock:'문 열기',lock:'문 잠금',hazard:'비상등',hazard_off:'비상등 끄기',horn:'경적',immobilize:'시동 차단',release:'차단 해제',setfloor:'층 보정',resetfloor:'기준 초기화',setinmode:'입력 극성 설정',update:'OTA',reboot:'재부팅'}[c.type]||esc(c.type);
+      var st=c.status==='done'?'<span class="g">완료</span>':c.status==='failed'?'<span class="r">실패'+(c.error?' · '+esc(c.error):'')+'</span>':c.status==='acked'?'<span class="y">실행중</span>':'<span class="gd">대기</span>';
+      h+='<div class="ev"><span class="tag flr">'+nm+'</span><span>'+esc(c.by||'앱/고객')+' · '+st+'</span><span class="ts">'+(t?(t.getMonth()+1)+'/'+t.getDate()+' '+t.toTimeString().slice(0,5):'—')+'</span></div>'; });
       var el=$('cmdlist'); if(el) el.innerHTML=h||'<div style="padding:12px;color:var(--muted);font-size:12px;">명령 기록 없음</div>'; },
     function(e){ console.warn('cmds',e); }); }catch(e){ console.warn('cmds',e); } }
   TELE=[]; EVTS=[]; drawLogs();
@@ -983,7 +1003,7 @@ function drawLogs(){
     } else if(e.event==='lowbat'){
       row='<div class="ev danger"><span class="tag imp park">배터리</span><span>🔋 배터리 부족 '+(e.vbat!=null?Number(e.vbat).toFixed(2)+'V':'')+'</span><span class="ts">'+fmtTs(e.ts)+'</span></div>';
     } else if(e.event==='boot'||e.event==='reconnect'){
-      row='<div class="ev"><span class="tag flr">기기</span><span>'+(e.event==='boot'?'⚡ 단말 부팅 '+(e.fw||''):'📡 재접속')+'</span><span class="ts">'+fmtTs(e.ts)+'</span></div>';
+      row='<div class="ev"><span class="tag flr">기기</span><span>'+(e.event==='boot'?'⚡ 단말 부팅 '+esc(e.fw||''):'📡 재접속')+'</span><span class="ts">'+fmtTs(e.ts)+'</span></div>';
     } else if(e.event==='immob'){
       row='<div class="ev'+(e.on?' danger':'')+'"><span class="tag imp park">시동</span><span>'+(e.on?'⛔ 시동 차단됨':'✅ 시동 차단 해제')+'</span><span class="ts">'+fmtTs(e.ts)+'</span></div>';
     } else if(e.event==='door_sw'){
@@ -1064,6 +1084,8 @@ function doLogin(){
       (m.indexOf('too-many-requests')>=0)                            ? '시도가 너무 잦습니다 — 잠시 후 다시':
       (m.indexOf('network-request-failed')>=0)                       ? '네트워크 오류 — 인터넷 연결을 확인하세요':
       (m.indexOf('user-disabled')>=0)                                ? '사용 중지된 계정입니다':
+      (m.indexOf('mfa-cancelled')>=0)                                ? '2단계 인증을 취소했습니다':
+      (m.indexOf('mfa-unsupported')>=0)                              ? '2단계 인증 방식을 처리하지 못했습니다 — 최고관리자에게 문의':
       '로그인 실패' + (m?(' ('+m+')'):'');
   });
 }
@@ -1136,6 +1158,9 @@ function waitAuth(n){
 }
 waitAuth();
 </script>
+<script src="lib/qrcode/qrcode.js"></script>
+<script src="caro-mfa.js?v=1"></script>
+<script src="caro-admin-lock.js?v=1"></script>
 <script src="caro-icons.js?v=1"></script>
 </body>
 </html>

@@ -18,7 +18,10 @@
 
   function ready(){ return window.FB_DB && window.FB_FN && typeof window.FB_FN.onSnapshot==='function'; }
   function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
-  function won(n){ try{ return (Number(n)||0).toLocaleString('ko-KR'); }catch(e){ return n; } }
+   /* ★[14차] onclick="f('…')" 처럼 글자가 다시 '코드' 로 읽히는 자리에는 esc 만으로는 부족하다
+     (HTML 규칙상 &#39; 는 읽히는 순간 ' 로 돌아와 문자열을 끊는다) → 코드 문자열 규칙으로 먼저 막고 나서 HTML 로 막는다 */
+  function jsa(s){ return esc(String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\n/g,'\\n').replace(/\r/g,'\\r').replace(/\u2028/g,'\\u2028').replace(/\u2029/g,'\\u2029')); }
+ function won(n){ try{ return (Number(n)||0).toLocaleString('ko-KR'); }catch(e){ return n; } }
   function fmtDay(v){ try{ var d=(typeof v==='number')?new Date(v):new Date(v); if(isNaN(d.getTime())) return '—';
     var p=function(n){return n<10?'0'+n:n;}; return d.getFullYear()+'.'+p(d.getMonth()+1)+'.'+p(d.getDate()); }catch(e){ return '—'; } }
   function tsOf(x){ return x.createdTs || Date.parse(x.createdAt) || 0; }
@@ -115,8 +118,8 @@
                         : timed ? '<span class="db-badge susp">정지중</span>'
                         : '<span class="db-badge ok">이용 가능</span>';
         var btns = blocked
-          ? '<button class="db-btn go" onclick="window.caroDebtUnsuspend&&caroDebtUnsuspend(\''+esc(u.userId)+'\')">이용 허용</button>'
-          : '<button class="db-btn" onclick="window.caroDebtHold&&caroDebtHold(\''+esc(u.userId)+'\')">정지 적용</button>';
+          ? '<button class="db-btn go" onclick="window.caroDebtUnsuspend&&caroDebtUnsuspend(\''+jsa(u.userId)+'\')">이용 허용</button>'
+          : '<button class="db-btn" onclick="window.caroDebtHold&&caroDebtHold(\''+jsa(u.userId)+'\')">정지 적용</button>';
         h+='<div class="db-row">'
           +'<div class="db-main">'
             +'<div class="db-u">'+esc(u.name)+'<span class="sub">'+esc(u.idName||'')+(u.license?(' · 면허 '+esc(u.license)):'')+'</span></div>'
@@ -154,7 +157,7 @@
           +'</div>'
           +(isLong?'<span class="db-badge long">장기미납</span>':'')
           +'<div class="db-amt">'+won(d.amount)+'원<small>미납</small></div>'
-          +'<button class="db-btn go" onclick="window.caroDebtPay&&caroDebtPay(\''+esc(d.id)+'\')">납부 처리</button>'
+          +'<button class="db-btn go" onclick="window.caroDebtPay&&caroDebtPay(\''+jsa(d.id)+'\')">납부 처리</button>'
           +'</div>';
       });
     }
@@ -179,7 +182,7 @@
             +'<div class="db-meta">'+meta+'</div>'
           +'</div>'
           +(held?'<span class="db-badge hab">승인 대기</span>':'<span class="db-badge susp">정지중</span>')
-          +'<button class="db-btn" onclick="window.caroDebtUnsuspend&&caroDebtUnsuspend(\''+esc(s.userId||s._id)+'\')">'+(held?'이용 허용':'정지 해제')+'</button>'
+          +'<button class="db-btn" onclick="window.caroDebtUnsuspend&&caroDebtUnsuspend(\''+jsa(s.userId||s._id)+'\')">'+(held?'이용 허용':'정지 해제')+'</button>'
           +'</div>';
       });
     }

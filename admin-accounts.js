@@ -17,6 +17,9 @@
   function T(m){ try{ if(window.toast) toast(m); }catch(e){} }
   function esc(s){ return (s==null?'':String(s)).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
 
+  /* ★[14차] onclick="f('…')" 처럼 글자가 다시 '코드' 로 읽히는 자리에는 esc 만으로는 부족하다
+     (HTML 규칙상 &#39; 는 읽히는 순간 ' 로 돌아와 문자열을 끊는다) → 코드 문자열 규칙으로 먼저 막고 나서 HTML 로 막는다 */
+  function jsa(s){ return esc(String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\n/g,'\\n').replace(/\r/g,'\\r').replace(/\u2028/g,'\\u2028').replace(/\u2029/g,'\\u2029')); }
   /* ── 권한 정의 (차량/요금/공지·이벤트/예약) ── */
   /* ★ 권한을 화면(탭) 두 개에 맞춰 딱 둘로 단순화: 실시간 관제 / 운영 관리.
      - control → 실시간 관제 탭(위치·원격제어·층보정·진단)
@@ -255,9 +258,9 @@
         +'<div class="acct2-role">'+((a.position||a.role)?((a.position?esc(a.position):'')+(a.position&&a.role?' · ':'')+(a.role?esc(a.role):'')+' · '):'')+esc(email)+'</div>'
         +'<div class="acct2-perms">'+badges(a.perms)+'</div></div>'
         +'<div class="acct2-btns">'
-        +'<button class="acct2-btn edit" onclick="editAcct(\''+esc(email)+'\')">수정</button>'
-        +'<button class="acct2-btn" onclick="toggleAcctActive(\''+esc(email)+'\','+(on?'false':'true')+')">'+(on?'정지':'활성')+'</button>'
-        +'<button class="acct2-btn del" onclick="delAcct(\''+esc(email)+'\')">삭제</button>'
+        +'<button class="acct2-btn edit" onclick="editAcct(\''+jsa(email)+'\')">수정</button>'
+        +'<button class="acct2-btn" onclick="toggleAcctActive(\''+jsa(email)+'\','+(on?'false':'true')+')">'+(on?'정지':'활성')+'</button>'
+        +'<button class="acct2-btn del" onclick="delAcct(\''+jsa(email)+'\')">삭제</button>'
         +'</div></div>';
     });
     box.innerHTML=html;

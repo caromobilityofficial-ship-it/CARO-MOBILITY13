@@ -105,9 +105,9 @@
     if(!ready()){ setTimeout(subscribe, 600); return; }
     var FN=window.FB_FN, db=window.FB_DB;
     if(unsubA||unsubI) return;
-    unsubA=FN.onSnapshot(FN.collection(db,'accident_reports'), function(s){ acc=[]; s.forEach(function(d){ acc.push(Object.assign({_id:d.id,_col:'accident_reports'}, d.data()||{})); }); render(); badge(); },
+    unsubA=FN.onSnapshot(FN.collection(db,'accident_reports'), function(s){ acc=[]; s.forEach(function(d){ acc.push(Object.assign({}, d.data()||{}, {_id:d.id,_col:'accident_reports'})); }); render(); badge(); },
       function(e){ console.warn('[접수함] accident_reports 구독 실패', e&&e.code); showErr(e); });
-    unsubI=FN.onSnapshot(FN.collection(db,'support_inquiries'), function(s){ inq=[]; s.forEach(function(d){ inq.push(Object.assign({_id:d.id,_col:'support_inquiries'}, d.data()||{})); }); render(); badge(); },
+    unsubI=FN.onSnapshot(FN.collection(db,'support_inquiries'), function(s){ inq=[]; s.forEach(function(d){ inq.push(Object.assign({}, d.data()||{}, {_id:d.id,_col:'support_inquiries'})); }); render(); badge(); },
       function(e){ console.warn('[접수함] support_inquiries 구독 실패', e&&e.code); showErr(e); });
   }
   function showErr(e){
@@ -169,11 +169,11 @@
     if(phone) meta.unshift('<a href="tel:'+phone+'">📞 '+esc(ph)+'</a>');
     if(d.name||d.userName) meta.push('👤 '+esc(d.name||d.userName)+(d.userEmail?' ('+esc(d.userEmail)+')':''));
     if(d.handledBy) meta.push('처리: '+esc(d.handledBy)+(d.handledAtMs?' · '+when({createdAtMs:d.handledAtMs}):''));
-    var photos=(d.photos||[]).map(function(p){ return '<img src="'+p+'" alt="첨부">'; }).join('');
+    var photos=(d.photos||[]).map(function(p){ return '<img src="'+esc(p)+'" alt="첨부">'; }).join('');
     var acts='';
-    if(stv==='new') acts='<button class="pri" data-act="in_progress" data-col="'+d._col+'" data-id="'+d._id+'">처리 시작</button>';
-    if(stv!=='done') acts+='<button data-act="done" data-col="'+d._col+'" data-id="'+d._id+'">완료 처리</button>';
-    if(stv==='done') acts+='<button data-act="new" data-col="'+d._col+'" data-id="'+d._id+'">다시 열기</button>';
+    if(stv==='new') acts='<button class="pri" data-act="in_progress" data-col="'+esc(d._col)+'" data-id="'+esc(d._id)+'">처리 시작</button>';
+    if(stv!=='done') acts+='<button data-act="done" data-col="'+esc(d._col)+'" data-id="'+esc(d._id)+'">완료 처리</button>';
+    if(stv==='done') acts+='<button data-act="new" data-col="'+esc(d._col)+'" data-id="'+esc(d._id)+'">다시 열기</button>';
     return '<div class="ib-card '+(isAcc?'acc':'inq')+(stv==='done'?' done':'')+'">'
       + '<div><div class="ib-kind">'+(isAcc?'🚨 사고 접수':'1:1 문의')+'</div><div class="ib-when">'+when(d)+'</div><span class="ib-st '+stv+'">'+STL[stv]+'</span></div>'
       + '<div class="ib-main"><div class="ib-h">'+head+'</div><div class="ib-p" title="클릭하면 전체 보기">'+body+'</div>'
@@ -185,6 +185,8 @@
   }
   function act(status, col, id){
     if(!ready()) return;
+    /* ★[14차] 컬렉션은 접수함 두 곳만 — 문서 안의 글자가 다른 컬렉션을 가리키게 못 한다 */
+    if(col!=='accident_reports' && col!=='support_inquiries'){ toast('처리할 수 없는 항목입니다'); return; }
     var FN=window.FB_FN, db=window.FB_DB;
     FN.setDoc(FN.doc(db,col,id),{ status:status, handledBy:me(), handledAtMs:Date.now(), handledAt:FN.serverTimestamp() },{merge:true})
       .then(function(){ toast(STL[status]+' 로 변경했습니다'); })

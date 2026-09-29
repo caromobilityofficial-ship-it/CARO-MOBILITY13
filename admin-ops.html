@@ -14,8 +14,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@500;600;700&family=Saira:wght@300;400;500;600&family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
 <!-- 카카오 지도(앱과 동일 키). 실패 시 자동으로 Leaflet+OSM 폴백 -->
 <script src="//dapi.kakao.com/v2/maps/sdk.js?appkey=932e79971e43cfe8bab8710f6190897b&autoload=false&libraries=services"></script>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link rel="stylesheet" href="lib/leaflet/leaflet.css" />
+<script src="lib/leaflet/leaflet.js"></script>   <!-- ★13차: 외부 CDN 대신 자체 파일 -->
 <style id="caro-admin-addons">
   /* ── 실시간 관제 패널: 세로 스크롤로만. (flex는 자식을 찌그러뜨려서 쓰지 않음) ── */
   .card.live .lv-body{max-height:calc(100vh - 150px);overflow-y:auto;overflow-x:hidden;padding-right:6px;}
@@ -380,6 +380,11 @@
   </div>
 </div>
 <script>
+  /* ★[13차 보안] 바깥에서 온 글자(예약자 이름·전화·차량명 등)는 화면에 끼우기 전에 esc() 를 거친다.
+     예전엔 예약 문서의 userName 에 <img onerror=…> 를 적어 두면 관리자가 이 화면을 여는 순간 실행됐다. */
+  function esc(s){ return (s==null?'':String(s)).replace(/[&<>"'`]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','`':'&#96;'}[c];}); }
+  /* onclick="f('…')" 처럼 글자를 다시 코드로 읽는 자리에는 esc 가 아니라 이것을 쓴다(따옴표 등 제거) */
+  function jsq(s){ return (s==null?'':String(s)).replace(/[^A-Za-z0-9_\-\.가-힣 ]/g,''); }
   /* ★ 관제센터(admin-control.html) 안의 iframe으로 열렸을 땐, 부모가 이미 로그인·권한 확인을 마쳤다.
      그러니 운영관리 자체 로그인 창은 띄우지 않는다(공유 세션을 조용히 기다림). 깜빡임 방지 위해 파싱 즉시 숨김. */
   window.__CARO_INFRAME = (function(){ try{ return window.self !== window.top; }catch(e){ return true; } })();
@@ -797,11 +802,11 @@
       var muted=_vehMuted[v.id];
       return '<tr class="'+(v.id===selectedId?'sel':'')+(unavail?' rowbad':'')+'" data-id="'+v.id+'">'+
         '<td><div class="vn"><span class="vbell'+(muted?' muted':'')+'" onclick="event.stopPropagation();caroBellToggle(\''+v.id+'\')" title="이 차량 이벤트 알림 켜기/끄기">'+bellSvg(muted)+'</span>'+
-          '<span class="vtext"><b class="carname" ondblclick="event.stopPropagation();openEdit(\''+v.id+'\')" title="클릭: 관제 보기 · 더블클릭: 정보 수정">'+v.name+'</b><small>'+(v.plate||'번호판 미등록')+'</small></span></div></td>'+
-        '<td><span class="grade '+(v.grade==='THE BLACK'?'black':'')+'">'+v.grade+'</span></td>'+
-        '<td><span class="st '+st+'"><i></i>'+es+'</span></td>'+
+          '<span class="vtext"><b class="carname" ondblclick="event.stopPropagation();openEdit(\''+v.id+'\')" title="클릭: 관제 보기 · 더블클릭: 정보 수정">'+esc(v.name)+'</b><small>'+esc(v.plate||'번호판 미등록')+'</small></span></div></td>'+
+        '<td><span class="grade '+(v.grade==='THE BLACK'?'black':'')+'">'+esc(v.grade)+'</span></td>'+
+        '<td><span class="st '+st+'"><i></i>'+esc(es)+'</span></td>'+
         '<td><div class="bat"><div class="track"><div class="fill" style="width:'+batWidth(v.battery)+'%;background:'+batColor(v.battery)+'"></div></div><span>'+batText(v.battery)+'</span></div></td>'+
-        '<td style="color:var(--muted)">'+v.place+'</td>'+
+        '<td style="color:var(--muted)">'+esc(v.place)+'</td>'+
         '<td><span class="floor-badge">'+((v.status==='점검'||!f)?'—':f.code)+'</span></td>'+
         '<td style="color:var(--muted2);font-family:Saira;font-size:12px">'+devRecentCell(v)+'</td>'+
         '<td><button class="btn sm stbtn" onclick="event.stopPropagation();toggleStatus(\''+v.id+'\')">'+(unavail?'복구':'사용불가')+'</button></td>'+
@@ -901,14 +906,14 @@
               : '<span class="rbadge soon">예약확정</span>';
     var phone=(''+(cur.phone||'')).trim(), digits=phone.replace(/[^0-9]/g,'');
     var telHtml = (phone && phone.indexOf('*')<0 && digits.length>=9)
-      ? '<a class="rtel" href="tel:'+digits+'">'+phone+'</a>'
-      : (phone ? '<span class="rv" style="color:var(--muted)">'+phone+' <small style="color:var(--muted2)">(가림)</small></span>'
+      ? '<a class="rtel" href="tel:'+digits+'">'+esc(phone)+'</a>'
+      : (phone ? '<span class="rv" style="color:var(--muted)">'+esc(phone)+' <small style="color:var(--muted2)">(가림)</small></span>'
                : '<span style="color:var(--muted2)">미등록</span>');
     el.innerHTML='<div class="rt">대여자 정보</div>'
       +'<div class="rrow"><span class="rk">상태</span><span class="rv">'+badge+'</span></div>'
-      +'<div class="rrow"><span class="rk">대여자</span><span class="rv">'+(cur.user||'-')+'</span></div>'
+      +'<div class="rrow"><span class="rk">대여자</span><span class="rv">'+esc(cur.user||'-')+'</span></div>'
       +'<div class="rrow"><span class="rk">연락처</span><span class="rv">'+telHtml+'</span></div>'
-      +'<div class="rrow"><span class="rk">대여 기간</span><span class="rv" style="font-size:12px;font-weight:600">'+(cur.period||'-')+'</span></div>';
+      +'<div class="rrow"><span class="rk">대여 기간</span><span class="rv" style="font-size:12px;font-weight:600">'+esc(cur.period||'-')+'</span></div>';
   }
   function renderLive(){
     var v=FLEET.find(function(x){return x.id===selectedId;});
@@ -921,9 +926,9 @@
     }
     var es=carEffectiveStatus(v);
     var hasAlt=(typeof v.alt==='number'), f=floorView(v), st=stCls(es);
-    document.getElementById('lvName').innerHTML = v.name+'<small>'+(v.plate||'번호판 미등록')+' · '+v.grade+'</small>';
+    document.getElementById('lvName').innerHTML = esc(v.name)+'<small>'+esc(v.plate||'번호판 미등록')+' · '+esc(v.grade)+'</small>';
     document.getElementById('lvStatus').className='st '+st;
-    document.getElementById('lvStatus').innerHTML='<i></i>'+es;
+    document.getElementById('lvStatus').innerHTML='<i></i>'+esc(es);
     renderRenter(v);   /* ★ 대여자 정보 카드 갱신 */
     document.getElementById('lvFloor').textContent = (v.status==='점검'||!f)?'—':f.code;
     document.getElementById('lvAlt').textContent = hasAlt?((v.alt>=0?'+':'')+v.alt.toFixed(1)+'m'):'기기 미연결';
@@ -967,8 +972,8 @@
     // 환경(지하/지상/확인중)
     var env=v.env||'';
     if(env==='지상') dgSet('dgEnv','ok','지상');
-    else if(/지하/.test(env)) dgSet('dgEnv','warn',env);
-    else dgSet('dgEnv','', env||'확인중');
+    else if(/지하/.test(env)) dgSet('dgEnv','warn',esc(env));
+    else dgSet('dgEnv','', esc(env)||'확인중');
     // 지상기준 학습
     if(v.groundSet) dgSet('dgGround','ok','완료');
     else dgSet('dgGround','warn','학습 대기');
@@ -997,7 +1002,7 @@
     var cls='caro-ward'+(sel?' sel':'')+(off?' off':'');
     return '<div class="'+cls+'">'+
       '<svg viewBox="132 92 248 350"><path d="M256 396C256 396 360 292 360 208A104 104 0 0 0 152 208C152 292 256 396 256 396Z" fill="currentColor"/><path d="M293 171A52 52 0 1 0 293 245" fill="none" stroke="#fff" stroke-width="30" stroke-linecap="round"/></svg>'+
-      '<span class="lab">'+v.name+(f?(' '+f.code):'')+'</span></div>';
+      '<span class="lab">'+esc(v.name)+(f?(' '+esc(f.code)):'')+'</span></div>';
   }
   function pickCar(id){ selectedId=id; renderFleet(); renderLive(); syncLogsToSelection(); caroMapUpdate(); }
   // 차량 좌표: 기기 GPS(v.lat/lng) 우선, 없으면 위치 문자열("위도, 경도")에서 파싱
@@ -1324,8 +1329,8 @@
       var free=priceVal(v,['fuelFreeKm','freeKm']);
       function pin(p,val){ return '<input class="pin" type="number" min="0" id="'+p+'_'+v.id+'" value="'+val+'" placeholder="0">'; }
       return '<tr data-id="'+v.id+'">'+
-        '<td><div class="vn"><b>'+v.name+'</b><small>'+(v.plate||v.docId)+'</small></div></td>'+
-        '<td><span class="grade '+(v.grade==='THE BLACK'?'black':'')+'">'+v.grade+'</span></td>'+
+        '<td><div class="vn"><b>'+esc(v.name)+'</b><small>'+esc(v.plate||v.docId)+'</small></div></td>'+
+        '<td><span class="grade '+(v.grade==='THE BLACK'?'black':'')+'">'+esc(v.grade)+'</span></td>'+
         '<td>'+pin('ph',hour)+'</td>'+
         '<td>'+pin('km',km)+'</td>'+
         '<td>'+pin('fk',free)+'</td>'+
@@ -1362,11 +1367,11 @@
     document.getElementById('resvCount').textContent='전체 '+list.length+'건';
     document.getElementById('resvBody').innerHTML = list.map(function(r){
       var sNow=liveStatus(r); var cls=stColor(sNow);
-      var carCell = r.car + (r.carNo?(' <span style="color:var(--muted)">('+r.carNo+')</span>'):'');
-      return '<tr><td style="font-family:Saira;color:var(--muted)">'+r.no+'</td><td>'+carCell+'</td>'+
-        '<td>'+r.user+'</td><td style="color:var(--muted)">'+r.period+'</td>'+
+      var carCell = esc(r.car) + (r.carNo?(' <span style="color:var(--muted)">('+esc(r.carNo)+')</span>'):'');
+      return '<tr><td style="font-family:Saira;color:var(--muted)">'+esc(r.no)+'</td><td>'+carCell+'</td>'+
+        '<td>'+esc(r.user)+'</td><td style="color:var(--muted)">'+esc(r.period)+'</td>'+
         '<td><span class="st '+cls+'"><i></i>'+sNow+'</span></td>'+
-        '<td><button class="btn sm" onclick="toast(\''+r.no+' 강제변경/취소는 다음 단계에서 연결\')">관리</button></td></tr>';
+        '<td><button class="btn sm" onclick="toast(\'강제변경/취소는 다음 단계에서 연결\')">관리</button></td></tr>';
     }).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:20px">예약이 없습니다.</td></tr>';
   }
   // ── notices ──
@@ -1747,7 +1752,14 @@
       issuedByEmail:(typeof ADMIN_EMAIL!=='undefined'?ADMIN_EMAIL:'admin'),
       issuedAt:FN.serverTimestamp(), timestamp:Date.now() };
     if(extra) Object.keys(extra).forEach(function(k){ payload[k]=extra[k]; });
-    FN.setDoc(FN.doc(db,'devices',dev,'commands',cmdId), payload).then(function(){
+    /* ★[14차] 서버 함수(staffCommand)가 권한·2단계 인증·값 형식을 확인한 뒤 만든다. 아직 배포 전(not-found)이면 예전처럼 직접 쓴다. */
+    var _direct=function(){ return FN.setDoc(FN.doc(db,'devices',dev,'commands',cmdId), payload).then(function(){ return cmdId; }); };
+    var _queued=(typeof window.FB_CALL==='function')
+      ? window.FB_CALL('staffCommand', Object.assign({}, extra||{}, {deviceId:dev, type:type})).then(function(r){ return r.cmdId; }, function(e){
+          if(/not-found|unimplemented/.test((e&&e.code)||'')) return _direct();
+          throw e; })
+      : _direct();
+    _queued.then(function(cmdId){
       if(window.toast)toast('📡 '+label+' 전송됨 · '+v.name);
       var ref=FN.doc(db,'devices',dev,'commands',cmdId), un=null;
       /* ★[v9.8 11차 검수] ① 30초는 짧다 — 단말이 주차 절전 중이면 최악 80초(확인 60 + 낮잠 20)에 실행된다.
@@ -1771,7 +1783,7 @@
           if(window.toast)toast('❌ '+label+' 실패: '+why); if(un)un(); clearTimeout(to); } });
       to=setTimeout(function(){ if(un)un();
         if(window.toast)toast('⏱ '+label+' — 100초 동안 응답 없음 (주차 절전 중이면 80초까지는 정상)'); },100000);
-    }).catch(function(e){ if(window.toast)toast('⚠ 전송 실패: '+(e.code||e.message)); });
+    }).catch(function(e){ if(window.toast)toast(/permission-denied|failed-precondition/.test((e&&e.code)||'') ? ('⛔ 전송 거부: '+(e.message||e.code)) : ('⚠ 전송 실패: '+(e.code||e.message))); });
   }
   window.caroAdminCmd=function(type){
     var label = (type==='unlock')?'문 열기':((type==='lock')?'문 잠그기':'비상등');
@@ -1943,6 +1955,9 @@
 <script src="admin-force-return.js?v=1"></script>
 <script src="admin-debt.js?v=2"></script>
 <script src="admin-pricing.js?v=9"></script>
+<script src="lib/qrcode/qrcode.js"></script>
+<script src="caro-mfa.js?v=1"></script>
+<script src="caro-admin-lock.js?v=1"></script>
 <script src="caro-icons.js?v=1"></script>
 </body>
 </html>

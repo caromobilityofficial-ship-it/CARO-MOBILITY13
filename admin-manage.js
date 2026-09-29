@@ -118,7 +118,7 @@
      +   '<span class="k">시작</span><span class="v">'+fmtDate(d.start)+'</span>'
      +   '<span class="k">종료</span><span class="v">'+fmtDate(d.end)+'</span>'
      +   '<span class="k">이용 시간</span><span class="v">'+(Number(d.hrs)||0)+'시간'
-        +((Number(d.extendedMins)||0)>0?(' (연장 '+d.extendedMins+'분)'):'')+'</span>'
+        +((Number(d.extendedMins)||0)>0?(' (연장 '+(Number(d.extendedMins)||0)+'분)'):'')+'</span>'
      +   (d.returned?('<span class="k">반납</span><span class="v">'+fmtDate(d.returnedAt)+'</span>'):'')
      + '</div></div>'
      + '<div class="rm-sec"><div class="rm-sec-t">결제</div><div class="rm-grid">'

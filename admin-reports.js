@@ -128,7 +128,7 @@
         }
         var injury = (view==='acc' && r.injury && r.injury !== '없음')
                      ? '<span class="rp-tag" style="background:rgba(178,58,58,.12);color:#b23a3a;">부상 '+esc(r.injury)+'</span>' : '';
-        var pc = r.photoCount ? '<span class="rp-tag">사진 '+r.photoCount+'</span>' : '';
+        var pc = r.photoCount ? '<span class="rp-tag">사진 '+esc(r.photoCount)+'</span>' : '';
         return '<div class="rp-item" data-id="'+esc(r.id)+'">'
              +   '<div class="rp-top">'
              +     '<span class="rp-no">'+esc(r.id)+'</span>'
@@ -200,7 +200,7 @@
     if(r.photos && r.photos.length){
       photos = '<div class="rp-row" style="display:block;"><div class="rp-k" style="margin-bottom:6px;">사진 ('+r.photos.length+')</div>'
              + '<div class="rp-photos">'
-             + r.photos.map(function(p){ return '<img src="'+p+'" alt="사진"/>'; }).join('')
+             + r.photos.map(function(p){ return '<img src="'+esc(p)+'" alt="사진"/>'; }).join('')
              + '</div></div>';
     }
 
@@ -234,7 +234,7 @@
           document.body.appendChild(z);
           z.addEventListener('click', function(){ z.classList.remove('on'); });
         }
-        z.innerHTML = '<img src="'+img.getAttribute('src')+'"/>';
+        z.innerHTML = '<img src="'+esc(img.getAttribute('src'))+'"/>';
         z.classList.add('on');
       };
     });

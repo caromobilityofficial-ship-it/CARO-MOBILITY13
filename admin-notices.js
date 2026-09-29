@@ -13,7 +13,10 @@
   var selType='공지';
   function ready(){ return window.FB_DB && window.FB_FN && typeof window.FB_FN.onSnapshot==='function'; }
   function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
-  function fmtDate(iso){ try{ var d=new Date(iso); if(isNaN(d.getTime())) return ''; var p=function(n){return n<10?'0'+n:n;}; return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate()); }catch(e){ return ''; } }
+   /* ★[14차] onclick="f('…')" 처럼 글자가 다시 '코드' 로 읽히는 자리에는 esc 만으로는 부족하다
+     (HTML 규칙상 &#39; 는 읽히는 순간 ' 로 돌아와 문자열을 끊는다) → 코드 문자열 규칙으로 먼저 막고 나서 HTML 로 막는다 */
+  function jsa(s){ return esc(String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\n/g,'\\n').replace(/\r/g,'\\r').replace(/\u2028/g,'\\u2028').replace(/\u2029/g,'\\u2029')); }
+ function fmtDate(iso){ try{ var d=new Date(iso); if(isNaN(d.getTime())) return ''; var p=function(n){return n<10?'0'+n:n;}; return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate()); }catch(e){ return ''; } }
   function toast(m){ try{ if(typeof window.toast==='function') window.toast(m); }catch(e){} }
   function isEvent(n){ var t=(n&&n.type)||''; if(t) return t==='이벤트'; return /이벤트|할인|혜택|event|sale/i.test((n&&n.title)||''); }
 
@@ -97,7 +100,7 @@
     var badge='<span class="ne-badge '+(ev?'ev':'no')+'">'+(ev?'이벤트':'공지')+'</span>';
     return '<div class="list-item"><div><div>'+badge+esc(n.title)+'</div>'+
       '<div class="meta">'+fmtDate(n.createdAt)+' · 게시중</div></div>'+
-      '<button class="btn sm" onclick="window.delNotice(\''+n.id+'\')">삭제</button></div>';
+      '<button class="btn sm" onclick="window.delNotice(\''+jsa(n.id)+'\')">삭제</button></div>';
   }
   function render(){
     injectCss();

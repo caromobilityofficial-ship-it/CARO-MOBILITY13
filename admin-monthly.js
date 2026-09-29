@@ -133,12 +133,12 @@
       var ph=num(d.pricePerHour)!=null?num(d.pricePerHour):num(d.price);
       var mp=plan1(d); if(mp!=null) setN++;
       var idA=(''+it.id).replace(/\\/g,'').replace(/'/g,"\\'");
-      var thumb=d.img?'<img class="mr-thumb" src="'+d.img+'" onerror="this.style.visibility=\'hidden\'"/> ':'';
+      var thumb=d.img?'<img class="mr-thumb" src="'+esc(d.img)+'" onerror="this.style.visibility=\'hidden\'"/> ':'';
       return '<tr>'
         +'<td style="color:var(--txt)">'+thumb+esc(name)+'</td>'
         +'<td><span class="mr-grade'+(it.bl?' bl':'')+'">'+(it.bl?'THE BLACK':'일반')+'</span></td>'
         +'<td style="font-family:\'Saira\',sans-serif;color:'+(mp==null?'var(--muted)':'var(--txt)')+'">'+(mp==null?'미설정':won(mp)+'원~')+'</td>'
-        +'<td style="text-align:right"><button class="mr-edit" onclick="mrOpenEdit(\''+it.col+'\',\''+idA+'\')">수정</button></td>'
+        +'<td style="text-align:right"><button class="mr-edit" onclick="mrOpenEdit(\''+esc(it.col)+'\',\''+esc(idA)+'\')">수정</button></td>'
       +'</tr>';
     }).join('');
     body.innerHTML = rows || '<tr><td colspan="4" class="mr-empty">등록된 차량이 없습니다. 우측 상단 ‘+ 차량 추가’로 등록하세요.</td></tr>';

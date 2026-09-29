@@ -75,10 +75,17 @@
     var f=FN(), db=DB();
     if(!f || !db || typeof f.setDoc!=='function') { notify('⚠ 잠금 명령을 보낼 수 없습니다 (연결 대기)'); return; }
     var cmdId='cmd_'+Date.now()+'_'+Math.random().toString(36).slice(2,8);
-    f.setDoc(f.doc(db,'devices',dev,'commands',cmdId), {
+    /* ★[14차] 서버 함수(staffCommand) 우선, 배포 전(not-found)이면 예전처럼 직접 쓰기 */
+    var direct=function(){ return f.setDoc(f.doc(db,'devices',dev,'commands',cmdId), {
       type:'lock', status:'pending', issuedBy:'admin', issuedByEmail:me(),
       issuedAt:(typeof f.serverTimestamp==='function'?f.serverTimestamp():new Date()), timestamp:Date.now()
-    }).then(function(){ notify('🔒 문 잠금 명령 전송 — 주차 절전 중이면 최대 80초 걸립니다'); })
+    }); };
+    var queued=(typeof window.FB_CALL==='function')
+      ? window.FB_CALL('staffCommand',{deviceId:dev,type:'lock'}).catch(function(e){
+          if(/not-found|unimplemented/.test((e&&e.code)||'')) return direct();
+          throw e; })
+      : direct();
+    queued.then(function(){ notify('🔒 문 잠금 명령 전송 — 주차 절전 중이면 최대 80초 걸립니다'); })
       .catch(function(e){ notify('⚠ 잠금 명령 전송 실패: '+((e&&e.code)||e)); });
   }
 
