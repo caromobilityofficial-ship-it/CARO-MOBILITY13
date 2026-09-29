@@ -1,0 +1,226 @@
+rules_version = '2';
+/* ═══════════════════════════════════════════════════════════════════════════
+   CARO Mobility — Firestore 보안 규칙  (2026-09-29, v9.8 12차 검수 반영)
+
+   ★이번에 고친 것 3가지
+     1) 단말 계정이 **하나로 박혀 있던 것** → 차량마다 자기 계정으로 (2대째부터 못 쓰던 문제)
+     2) 로그인만 하면 **누구나 아무 차에나 시동차단 명령**을 넣을 수 있던 것 → 고객은 문열기·잠금·비상등·경적만
+     3) 정지된 사용자가 **자기 정지를 스스로 풀 수 있던 것** → 해제는 관리자만
+
+   ★고객 서비스가 멈추지 않도록 일부러 그대로 둔 것
+     · 명령 생성을 '서버(issueCommand)만' 으로 완전히 잠그지 않았다.
+       지금 고객앱은 SECURE_SERVER: false 라 브라우저에서 직접 명령을 만든다.
+       여기서 잠그면 **고객이 차 문을 못 연다.**
+       앱이 서버 모드로 배포된 뒤에 아래 [2단계] 주석대로 한 줄만 바꾸면 된다.
+
+   배포:  Firebase 콘솔 → Firestore Database → 규칙 → 붙여넣기 → 게시
+   ═══════════════════════════════════════════════════════════════════════════ */
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /* ───────── 최고관리자(본인) 식별 ───────── */
+    function isAdmin() {
+      return request.auth != null &&
+             request.auth.token.email == 'caro.mobility.official@gmail.com';
+    }
+
+    /* ───────── ★수정 1 — 차량 단말(ESP32) 계정 식별 ─────────
+       예전:  'device-caro001@caro.local' 하나로 고정
+              → 차량이 2대가 되는 순간 두 번째 단말은 아무것도 못 쓴다.
+              → 여러 대가 계정 하나를 같이 쓰면, 단말 하나를 뜯어 비밀번호를 꺼내는 순간
+                 **전 차량의 문을 열 수 있다.**
+       지금:  차량 문서 id 로 계정 이름을 만들어 대조한다.
+              devices/CARO-001  ←  caro-001@device.caromobility.kr  만 쓸 수 있다
+              devices/CARO-002  ←  caro-002@device.caromobility.kr  만 쓸 수 있다
+              (단말 펌웨어 config.h 의 DEV_ID / DEV_EMAIL 과 같은 규칙)
+       옛 계정(device-caro001@caro.local)도 당분간 같이 받아 준다 — 기존 단말이 멈추지 않게. */
+    function isDevice(deviceId) {
+      return request.auth != null &&
+             ( request.auth.token.email == deviceId.lower() + '@device.caromobility.kr'
+               || request.auth.token.email == 'device-caro001@caro.local' );   // ← 옛 단말 정리되면 이 줄 삭제
+    }
+
+    /* ───────── 직원 권한 (admin_accounts/{이메일} 의 perms 로 판단) ───────── */
+    function acctRef() {
+      return /databases/$(database)/documents/admin_accounts/$(request.auth.token.email.lower());
+    }
+    function isActiveAdmin() {
+      return request.auth != null && exists(acctRef()) &&
+             get(acctRef()).data.get('active', false) == true;
+    }
+    function can(p) {
+      return isAdmin() ||
+        (isActiveAdmin() && get(acctRef()).data.get('perms', {}).get(p, false) == true);
+    }
+    /* 관제(사람)인가 — 시동차단처럼 위험한 명령을 보낼 수 있는 사람 */
+    function isStaff() { return isAdmin() || can('resv') || can('cars'); }
+
+    /* 차량 — 모두 읽기, [차량 또는 요금] 권한자 쓰기 */
+    match /cars/{carId} {
+      allow read: if true;
+      allow write: if can('cars') || can('pricing');
+    }
+
+    /* 요금 설정 (성수기/주말 요금) — 모두 읽기, [요금] 권한자 쓰기 */
+    match /settings/{docId} {
+      allow read: if true;
+      allow write: if can('pricing');
+    }
+
+    /* caro the black 차량 */
+    match /bl_cars/{carId} {
+      allow read: if true;
+      allow write: if can('cars') || can('pricing');
+    }
+
+    /* 공지·이벤트 — 모두 읽기, [공지] 권한자 쓰기 */
+    match /notices/{id} {
+      allow read: if true;
+      allow write: if can('notices');
+    }
+
+    /* 관리자 계정 — 최고관리자만 관리 / 직원 본인은 자기 권한만 읽기 */
+    match /admin_accounts/{id} {
+      allow read:  if isAdmin() ||
+                      (request.auth != null && id == request.auth.token.email.lower());
+      allow write: if isAdmin();
+    }
+
+    /* 예약 — 본인 것만 + [예약] 권한자/관리자는 전체 */
+    match /reservations/{resId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null &&
+                       request.resource.data.userId == request.auth.uid;
+      allow update, delete: if request.auth != null &&
+                                (resource.data.userId == request.auth.uid || isAdmin() || can('resv'));
+    }
+
+    /* 사용자 프로필 */
+    match /users/{uid} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null &&
+                      (request.auth.uid == uid || isAdmin());
+    }
+
+    /* 로그인 이벤트 */
+    match /login_events/{eid} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update, delete: if isAdmin();
+    }
+
+    /* AI 상담 기록 — 본인 작성/조회, 관리자는 전체(통계) */
+    match /support_chats/{id} {
+      allow read:   if isAdmin() || (request.auth != null && resource.data.userId == request.auth.uid);
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow update: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow delete: if isAdmin();
+    }
+
+    /* 사고 접수 — 고객 본인 생성·조회 / 관리자·[예약] 직원 전체. 삭제 불가(보험·분쟁 대응) */
+    match /accident_reports/{id} {
+      allow read:   if isAdmin() || can('resv') ||
+                       (request.auth != null && resource.data.userId == request.auth.uid);
+      allow create: if request.auth != null &&
+                       request.resource.data.userId == request.auth.uid;
+      allow update: if isAdmin() || can('resv');
+      allow delete: if false;
+    }
+
+    /* 1:1 문의 */
+    match /support_inquiries/{id} {
+      allow read:   if isAdmin() || can('resv') ||
+                       (request.auth != null && resource.data.userId == request.auth.uid);
+      allow create: if request.auth != null &&
+                       request.resource.data.userId == request.auth.uid;
+      allow update: if isAdmin() || can('resv');
+      allow delete: if isAdmin();
+    }
+
+    /* ───────── 미납(채권) ───────── */
+    match /unpaid_debts/{docId} {
+      allow read, write: if isAdmin() || can('resv');
+      allow create: if request.auth != null &&
+                       request.resource.data.userId == request.auth.uid;
+      allow read, update: if request.auth != null &&
+                             resource.data.userId == request.auth.uid;
+    }
+
+    /* ───────── ★수정 3 — 이용 정지 (문서 ID = 사용자 uid) ─────────
+       예전:  본인이 자기 정지 문서를 통째로 쓸 수 있었다
+              → 정지당한 사람이 active:false 로 바꿔 **스스로 정지를 풀 수 있었다.**
+       지금:  본인은 '정지 걸기'(active:true)만 가능. 푸는 것은 관리자·[예약] 직원만.
+              (고객앱 customer-redesign.js 가 장기 미납 시 스스로 기록하는 흐름은 그대로 동작) */
+    match /suspensions/{uid} {
+      allow read:  if isAdmin() || can('resv') ||
+                      (request.auth != null && request.auth.uid == uid);
+      allow write: if isAdmin() || can('resv');
+      allow create, update: if request.auth != null && request.auth.uid == uid
+                            && request.resource.data.active == true;
+    }
+
+    /* ═══════════ 차량 단말 (ESP32) ═══════════ */
+    match /devices/{deviceId} {
+      allow read:  if request.auth != null;
+      /* 상태 보고는 그 차량의 단말 계정만. 다른 차 문서에는 손댈 수 없다. */
+      allow write: if isAdmin() || isDevice(deviceId);
+
+      /* 주행 기록 · 사건 기록 — 단말만 쓴다 (관제·고객앱은 읽기만 한다).
+         예전엔 로그인한 사람이면 누구나 가짜 기록을 넣을 수 있었다. */
+      match /telemetry/{tsId} {
+        allow read:  if request.auth != null;
+        allow create: if isDevice(deviceId) || isAdmin();
+        allow update, delete: if isAdmin();          /* 기록은 고쳐 쓰지 않는다 */
+      }
+      match /events/{eventId} {
+        allow read:  if request.auth != null;
+        allow create: if isDevice(deviceId) || isAdmin();
+        allow update, delete: if isAdmin();
+      }
+
+      /* ───────── ★수정 2 — 차량 명령 ─────────
+         예전:  allow create: if request.auth != null;
+                → 로그인한 사람이면 **누구나 아무 차에나** 명령을 만들 수 있었다.
+                  개발자도구로 type:'immobilize' 를 넣으면 남의 차 시동을 끊을 수 있었다.
+         지금:  · 관제(관리자·[예약]/[차량] 권한 직원) — 모든 명령
+                · 그 밖의 로그인 사용자(고객앱) — 문열기·잠금·비상등·경적·차찾기 **만**
+                  (시동차단·차단해제·재부팅·입력극성·층보정 등은 막힌다)
+                · status 는 반드시 'pending' 으로 시작해야 한다
+         ★[2단계] 앱이 서버 모드(SECURE_SERVER:true)로 배포되고 안정된 뒤에는
+                  아래 create 조건을 `if isStaff();` 한 줄로 바꾼다.
+                  그러면 고객 명령은 전부 서버(issueCommand)가 예약을 확인한 뒤에만 만들어진다.
+                  ※ 지금 바꾸면 고객이 차 문을 못 연다. 반드시 앱 배포 뒤에. */
+      match /commands/{cmdId} {
+        allow read:   if request.auth != null;
+        allow create: if request.auth != null
+                      && request.resource.data.status == 'pending'
+                      && ( request.resource.data.type in
+                              ['unlock','lock','open','hazard','hazard_off','horn','find']
+                           || isStaff() );
+                      /* ↑ 흔한 경우(고객 문열기)를 먼저 본다. isStaff() 는 admin_accounts 문서를
+                           읽어야 해서 호출마다 읽기 비용이 붙는다 — 순서만 바꿔도 비용이 준다. */
+        /* 실행 결과는 그 차량의 단말만 적는다 — 사람이 '실행된 척' 못 하게 */
+        allow update: if isDevice(deviceId) || isAdmin();
+        allow delete: if isAdmin();
+      }
+    }
+
+    /* ───────── 서버(Cloud Functions)가 Admin SDK 로 쓰는 것들 ─────────
+       Admin SDK 는 규칙을 우회하므로 쓰기는 false 로 두고, 화면에 필요한 읽기만 연다.
+       (SECURE_SERVER 를 켰을 때 화면이 비지 않도록 미리 넣어 둔다) */
+    match /availability/{id}  { allow read: if request.auth != null; allow write: if false; }
+    match /orders/{orderId}   { allow read: if isAdmin() || can('resv') ||
+                                             (request.auth != null && resource.data.uid == request.auth.uid);
+                                allow write: if false; }
+    match /command_log/{id}   { allow read: if isStaff(); allow write: if false; }
+    match /admin_alerts/{id}  { allow read, write: if isStaff(); }
+    match /fuel_claims/{id}   { allow read: if isAdmin() || can('resv') ||
+                                             (request.auth != null && resource.data.userId == request.auth.uid);
+                                allow create: if request.auth != null &&
+                                              request.resource.data.userId == request.auth.uid;
+                                allow update, delete: if isAdmin() || can('resv'); }
+
+    /* ───────── 그 외 전부 차단 ───────── */
+    match /{document=**} { allow read, write: if false; }
+  }
+}
