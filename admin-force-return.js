@@ -64,6 +64,24 @@
     }catch(e){}
   }
 
+  /* 강제 반납 뒤 차 문 잠그기 (기기가 연결돼 있을 때만) */
+  function lockAfterReturn(d){
+    var carId = (d && d.car && (d.car.id != null ? d.car.id : d.car.carId));
+    if(carId == null) return;
+    var map = window.CARO_DEVICE_MAP || {};
+    var dev = map[String(carId)] || map[carId];
+    if(!dev) return;                                   // IoT 미연결 차량 — 조용히 넘어간다
+    if(!window.confirm('강제 반납했습니다.\n이 차량의 문도 지금 잠글까요?\n(기기 ' + dev + ')')) return;
+    var f=FN(), db=DB();
+    if(!f || !db || typeof f.setDoc!=='function') { notify('⚠ 잠금 명령을 보낼 수 없습니다 (연결 대기)'); return; }
+    var cmdId='cmd_'+Date.now()+'_'+Math.random().toString(36).slice(2,8);
+    f.setDoc(f.doc(db,'devices',dev,'commands',cmdId), {
+      type:'lock', status:'pending', issuedBy:'admin', issuedByEmail:me(),
+      issuedAt:(typeof f.serverTimestamp==='function'?f.serverTimestamp():new Date()), timestamp:Date.now()
+    }).then(function(){ notify('🔒 문 잠금 명령 전송 — 주차 절전 중이면 최대 80초 걸립니다'); })
+      .catch(function(e){ notify('⚠ 잠금 명령 전송 실패: '+((e&&e.code)||e)); });
+  }
+
   function forceReturn(no, btns){
     if(!ready()||!no) { notify('연결 준비 중입니다'); return; }
     var f=FN(), db=DB(), t=nowIso();
@@ -80,6 +98,10 @@
         try{ if(typeof f.deleteDoc==='function') f.deleteDoc(f.doc(db,'availability',no)).catch(function(){}); }catch(e){}
         logAlert('force_return', no, { userId:d.userId||'', carName:(d.car&&d.car.name)||'' });
         notify('✅ '+no+' 강제 반납 처리 완료 — 손님 앱에도 바로 반영됩니다');
+        /* ★[v9.8 11차 검수] 강제 반납은 예약만 닫고 **차 문은 열린 채로 남겼다.**
+           반납 안 하고 간 차를 관제가 정리하는 자리인데, 문이 열려 있으면 그대로 길에 방치된다.
+           기기가 붙어 있으면 잠금 명령을 같이 보낼지 묻는다 (조용히 보내지 않는다). */
+        try{ lockAfterReturn(d); }catch(e){ console.warn('반납 후 잠금 실패:', e); }
         refreshModal(no);
       });
     }).catch(function(e){

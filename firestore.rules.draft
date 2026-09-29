@@ -1,0 +1,107 @@
+rules_version = '2';
+// ═══════════════════════════════════════════════════════════════════════════
+//  CARO — Firestore 보안 규칙 **초안** (2026-09-29, v9.8 11차 검수)
+//
+//  ★이 파일은 그대로 배포하지 말 것. 지금 운영 중인 규칙은 Firebase 콘솔에만 있고
+//    저장소에 없어서, 무엇을 막고 있는지 아무도 확인할 수 없는 상태다.
+//
+//  하는 법:
+//    ① Firebase 콘솔 → Firestore → 규칙 → 지금 규칙 전문을 복사해
+//       이 파일 아래 "── 기존 규칙 ──" 자리에 붙인다.
+//    ② 아래 devices/ 블록을 그 규칙에 합친다 (겹치면 아래 것이 더 엄격한 쪽이다).
+//    ③ 콘솔의 '규칙 놀이터(Playground)' 로 아래 시험 항목을 하나씩 돌려 본다.
+//    ④ 통과하면 배포하고, 이 파일을 저장소에 커밋한다 (이력·백업·검토가 그때부터 된다).
+//
+//  왜 지금 중요한가:
+//    단말마다 고유 계정을 심기 시작하면(mkprov9.py), 규칙이 **유일한 방어선**이 된다.
+//    규칙이 느슨하면 단말 한 대의 계정(플래시를 읽으면 나온다)으로
+//    **전 차량의 문을 여는 명령을 만들 수 있다.**
+// ═══════════════════════════════════════════════════════════════════════════
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── 도우미 ───────────────────────────────────────────────────────────
+    function signedIn()   { return request.auth != null; }
+    // 단말 계정 이메일 규칙 : <기기ID>@dev.caro.local  (mkprov9.py 가 그렇게 만든다)
+    function isDevice(id) {
+      return signedIn()
+        && request.auth.token.email == id + '@dev.caro.local'
+        && request.auth.token.email_verified == false;   // 단말 계정은 메일 확인을 하지 않는다
+    }
+    function isStaff()    { return signedIn() && request.auth.token.staff == true; }   // 관제 직원 : 커스텀 클레임
+    function isMine(uid)  { return signedIn() && request.auth.uid == uid; }
+
+    // ── 단말 문서 ────────────────────────────────────────────────────────
+    //  · 단말은 **자기 문서만** 쓴다 (다른 차 문서에는 손댈 수 없다)
+    //  · 관제 직원은 전부 읽는다
+    //  · 고객앱은 차량 위치·상태를 보려고 읽는다 → 개인정보가 없는 필드만 있어야 한다
+    match /devices/{deviceId} {
+      allow read:   if signedIn();                       // (고객앱이 차량 목록·위치를 본다)
+      allow write:  if isDevice(deviceId) || isStaff();
+      allow delete: if isStaff();
+
+      // 기록 : 단말만 쓰고, 지우는 것은 TTL 정책이 한다 (사람이 지우지 않는다)
+      match /telemetry/{doc} {
+        allow read:   if isStaff();
+        allow create: if isDevice(deviceId);
+        allow update, delete: if false;                  // 기록은 고쳐 쓰지 않는다
+      }
+      match /events/{doc} {
+        allow read:   if isStaff();
+        allow create: if isDevice(deviceId);
+        allow update, delete: if false;
+      }
+
+      // ★명령 : 가장 중요한 자리. '누가 이 차의 문을 열 수 있는가' 가 여기서 정해진다.
+      match /commands/{cmdId} {
+        allow read: if isDevice(deviceId) || isStaff();
+
+        // 만들 수 있는 사람 : 관제 직원, 또는 Cloud Functions(issueCommand — 유효 예약 확인 뒤).
+        //  ★고객 브라우저가 직접 만들지 못하게 막는 것이 핵심이다.
+        //    지금 고객앱(script.js sendDeviceCommand)은 브라우저에서 직접 만든다 →
+        //    CARO_CONFIG.SECURE_SERVER 를 켜고 caro-secure.js 의 issueCommand 경로로
+        //    옮긴 뒤에 아래 줄에서 isStaff() 만 남길 것. (옮기기 전에 막으면 고객이 문을 못 연다)
+        allow create: if (isStaff() || signedIn())
+                      && request.resource.data.status == 'pending'
+                      && request.resource.data.type is string
+                      && request.resource.data.type in
+                         ['unlock','lock','open','hazard','hazard_off','horn',
+                          'immobilize','release','immob_on','immob_off',
+                          'setfloor','resetfloor','setfloormap','clearfloormap',
+                          'markfloor','setfloorheight','setinmode','reboot','report','tel','buzz'];
+
+        // 고치는 것은 **단말만** — 실행 결과(status/error/ackedAt/doneAt)를 적는다.
+        //  사람이 status 를 done 으로 바꿔 '실행된 척' 하지 못하게 한다.
+        allow update: if isDevice(deviceId)
+                      && request.resource.data.diff(resource.data).affectedKeys()
+                         .hasOnly(['status','error','ackedAt','doneAt']);
+        allow delete: if isStaff();
+      }
+    }
+
+    // ── 사용자 ───────────────────────────────────────────────────────────
+    match /users/{uid} {
+      allow read, write: if isMine(uid) || isStaff();
+    }
+
+    // ── 기존 규칙 ─────────────────────────────────────────────────────────
+    //  cars / bl_cars / reservations / availability / fuel_claims / login_events /
+    //  notices / pricing / debt / inbox … 는 지금 콘솔에 있는 규칙을 그대로 가져와 여기에 붙일 것.
+    //  (이 초안은 devices/ 만 다룬다 — 나머지를 여기서 추측해 덮어쓰면 운영이 깨진다)
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  규칙 놀이터에서 확인할 것 (전부 기대대로 나와야 한다)
+//
+//   1. 단말 caro-0001 계정으로 devices/caro-0002 쓰기      → 거부
+//   2. 단말 caro-0001 계정으로 devices/caro-0001 쓰기      → 허용
+//   3. 단말 caro-0001 계정으로 caro-0002/commands 만들기   → 거부
+//   4. 단말 계정으로 자기 commands 의 status 를 done 으로  → 허용
+//   5. 단말 계정으로 자기 commands 의 type 을 바꾸기       → 거부 (affectedKeys 제한)
+//   6. 로그인한 고객이 commands 에 type:'immobilize' 생성  → ★지금은 허용된다.
+//        시동차단은 고객이 만들 수 있으면 안 된다 — SECURE_SERVER 로 옮긴 뒤
+//        allow create 를 isStaff() 로 좁히면 막힌다. 그 전까지는 남는 위험으로 기록.
+//   7. 로그인 안 한 사람이 devices 읽기                     → 거부
+// ═══════════════════════════════════════════════════════════════════════════

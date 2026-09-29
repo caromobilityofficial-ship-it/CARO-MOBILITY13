@@ -1726,10 +1726,27 @@
     FN.setDoc(FN.doc(db,'devices',dev,'commands',cmdId), payload).then(function(){
       if(window.toast)toast('📡 '+label+' 전송됨 · '+v.name);
       var ref=FN.doc(db,'devices',dev,'commands',cmdId), un=null;
+      /* ★[v9.8 11차 검수] ① 30초는 짧다 — 단말이 주차 절전 중이면 최악 80초(확인 60 + 낮잠 20)에 실행된다.
+            예전엔 30초에 조용히 구독만 끊어서, 그 뒤 성공해도 관제 화면엔 **아무 말도 안 떴다**.
+         ② 실패 사유(d.error)를 안 보여 줘서 '주행 중이라 거부' 인지 '통신 두절' 인지 구분할 수 없었다. */
+      var to=null;
       un=FN.onSnapshot(ref,function(s){ if(!s.exists())return; var d=s.data()||{};
-        if(d.status==='done'){ if(window.toast)toast('✅ '+label+' 완료'); if(un)un(); }
-        else if(d.status==='failed'){ if(window.toast)toast('❌ '+label+' 실패'); if(un)un(); } });
-      setTimeout(function(){ if(un)un(); },30000);
+        if(d.status==='acked'){ if(window.toast)toast('📨 기기가 '+label+' 명령을 받았습니다'); return; }
+        if(d.status==='done'){ if(window.toast)toast('✅ '+label+' 완료'); if(un)un(); clearTimeout(to); return; }
+        if(d.status==='failed'){
+          var e=String(d.error||'');
+          var why = /expired/.test(e)                ? '명령이 늦게 도착해 실행하지 않음'
+                  : /acc on, or acc off/.test(e)     ? '시동이 켜져 있거나 끈 지 60초 미만 (안전)'
+                  : /gps shows vehicle moving/.test(e)? '차가 움직이는 중 (안전)'
+                  : /cannot confirm stopped/.test(e) ? '정차를 확인할 수 없음 (위성·자이로 무응답)'
+                  : /hazard state unknown/.test(e)   ? '기기가 비상등 상태를 모름 — 눈으로 확인 후 재시도'
+                  : /sensor not ready/.test(e)       ? '기압계 준비 중 — 1~2분 뒤 재시도'
+                  : /out of range/.test(e)           ? '값이 허용 범위를 벗어남'
+                  : /device reset during/.test(e)    ? '실행 중 기기 재시작됨'
+                  : (e||'사유 없음');
+          if(window.toast)toast('❌ '+label+' 실패: '+why); if(un)un(); clearTimeout(to); } });
+      to=setTimeout(function(){ if(un)un();
+        if(window.toast)toast('⏱ '+label+' — 100초 동안 응답 없음 (주차 절전 중이면 80초까지는 정상)'); },100000);
     }).catch(function(e){ if(window.toast)toast('⚠ 전송 실패: '+(e.code||e.message)); });
   }
   window.caroAdminCmd=function(type){

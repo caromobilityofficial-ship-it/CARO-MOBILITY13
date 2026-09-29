@@ -2660,10 +2660,13 @@ function sendDeviceCommand(carId, cmdType){
         /* ── NEW: 명령 상태 실시간 추적 ── */
         var cmdRef = fn.doc(db, 'devices', deviceId, 'commands', cmdId);
         var unsub = null;
+        /* ★[v9.8 11차 검수] 30초는 너무 짧다. 단말이 주차 절전 중이면 명령 확인 60초 + 낮잠 20초 =
+           최악 80초 뒤에 실행된다. 30초에 '응답 없음' 을 띄우면 고객은 차 앞에서 실패 메시지를 보고
+           다시 누르는데, 그 사이 문은 열린다. 100초로 늘리고 안내문도 정직하게 바꾼다. */
         var timeoutId = setTimeout(function(){
           if(unsub) unsub();
-          showCtrlToast('⏱ 디바이스 응답 없음 (' + cmdType + ')');
-        }, 30000);
+          showCtrlToast('⏱ 차량 응답이 늦습니다 — 잠시 후 다시 시도해 주세요 (' + cmdType + ')');
+        }, 100000);
 
         unsub = fn.onSnapshot(cmdRef, function(snap){
           if(!snap.exists()) return;
@@ -2677,7 +2680,7 @@ function sendDeviceCommand(carId, cmdType){
             clearTimeout(timeoutId);
             if(unsub) unsub();
           } else if(d.status === 'failed'){
-            showCtrlToast('❌ 명령 실패: ' + (d.errorMsg || '알 수 없음'));
+            showCtrlToast('❌ 명령 실패: ' + (d.error || d.errorMsg || '알 수 없음'));   /* ★펌웨어는 error 에 쓴다 */
             clearTimeout(timeoutId);
             if(unsub) unsub();
           }
@@ -2819,7 +2822,9 @@ function ctrlActionHome(type){
           if(ok) showCtrlToast('🔓 잠금 해제 명령 전송됨');
         });
       } else {
-        showCtrlToast('🔓 차량 문이 열렸습니다.');
+        /* ★[v9.8 11차 검수] 예전엔 명령을 한 줄도 안 보내고 '문이 열렸습니다' 라고 알렸다.
+           고객은 열린 줄 알고 차로 걸어간다 — 거짓 성공 안내는 없는 것만 못하다. */
+        showCtrlToast('⚠ 예약 차량을 확인할 수 없습니다 — 새로고침 후 다시 시도해 주세요');
       }
       return;
     }
@@ -2832,7 +2837,8 @@ function ctrlActionHome(type){
           if(ok) showCtrlToast('🔒 잠금 명령 전송됨');
         });
       } else {
-        showCtrlToast('🔒 차량 문이 잠겼습니다.');
+        /* ★[v9.8 11차 검수] 문 열기와 같은 거짓 성공 안내 — 잠긴 줄 알고 떠나면 차가 열린 채 남는다 */
+        showCtrlToast('⚠ 예약 차량을 확인할 수 없습니다 — 새로고침 후 다시 시도해 주세요');
       }
       return;
     }
@@ -3766,7 +3772,7 @@ function openHomeCtrl(){
   /* 반납 안 된 예약 중 가장 최근 것을 표시 */
   var now2=new Date();
     myReservations.forEach(function(r,i){
-      if(!r.returned && r.start && r.end){
+      if(!r.returned && !r.cancelled && r.start && r.end){
         var rActive=now2>=r.start&&now2<=r.end;
         var prevActive=activeRes&&now2>=activeRes.start&&now2<=activeRes.end;
         if(!activeRes){
@@ -3790,8 +3796,15 @@ function openHomeCtrl(){
 
   if(activeRes){
     /* 대여 시작 10분 전부터 버튼 활성화 (사진 촬영 시간 확보) */
+    /* ★[v9.8 11차 검수] 예전엔 상한이 없었다 — 시작 시각만 지나면 `returned` 가 찍히기 전까지
+       **끝난 예약으로도 계속 차 문을 열 수 있었다.** 반납 버튼을 안 누른 고객은 무기한 접근이 됐다.
+       그렇다고 종료 즉시 막으면 늦게 반납하는 고객이 차 안 짐을 못 꺼낸다(더 위험).
+       → 종료 후 24시간까지는 '반납 지연' 으로 열어 두되 경고하고, 그 뒤로는 관제 개입. */
+    var GRACE_MS = 24*60*60*1000;
     var isStarted=(activeRes.start-now)<=10*60*1000;
-  setCtrlButtonsActive(isStarted);
+    var overdueMs=now-activeRes.end;
+    var expired=overdueMs>GRACE_MS;
+    setCtrlButtonsActive(isStarted && !expired);
     if(isStarted){var pb=document.getElementById('ctrl-photo-toggle');if(pb){pb.disabled=false;pb.style.opacity='';pb.style.pointerEvents='';}}
 
     var name=getCarName(activeRes.car);
@@ -3809,7 +3822,10 @@ function openHomeCtrl(){
     var pkText=floors[hash]+' · '+spots[hash]+' 구역';
     if(park) park.textContent=pkText;
     /* 시작 전이면 안내 문구 표시 */
-    if(notice) notice.textContent=isStarted?'':'대여 시작 10분 전부터 버튼이 활성화됩니다';
+    if(notice) notice.textContent = expired
+        ? '반납 예정 시각이 24시간 넘게 지나 차량 제어가 잠겼습니다 — 고객센터로 연락해 주세요'
+        : (overdueMs>0 ? '⚠ 반납 시간이 지났습니다 — 연장하거나 반납해 주세요 (24시간 뒤 제어가 잠깁니다)'
+                       : (isStarted?'':'대여 시작 10분 전부터 버튼이 활성화됩니다'));
     if(notice) notice.style.display='block';
     var dur=document.getElementById('home-ctrl-duration');
     if(dur){

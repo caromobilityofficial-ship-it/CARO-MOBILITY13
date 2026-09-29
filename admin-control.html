@@ -283,6 +283,8 @@ html,body{max-width:100%;overflow-x:hidden;}
       <div class="lv"><div class="k">고도</div><div class="v" id="lv-alt">—</div></div>
       <div class="lv"><div class="k">위성</div><div class="v" id="lv-sat">—</div></div>
       <div class="lv"><div class="k">위치출처</div><div class="v" id="lv-src">—</div></div>
+      <div class="lv"><div class="k">배터리</div><div class="v" id="lv-bat">—</div></div>
+      <div class="lv"><div class="k">시동</div><div class="v" id="lv-acc">—</div></div>
     </div>
   </div>
 
@@ -291,11 +293,17 @@ html,body{max-width:100%;overflow-x:hidden;}
     <div class="card">
       <h3><span class="dot"></span>원격 제어</h3>
       <div class="ctrl">
-        <button class="cbtn" onclick="sendCmd('unlock')">🔓 문 열기</button>
+        <button class="cbtn" onclick="if(confirm('차량 문을 원격으로 엽니다. 실행할까요?')) sendCmd('unlock')">🔓 문 열기</button>
         <button class="cbtn" onclick="sendCmd('lock')">🔒 문 잠금</button>
-        <button class="cbtn warn wide" onclick="sendCmd('hazard')">⚠ 비상등 (원격 실행)</button>
+        <button class="cbtn warn" onclick="sendCmd('hazard')">⚠ 비상등</button>
+        <button class="cbtn" id="hazackbtn" style="display:none" onclick="if(confirm('차량 비상등이 실제로 꺼져 있는 것을 확인했습니까? (누르지 않고 상태만 확정합니다)')) sendCmd('hazard_off',{value:'ack'})">✔ 비상등 꺼짐 확인</button>
+        <button class="cbtn warn" onclick="hornCmd()">📣 경적 (0.5초)</button>
+        <button class="cbtn warn" onclick="immobOn()">⛔ 시동 차단</button>
+        <button class="cbtn" onclick="immobOff()">✅ 차단 해제</button>
+        <button class="cbtn" onclick="inModeCmd()">🔧 입력 극성 설정</button>
+        <button class="cbtn warn" onclick="rebootCmd()">🔄 단말 재부팅</button>
+        <div id="immobst" style="grid-column:1/3;font-size:11px;color:var(--muted);padding:2px 4px 0;">시동차단 상태: —</div>
       </div>
-      <div class="fwrow"><button class="fwbtn" onclick="fwUpdate()">⬆ 펌웨어 원격 업데이트 (OTA)</button></div>
     </div>
     <div class="card">
       <h3><span class="dot"></span>층 보정 — 차량 위치 조정</h3>
@@ -305,6 +313,10 @@ html,body{max-width:100%;overflow-x:hidden;}
     <div class="card">
       <h3><span class="dot"></span>기기 진단</h3>
       <table class="diagt" id="diagt"></table>
+    </div>
+    <div class="card">
+      <h3><span class="dot"></span>명령 이력 <span style="font-size:11px;color:var(--muted);font-weight:400">최근 30건 · 누가 언제</span></h3>
+      <div class="loglist" id="cmdlist" style="max-height:220px;overflow:auto;"></div>
     </div>
   </div>
 </div>
@@ -536,11 +548,14 @@ function render(){
     h+='<div class="vcard'+(v.id===selId?' sel':'')+'" data-id="'+v.id+'">'
       +'<div class="nm"><span class="on'+(v.online?' live':'')+'"></span>'+(v.name||v.id)
       +(v.impact?'<span class="alerttag">⚠ 충격</span>':'')+(v.over?'<span class="alerttag">과속</span>':'')
+      +(v.immob?'<span class="alerttag">⛔ 차단</span>':'')+(v.doorOpen&&!v.acc?'<span class="alerttag">🚪 문열림</span>':'')
+      +(typeof v.vbat==='number'&&v.vbat<11.6?'<span class="alerttag">🔋 저전압</span>':'')
       +'</div><div class="sub">'
       +(dev?('<b>'+dev+'</b>'):'<span>기기 미연결</span>')
       +(v.floor!=null?('<span>'+floorStr(v.floor)+'</span>'):'')
       +(typeof v.speed==='number'?('<span>'+Math.round(v.speed)+'km/h</span>'):'')
       +(v.fw?('<span>'+v.fw+'</span>'):'')
+      +(function(){ var r=resvOf(v); return r?('<span style="color:'+(r.live==='반납지연'?'var(--warn)':'var(--gold-soft)')+'">'+r.live+' · '+r.user+'</span>'):'<span>예약 없음</span>'; })()
       +'</div></div>';
   });
   $('flist').innerHTML=h||'<div style="padding:20px;color:var(--muted);font-size:12px;">차량 데이터 대기 중…</div>';
@@ -558,9 +573,12 @@ function render(){
     var src=$('lv-src');
     if(v.gsrc==='dr'){ src.textContent='추측항법(터널)'; src.className='v use'; }
     else if(!v.gpsLive && typeof v.lat==='number'){ src.textContent='GPS 끊김'; src.className='v bad'; }
-    else if(v.gsrc==='modem'){ src.textContent='모뎀GPS'; src.className='v use'; }
-    else if(v.sats>=4||v.gsrc==='module'){ src.textContent='GPS모듈'; src.className='v gold'; }
+    else if(v.gsrc==='dr'){ src.textContent='추측항법'; src.className='v use'; }
+    else if(v.sats>=4||v.gsrc==='gnss'||v.gsrc==='gnss+dr'){ src.textContent='GPS'; src.className='v gold'; }
     else { src.textContent='—'; src.className='v'; }
+    /* [v9] 배터리·시동 */
+    var bt=$('lv-bat'); if(bt){ bt.textContent=(typeof v.vbat==='number')?v.vbat.toFixed(1)+'V':'—'; bt.className='v '+(typeof v.vbat==='number'?(v.vbat<11.6?'bad':(v.vbat>13.2?'ok':'')):''); }
+    var ac=$('lv-acc'); if(ac){ ac.textContent=(typeof v.vbat==='number')?(v.acc?'ON':'OFF'):'—'; ac.className='v '+(v.acc?'ok':''); }
     /* 층 보정 현재층 하이라이트 */
     var cur=(v.floor>=1)?String(v.floor):('B'+(1-v.floor));
     document.querySelectorAll('#calgrid .fb').forEach(function(b){
@@ -574,16 +592,60 @@ function ago(t){ if(!t)return '—'; var s=Math.floor((Date.now()-t.getTime())/1
   if(s<5)return '방금'; if(s<60)return s+'초 전'; if(s<3600)return Math.floor(s/60)+'분 전'; return Math.floor(s/3600)+'시간 전'; }
 function renderDiag(v){
   var rows=[
-    ['통신 상태', v.online?'<span class="g">● 온라인</span>':'<span class="r">● 오프라인</span>'],
+    ['통신 상태', v.online?(v.park?'<span class="g">● 온라인 (주차 절전 · 5분 보고)</span>':'<span class="g">● 온라인</span>'):'<span class="r">● 오프라인</span>'],
     ['마지막 수신', '<span class="gd">'+ago(v.lastSeen)+'</span>'],
     ['GPS', (typeof v.lat==='number')?('<span class="g">정상 · 위성'+(v.sats||0)+'</span>'):'<span class="y">탐색중</span>'],
-    ['위치 출처', v.gsrc==='modem'?'<span class="b">모뎀 GNSS</span>':(v.gsrc==='module'?'<span class="g">GPS 모듈</span>':'<span class="y">—</span>')],
+    ['위치 출처', {gnss:'<span class="g">위성(GNSS)</span>','gnss+dr':'<span class="g">위성+추측항법</span>',dr:'<span class="b">추측항법(실내)</span>',none:'<span class="y">없음</span>'}[v.gsrc]||'<span class="y">—</span>'],
     ['기압계(층)', (typeof v.alt==='number')?'<span class="g">정상</span>':'<span class="r">응답없음</span>'],
     ['지상기준 학습', v.groundSet?'<span class="g">완료</span>':'<span class="y">대기</span>'],
     ['자이로(충격)', (typeof v.heading==='number')?'<span class="g">정상</span>':'<span class="r">응답없음</span>'],
     ['펌웨어', '<span class="gd">'+(v.fw||'—')+'</span>'],
   ];
-  if(v.ota) rows.push(['OTA 상태','<span class="b">'+v.ota+'</span>']);
+  /* [v9 단말] 전원·입력·신호 */
+  if(typeof v.vbat==='number'){
+    rows.push(['차량 배터리', '<span class="'+(v.vbat<11.6?'r':'g')+'">'+v.vbat.toFixed(2)+' V'+(v.vbat<11.6?' · 방전 주의':'')+'</span>']);
+    rows.push(['시동(ACC)', v.acc?'<span class="g">ON</span>':'<span class="gd">OFF</span>']);
+    rows.push(['입력1 / 입력2', (v.in1?'<span class="y">IN1 ON</span>':'<span class="gd">IN1 off</span>')+' · '+(v.in2?'<span class="y">IN2 ON</span>':'<span class="gd">IN2 off</span>')]);
+    if(typeof v.temp==='number') rows.push(['실내 온도','<span class="gd">'+v.temp.toFixed(1)+' ℃</span>']);
+    if(typeof v.csq==='number') rows.push(['LTE 신호', v.csq>=99?'<span class="r">없음</span>':'<span class="'+(v.csq>=10?'g':'y')+'">'+v.csq+' / 31</span>']);
+    rows.push(['시동 차단', v.immob?'<span class="r">⛔ 차단 중</span>':'<span class="g">해제 (시동 가능)</span>']);
+    rows.push(['문 (도어스위치)', v.doorOpen?'<span class="y">열림</span>':'<span class="g">닫힘</span>']);
+    if(typeof v.accOffSec==='number'&&!v.acc) rows.push(['마지막 시동 후', '<span class="'+(v.accOffSec>3*86400?'r':'gd')+'">'+(v.accOffSec<3600?Math.floor(v.accOffSec/60)+'분':v.accOffSec<86400?Math.floor(v.accOffSec/3600)+'시간':Math.floor(v.accOffSec/86400)+'일')+' 경과</span>']);
+  }
+  /* ═══ ★설치 점검 (배선이 제대로 물렸는지) — 차에 가 보지 않고 판별하는 자리 ═══ */
+  if(v.hasDiag){
+    if(typeof v.vacc==='number'){
+      var accBad=(v.accSeenSec===-1);
+      rows.push(['ACC 배선', '<span class="'+(accBad?'r':'g')+'">'+v.vacc.toFixed(2)+' V'
+        +(accBad?' · ⚠ 부팅 후 한 번도 ON 을 못 봄 — 배선 누락 의심':(v.acc?' · 시동 ON':' · 정상(시동 OFF)'))+'</span>']);
+    }
+    if(typeof v.vin1==='number'&&typeof v.vin2==='number'){
+      var im=v.inMode||0, mstr=function(b){return (im>>b&1)?'접지식(점퍼)':'12V 인가식';};
+      rows.push(['입력1 배선', '<span class="gd">'+v.vin1.toFixed(2)+' V · '+mstr(0)+'</span>']);
+      rows.push(['입력2 배선', '<span class="gd">'+v.vin2.toFixed(2)+' V · '+mstr(1)+'</span>']);
+    }
+    rows.push(['비상등', v.hazard?'<span class="y">⚠ 켜짐 — 오래 두면 차 배터리가 나갑니다</span>'
+                                  :(v.hazUnknown?'<span class="y">상태 모름</span>':'<span class="g">꺼짐</span>')]);
+    /* ═══ ★자가 진단 (단말 자신이 정상인지) ═══ */
+    var bad=[];
+    if(!v.wdt) bad.push('감시타이머 미등록(먹통에서 스스로 못 빠져나옴)');
+    if(!v.tlsVerify) bad.push('🔓 서버 인증서 미검증 (파일럿 설정) — 고객 차량 투입 전 켤 것');
+    if(!v.nvs) bad.push('저장장치 이상');
+    if(v.immobSaveFail) bad.push('⛔ 시동차단 상태 저장 실패 — 재부팅되면 차단이 풀립니다');
+    if(!v.imuOk) bad.push('자이로 없음');
+    if(!v.envOk) bad.push('기압계 없음');
+    rows.push(['단말 자가진단', bad.length?'<span class="r">'+bad.join('<br>')+'</span>':'<span class="g">이상 없음</span>']);
+    if(typeof v.uptime==='number'&&v.uptime>0)
+      rows.push(['연속 동작', '<span class="'+(v.uptime<600?'y':'gd')+'">'
+        +(v.uptime<3600?Math.floor(v.uptime/60)+'분':v.uptime<86400?Math.floor(v.uptime/3600)+'시간':Math.floor(v.uptime/86400)+'일')
+        +(v.uptime<600?' · ⚠ 최근 재시작됨':'')+'</span>']);
+    if(typeof v.heap==='number'&&v.heap>0)
+      rows.push(['메모리 여유', '<span class="'+(v.heap<40000?'r':'gd')+'">'+Math.round(v.heap/1024)+' KB'+(v.heap<40000?' · ⚠ 부족':'')+'</span>']);
+  }
+  if(v.station) rows.push(['가까운 거점', '<span class="'+(v.station.d>v.station.s.radiusM?'y':'g')+'">'+v.station.s.name+' '+Math.round(v.station.d)+'m'+(v.station.d>v.station.s.radiusM?' (거점 밖)':' (거점 안)')+'</span>']);
+  var rv=resvOf(v); rows.push(['현재 예약', rv?('<span class="'+(rv.live==='반납지연'?'y':'g')+'">'+rv.live+' · '+rv.user+(rv.phone?' '+rv.phone:'')+' · ~'+new Date(rv.eMs).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})+'</span>'):'<span class="gd">없음</span>']);
+  var ist=$('immobst'); if(ist) ist.textContent='시동차단 상태: '+(v.immob?'⛔ 차단 중':'해제')+(v.acc||v.moving?' · 주행/시동 중이라 차단 불가':'')+(v.hazUnknown?' · ⚠ 비상등 상태 모름 — 눈으로 확인 후 "비상등 꺼짐 확인"':'');
+  var hab=$('hazackbtn'); if(hab) hab.style.display=v.hazUnknown?'':'none';   /* [v9.7] 단말이 비상등 상태를 모를 때만 확인 버튼 */
   $('diagt').innerHTML=rows.map(function(r){return '<tr><td>'+r[0]+'</td><td>'+r[1]+'</td></tr>';}).join('');
 }
 
@@ -595,27 +657,112 @@ $('flist').onclick=function(e){
 
 /* ═══════════ 원격 명령 ═══════════ */
 function devOf(){ return selId?IDMAP[selId]:null; }
+var CMD_BUSY={};
 function sendCmd(type,extra){
   var db=window.FB_DB, FN=window.FB_FN, dev=devOf();
   if(!dev){ toast('이 차량은 IoT 기기 미연결'); return; }
+  if(CMD_BUSY[dev+type]){ toast('같은 명령이 아직 진행 중입니다 — 기기 응답을 기다려 주세요'); return; }
+  CMD_BUSY[dev+type]=true;
   var id='cmd-'+Date.now();
-  var pl=Object.assign({type:type,status:'pending'},extra||{});
+  var who=(window.FB_AUTH&&window.FB_AUTH.currentUser&&window.FB_AUTH.currentUser.email)||'admin';
+  var pl=Object.assign({type:type,status:'pending',by:who,at:FN.serverTimestamp?FN.serverTimestamp():new Date(),timestamp:Date.now()},extra||{});
   FN.setDoc(FN.doc(db,'devices',dev,'commands',id),pl).then(function(){
     toast('명령 전송: '+type+' — 기기 응답 대기…');
     var ref=FN.doc(db,'devices',dev,'commands',id), un=null, to=null;
+    function done_(){ if(un)un(); clearTimeout(to); CMD_BUSY[dev+type]=false; }   /* ★어떤 이유로 끝나든 잠금을 반드시 푼다 */
     un=FN.onSnapshot(ref,function(s){ if(!s.exists())return; var d=s.data()||{};
-      if(d.status==='done'){ toast('✅ 기기 실행 완료: '+type); if(un)un(); clearTimeout(to); } });
-    to=setTimeout(function(){ if(un)un(); },20000);
+      if(d.status==='acked'){ toast('📨 기기가 명령을 받았습니다 — 실행 중…'); return; }
+      if(d.status==='done'){ toast('✅ 기기 실행 완료: '+type); done_(); return; }
+      if(d.status==='failed'){
+        /* ★예전엔 '만료' 한 가지만 처리해서, 기기가 이유를 붙여 거부해도 화면엔 아무 말이 없다가
+           45초 뒤 '기기 응답이 없습니다' 가 떴다 — 통신 문제로 잘못 안내되던 자리. */
+        var e=String(d.error||'');
+        /* 기기가 돌려주는 사유를 사람 말로. 펌웨어의 err 문자열과 1:1 (recheck98_app.py 가 빠진 것을 잡는다) */
+        var msg = /expired/.test(e)              ? '⏱ 명령이 늦게 도착해 실행하지 않았습니다 — 기기 통신 확인 후 다시 보내 주세요'
+                : /no timestamp/.test(e)         ? '⏱ 기기가 서버 시각을 못 읽어 실행하지 않았습니다 — 잠시 후 다시'
+                : /device reset during/.test(e)  ? '⚠ 실행 도중 기기가 재시작됐습니다 — 상태를 확인하고 다시 보내 주세요'
+                : /acc on, or acc off/.test(e)   ? '⛔ 시동이 켜져 있거나 끈 지 60초가 안 됐습니다 — 시동을 끄고 1분 뒤 다시 (안전)'
+                : /gps shows vehicle moving/.test(e)   ? '⛔ 위성 신호상 차가 움직이고 있습니다 — 정차 확인 후 다시 (안전)'
+                : /cannot confirm stopped/.test(e)     ? '⛔ 정차를 확인할 수 없습니다 (위성·자이로 응답 없음) — 현장 확인이 필요합니다'
+                : /hazard state unknown/.test(e)       ? '⚠ 기기가 비상등 상태를 모릅니다 — 눈으로 확인 후 "비상등 꺼짐 확인" 을 먼저 누르세요'
+                : /floor height must be/.test(e)       ? '⚠ 층 높이는 200~600 cm 사이로 넣어 주세요'
+                : /floor map must be like/.test(e)     ? '⚠ 층 표 형식이 틀렸습니다 — 예: 1:0,-1:-4.2,-2:-7.0 (2~14개 층)'
+                : /floor out of range|out of range/.test(e) ? '⚠ 층 값이 허용 범위를 벗어났거나 기압계가 준비되지 않았습니다'
+                : /sensor not ready/.test(e)           ? '⚠ 기압계가 아직 준비되지 않았습니다 — 1~2분 뒤 다시'
+                : /^use /.test(e)                      ? '⚠ 값의 형식이 틀렸습니다: '+e
+                : /unknown type/.test(e)               ? '❌ 기기가 모르는 명령입니다 — 펌웨어 버전을 확인하세요'
+                : /OTA not supported/.test(e)          ? 'ℹ 이 기기는 USB 로만 펌웨어를 넣습니다 (설계상 원격 갱신 없음)'
+                : '❌ 기기가 실행하지 못했습니다: '+(e||'사유 없음');
+        toast(msg); done_(); return; } });
+    /* ★대기 시간 = 펌웨어 최악 응답(주차 절전 = 명령확인 60s + 낮잠 20s = 80s) + 여유.
+       예전 45초는 80초보다 짧아, **주차 중인 정상 차량이 매번 '응답 없음'** 으로 보였다. */
+    to=setTimeout(function(){ if(un)un(); CMD_BUSY[dev+type]=false;
+      toast('⏱ 100초 동안 기기 응답이 없습니다 — 통신 상태를 확인하세요 (주차 절전 중이면 최대 80초까지는 정상)'); },100000);
   }).catch(function(e){ toast('전송 실패: '+e.message); });
 }
 function calSet(f){ sendCmd('setfloor',{value:String(f)}); }
 function calReset(){ sendCmd('resetfloor'); }
-function fwUpdate(){
-  var url=prompt('펌웨어 .bin 주소','https://toly1021-ui.github.io/CARO-MOBILITY13/caro_fw.bin');
-  if(!url) return;
-  if(!/^https:\/\/.+\.bin(\?|$)/i.test(url)&&!/firebasestorage\.googleapis\.com/i.test(url)){ toast('올바른 .bin 주소가 아닙니다'); return; }
-  sendCmd('update',{url:url});
+/* ═══════════ [v9.2] 시동 차단 ═══════════ */
+function hornCmd(){ if(!confirm('경적을 0.5초 울립니다. 실행할까요?')) return; sendCmd('horn',{value:'500'}); }
+function immobOn(){
+  var v=FLEET.find(function(x){return x.id===selId;}); if(!v){ toast('차량을 먼저 선택'); return; }
+  if(!v.online){ toast('오프라인 차량은 차단 명령이 전달되지 않습니다'); return; }
+  if(v.acc || v.moving || (typeof v.speed==='number' && v.speed>2)){ toast('⛔ 주행/시동 중에는 차단할 수 없습니다 (안전)'); return; }
+  if(!confirm(v.name+' 시동을 차단할까요?\n(스타터 신호를 끊어 시동이 걸리지 않게 합니다. 주행 중 차량엔 영향 없음)')) return;
+  sendCmd('immobilize');
 }
+/* ★[v9.8 10차 검수] 입력 극성(점퍼) 교정 — 펌웨어엔 setinmode 가 있는데 화면에 수단이 없었다.
+   점퍼(JP4·JP5)와 설정이 어긋나면 '문 열림/닫힘' 이 반대로 보인다. 설치 현장에서 바로 고치는 자리. */
+function inModeCmd(){
+  var v=FLEET.find(function(x){return x.id===selId;}); if(!v){ toast('차량을 먼저 선택'); return; }
+  var cur=(typeof v.inMode==='number')?v.inMode:0;
+  var a=prompt('입력1 방식 — 0 = 12V 인가식(점퍼 없음) / 1 = 접지식(점퍼 꽂음)', String(cur&1)); if(a===null) return;
+  var b=prompt('입력2 방식 — 0 = 12V 인가식 / 1 = 접지식', String((cur>>1)&1)); if(b===null) return;
+  a=(a.trim()==='1')?'1':'0'; b=(b.trim()==='1')?'1':'0';
+  if(!confirm('입력 극성을 IN1='+(a==='1'?'접지식':'12V 인가식')+', IN2='+(b==='1'?'접지식':'12V 인가식')+' 로 설정합니다.\n실제로 꽂은 점퍼와 같아야 합니다.')) return;
+  sendCmd('setinmode',{value:a+','+b});
+}
+/* ★[v9.8 10차 검수] 원격 재부팅 — 먹통 1차 대응 수단이 화면에 없었다.
+   시동차단 중이면 재부팅 뒤 저장값으로 복원된다(immobSaveFail 이 떠 있으면 풀릴 수 있어 경고). */
+function rebootCmd(){
+  var v=FLEET.find(function(x){return x.id===selId;}); if(!v){ toast('차량을 먼저 선택'); return; }
+  if(v.acc||v.moving){ toast('⛔ 주행/시동 중에는 재부팅하지 않습니다'); return; }
+  var w=v.immob?('\n\n⚠ 이 차량은 시동 차단 중입니다. 재부팅 뒤 저장값으로 복원됩니다'
+                 +(v.immobSaveFail?' — 다만 지금 "저장 실패" 상태라 차단이 풀릴 수 있습니다.':'.')):'';
+  if(!confirm(v.name+' 단말을 재부팅할까요?\n약 30~60초 동안 오프라인이 됩니다.'+w)) return;
+  sendCmd('reboot');
+}
+function immobOff(){
+  var v=FLEET.find(function(x){return x.id===selId;}); if(!v){ toast('차량을 먼저 선택'); return; }
+  if(!confirm(v.name+' 시동 차단을 해제할까요?')) return;
+  sendCmd('release');
+}
+/* ═══════════ [v9.2] 거점(지오펜스) — caro-config.js 와 동일하게 유지 ═══════════ */
+var STATIONS=(window.CARO_CONFIG&&window.CARO_CONFIG.STATIONS)||[
+  { id:"st_songdo", name:"송도 거점", lat:37.3846, lng:126.6500, radiusM:300 },
+  { id:"st_guwol", name:"구월동 거점", lat:37.4476, lng:126.7007, radiusM:300 },
+  { id:"st_bupyeong", name:"부평 거점", lat:37.4893, lng:126.7235, radiusM:300 },
+  { id:"st_dongincheon", name:"동인천 거점", lat:37.4762, lng:126.6188, radiusM:300 } ];
+function distM(a,b,c,d){ var R=6371000,p=Math.PI/180,x=(c-a)*p,y=(d-b)*p,h=Math.sin(x/2)*Math.sin(x/2)+Math.cos(a*p)*Math.cos(c*p)*Math.sin(y/2)*Math.sin(y/2); return 2*R*Math.asin(Math.sqrt(h)); }
+function nearestStation(lat,lng){ var best=null; STATIONS.forEach(function(s){ var d=distM(lat,lng,s.lat,s.lng); if(!best||d<best.d) best={s:s,d:d}; }); return best; }
+/* ═══════════ [v9.2] 예약 연동 : 차량별 현재 예약 ═══════════ */
+var RESV={};   /* carDocId → {user, sMs, eMs, status} */
+function toMs(t){ try{ if(!t) return 0; if(t.toDate) return t.toDate().getTime(); if(typeof t==='number') return t; var d=new Date(t); return isNaN(d.getTime())?0:d.getTime(); }catch(e){return 0;} }
+function resvStatus(r){ var now=Date.now(); if(r.cancelled||r.returned) return null;
+  var raw=(''+(r.status||'')).toLowerCase(); if(/취소|cancel|반납|returned|complete/.test(raw)) return null;
+  if(r.eMs&&now>r.eMs) return (now-r.eMs<=2*86400000)?'반납지연':null; if(r.sMs&&r.eMs&&now>=r.sMs&&now<=r.eMs) return '대여중'; if(r.sMs&&r.sMs-now<3600000&&r.sMs>now) return '곧 시작'; return null; }
+function applyResvSnap(s){
+  RESV={};
+  s.forEach(function(doc){ var d=doc.data()||{}; var cid=(d.car&&typeof d.car==='object'&&d.car.id!=null)?d.car.id:(d.carId!=null?d.carId:d.carNo);
+    if(cid==null) return; var r={no:doc.id,user:d.userName||d.name||(d.userEmail?(''+d.userEmail).split('@')[0]:'-'),phone:d.userPhone||d.phone||'',sMs:toMs(d.startAt||d.startTime||d.start),eMs:toMs(d.endAt||d.endTime||d.end),status:d.status,cancelled:d.cancelled,returned:d.returned};
+    var st=resvStatus(r); if(!st) return; r.live=st; var k=String(cid); if(!RESV[k]||r.eMs>RESV[k].eMs) RESV[k]=r; });
+  render();
+}
+function resvOf(v){ return RESV[String(v.docId)]||null; }
+/* ═══════════ [v9.2] 경보: 배터리·오프라인·거점이탈·미예약 이동·반납지연 ═══════════ */
+var alertState={};
+function alertOnce(key,ok,msg,sound){ var was=alertState[key]||false; if(ok&&!was){ alertsToday++; if(sound!==false) beep(); toast(msg); notify(msg); } alertState[key]=ok; }
+// 원격 펌웨어 업데이트(OTA)는 지원하지 않음 — 펌웨어는 설치자가 USB 로만 갱신 (보안: 원격으로 동작이 바뀌지 않게)
 
 /* ═══════════ Firestore 실시간 구독 ═══════════ */
 function startFS(){
@@ -631,6 +778,7 @@ function startFS(){
   }
   FN.onSnapshot(FN.collection(db,'cars'),function(s){applyCars(s,'N');},function(e){console.warn(e);});
   FN.onSnapshot(FN.collection(db,'bl_cars'),function(s){applyCars(s,'B');},function(e){console.warn(e);});
+  try{ FN.onSnapshot(FN.collection(db,'reservations'),function(s){ applyResvSnap(s); },function(e){ console.warn('resv',e); }); }catch(e){}
   FN.onSnapshot(FN.collection(db,'devices'),function(s){
     DEV={};
     s.forEach(function(doc){ DEV[doc.id]=doc.data()||{}; });
@@ -654,10 +802,30 @@ function remap(){
     v.heading=num(d.heading); v.speed=num(d.speed); v.shock=num(d.shock);
     v.impact=(d.impact===true); v.over=(d.over===true); v.moving=(d.moving===true);
     v.fw=d.fw||''; v.ota=d.ota||''; v.lastSeen=ls;
-    v.online=(d.status==='online'&&ls&&(Date.now()-ls.getTime()<60000));
+    /* [v9 단말 추가 필드] */
+    v.vbat=num(d.vbat); v.acc=(d.acc===true); v.in1=(d.in1===true); v.in2=(d.in2===true); v.temp=num(d.temp); v.csq=num(d.csq);
+    v.immob=(d.immob===true); v.hazUnknown=(d.hazUnknown===true); v.doorOpen=(d.doorOpen===true||d.in1===true); v.accOffSec=num(d.accOffSec);
+    /* ★[v9.8 10차 검수] 펌웨어가 보내고 있었지만 화면이 읽지도 않던 안전·설치 진단 필드.
+       'full' 보고(10번에 1번)에만 들어오므로 없을 수 있다 — 없으면 그 줄을 안 그린다. */
+    v.hazard=(d.hazard===true); v.wdt=(d.wdt===true); v.nvs=(d.nvs===true); v.tlsVerify=(d.tlsVerify===true);
+    v.immobSaveFail=(d.immobSaveFail===true); v.imuOk=(d.imuOk===true); v.envOk=(d.envOk===true);
+    v.vacc=num(d.vacc); v.vin1=num(d.vin1); v.vin2=num(d.vin2);
+    v.accSeenSec=num(d.accSeenSec); v.inMode=num(d.inMode);
+    v.heap=num(d.heap); v.uptime=num(d.uptime); v.hasDiag=(d.wdt!==undefined);
+    /* [v9.7] 주차 절전 중인 단말은 5분에 한 번만 보고한다 → 오프라인 판정 창을 630초(보고주기×2+30초)로 늘린다 */
+    v.park=(d.park===true);
+    /* ★오프라인 판정 창 = 그 상태의 보고 주기 × 2 + 30초.
+       펌웨어 보고 주기: 주행 10s / 보통 주차 60s / 주차 절전 300s / ★저전압(11.6V 미만·시동꺼짐) 600s.
+       예전엔 절전(630s)과 그 외(60s) 둘뿐이라, 10분에 한 번만 보고하는 **저전압 차가 늘 '오프라인'** 으로 보였다.
+       보통 주차도 창이 60s = 보고 주기와 같아 한 번만 늦어도 오프라인으로 깜빡였다. */
+    v.lowbat=(typeof v.vbat==='number' && v.vbat>0 && v.vbat<11.6 && d.acc!==true);
+    var win = v.park ? 630000 : (v.lowbat ? 1230000 : 150000);
+    v.online=(d.status==='online'&&ls&&(Date.now()-ls.getTime()<win));
     /* ★ GPS 실시간 여부: 펌웨어는 '유효 fix(위성4+)' 일 때만 좌표를 새로 보냄.
        위성이 4개 미만(0~3)이면 좌표는 '마지막으로 잡힌 위치'로 고정(=옛 위치). 이걸 정직하게 구분. */
-    v.gpsLive = !!(v.online && (v.sats>=4 || v.gsrc==='modem' || v.gsrc==='dr'));   /* dr=추측항법도 이동 중으로 취급(와드가 계속 움직임) */
+    /* ★펌웨어가 보내는 gsrc = none / gnss / dr / gnss+dr. 'gnss+dr'(융합)이 빠져 있어
+       지하주차장 진입 직후처럼 위성이 4개 미만이면서 융합 위치는 정상인 경우 'GPS 끊김' 으로 잘못 떴다. */
+    v.gpsLive = !!(v.online && (v.sats>=4 || v.gsrc==='gnss' || v.gsrc==='gnss+dr' || v.gsrc==='dr'));
     if(v.gpsLive && (v.lat!==v._fLat || v.lng!==v._fLng)){ v._fLat=v.lat; v._fLng=v.lng; v._fTs=Date.now(); }
   });
   if(!selId){ var first=FLEET.find(function(v){return IDMAP[v.id];}); if(first){ selId=first.id; subLogs(); } }
@@ -669,6 +837,16 @@ function checkAlerts(){
     if(v.impact&&!p.impact){ alertsToday++; beep(); toast('⚠ '+v.name+' 충격 감지!'); notify(v.name+' 충격 감지'); }
     if(v.over&&!p.over){ alertsToday++; beep(); toast('🚨 '+v.name+' 과속!'); notify(v.name+' 과속 감지'); }
     evPrev[v.id]={impact:v.impact,over:v.over};
+    /* [v9.2] */
+    var r=resvOf(v);
+    alertOnce('bat-'+v.id, typeof v.vbat==='number'&&v.vbat<11.6, '🔋 '+v.name+' 배터리 '+(v.vbat||0).toFixed(1)+'V — 방전 위험');
+    alertOnce('idle-'+v.id, typeof v.accOffSec==='number'&&v.accOffSec>3*86400, '🕒 '+v.name+' 3일 이상 시동 안 걸림 — 배터리 확인', false);
+    alertOnce('off-'+v.id, !!(v.lastSeen&&!v.online&&(Date.now()-v.lastSeen.getTime()>10*60000)&&(Date.now()-v.lastSeen.getTime()<7*86400000)), '📡 '+v.name+' 단말 10분 이상 무응답 (마지막 위치 유지)');
+    if(typeof v.lat==='number'&&v.gpsLive){ var ns=nearestStation(v.lat,v.lng); v.station=ns; var outside=ns&&ns.d>ns.s.radiusM;
+      alertOnce('geo-'+v.id, !!(outside&&!r), '🚨 '+v.name+' 예약 없이 거점 밖 ('+(ns?ns.s.name+' '+Math.round(ns.d)+'m':'')+') — 도난·무단사용 의심');
+      alertOnce('mv-'+v.id, !!(v.moving&&!r), '🚨 '+v.name+' 예약 없이 주행 중!'); }
+    alertOnce('late-'+v.id, !!(r&&r.live==='반납지연'&&v.moving), '⏰ '+v.name+' 반납시간 지났는데 주행 중 ('+(r?r.user:'')+')');
+    alertOnce('door-'+v.id, !!(v.doorOpen&&!v.acc&&!r), '🚪 '+v.name+' 예약 없이 문 열림 감지');
   });
 }
 function notify(msg){
@@ -678,10 +856,17 @@ function notify(msg){
 }
 
 /* ── 선택 차량 기록 구독 (telemetry + events) ── */
-var unT=null,unE=null;
+var unT=null,unE=null,unC=null;
 function subLogs(){
   var db=window.FB_DB, FN=window.FB_FN, dev=devOf();
-  if(unT){unT();unT=null;} if(unE){unE();unE=null;}
+  if(unT){unT();unT=null;} if(unE){unE();unE=null;} if(unC){unC();unC=null;}
+  if(dev&&FN.query){ try{ unC=FN.onSnapshot(FN.query(FN.collection(db,'devices',dev,'commands'),FN.orderBy('timestamp','desc'),FN.limit(30)),
+    function(s){ var h=''; s.forEach(function(d){ var c=d.data()||{}; var t=c.timestamp?new Date(c.timestamp):null;
+      var nm={unlock:'문 열기',lock:'문 잠금',hazard:'비상등',hazard_off:'비상등 끄기',horn:'경적',immobilize:'시동 차단',release:'차단 해제',setfloor:'층 보정',resetfloor:'기준 초기화',setinmode:'입력 극성 설정',update:'OTA',reboot:'재부팅'}[c.type]||c.type;
+      var st=c.status==='done'?'<span class="g">완료</span>':c.status==='failed'?'<span class="r">실패'+(c.error?' · '+c.error:'')+'</span>':c.status==='acked'?'<span class="y">실행중</span>':'<span class="gd">대기</span>';
+      h+='<div class="ev"><span class="tag flr">'+nm+'</span><span>'+(c.by||'앱/고객')+' · '+st+'</span><span class="ts">'+(t?(t.getMonth()+1)+'/'+t.getDate()+' '+t.toTimeString().slice(0,5):'—')+'</span></div>'; });
+      var el=$('cmdlist'); if(el) el.innerHTML=h||'<div style="padding:12px;color:var(--muted);font-size:12px;">명령 기록 없음</div>'; },
+    function(e){ console.warn('cmds',e); }); }catch(e){ console.warn('cmds',e); } }
   TELE=[]; EVTS=[]; drawLogs();
   if(!dev||!FN.query) return;
   if(!selDate) selDate=todayStr();
@@ -720,6 +905,20 @@ function drawLogs(){
       row='<div class="ev'+(park?' danger':'')+'">'+tag+'<span>'+tx+'</span><span class="ts">'+fmtTs(e.ts)+'</span></div>';
     } else if(e.event==='overspeed'){
       row='<div class="ev"><span class="tag spd">과속</span><span>'+(Math.round(e.speed||0)+'km/h 과속')+'</span><span class="ts">'+fmtTs(e.ts)+'</span></div>';
+    } else if(e.event==='acc_on'||e.event==='acc_off'){
+      row='<div class="ev"><span class="tag spd">시동</span><span>'+(e.event==='acc_on'?'🔑 시동 ON':'🔑 시동 OFF')+'</span><span class="ts">'+fmtTs(e.ts)+'</span></div>';
+    } else if(e.event==='door'){
+      row='<div class="ev"><span class="tag flr">문</span><span>'+(e.action==='unlock'?'🔓 원격 문 열림':'🔒 원격 문 잠금')+'</span><span class="ts">'+fmtTs(e.ts)+'</span></div>';
+    } else if(e.event==='lowbat'){
+      row='<div class="ev danger"><span class="tag imp park">배터리</span><span>🔋 배터리 부족 '+(e.vbat!=null?Number(e.vbat).toFixed(2)+'V':'')+'</span><span class="ts">'+fmtTs(e.ts)+'</span></div>';
+    } else if(e.event==='boot'||e.event==='reconnect'){
+      row='<div class="ev"><span class="tag flr">기기</span><span>'+(e.event==='boot'?'⚡ 단말 부팅 '+(e.fw||''):'📡 재접속')+'</span><span class="ts">'+fmtTs(e.ts)+'</span></div>';
+    } else if(e.event==='immob'){
+      row='<div class="ev'+(e.on?' danger':'')+'"><span class="tag imp park">시동</span><span>'+(e.on?'⛔ 시동 차단됨':'✅ 시동 차단 해제')+'</span><span class="ts">'+fmtTs(e.ts)+'</span></div>';
+    } else if(e.event==='door_sw'){
+      row='<div class="ev"><span class="tag flr">문</span><span>'+(e.open?'🚪 문 열림 (도어스위치)':'🚪 문 닫힘')+'</span><span class="ts">'+fmtTs(e.ts)+'</span></div>';
+    } else if(e.event==='in1'||e.event==='in2'){
+      row='<div class="ev"><span class="tag spd">입력</span><span>'+(e.event==='in1'?'입력1':'입력2')+(e.value?' ON':' OFF')+'</span><span class="ts">'+fmtTs(e.ts)+'</span></div>';
     } else {
       row='<div class="ev"><span class="tag flr">층</span><span>'+(floorStr(num(e.floor))+' 이동')+'</span><span class="ts">'+fmtTs(e.ts)+'</span></div>';
     }
@@ -738,6 +937,23 @@ function drawLogs(){
       +'<td>'+(t.lat!=null?(Number(t.lat).toFixed(5)+', '+Number(t.lng).toFixed(5)):'—')+'</td></tr>';
   });
   $('tbody').innerHTML=th||'<tr><td colspan="7" style="color:var(--muted);">이 날짜엔 주행 기록이 없습니다</td></tr>';
+  drawRoute();
+}
+/* ═══════════ [v9.2] 선택 날짜 주행 경로를 지도에 선으로 + 충격 지점 표시 ═══════════ */
+var routeObjs=[];
+function drawRoute(){
+  if(!mapKind) return;
+  routeObjs.forEach(function(o){ try{ mapKind==='kakao'?o.setMap(null):lmap.removeLayer(o); }catch(e){} }); routeObjs=[];
+  var pts=TELE.filter(function(t){return t.lat!=null&&t.lng!=null;}).sort(function(a,b){return toMs(a.ts)-toMs(b.ts);}).map(function(t){return [Number(t.lat),Number(t.lng)];});
+  var imps=EVTS.filter(function(e){return e.event==='impact'&&e.lat!=null;});
+  if(pts.length<2&&!imps.length) return;
+  if(mapKind==='kakao'){
+    if(pts.length>=2){ var pl=new kakao.maps.Polyline({path:pts.map(function(p){return new kakao.maps.LatLng(p[0],p[1]);}),strokeWeight:4,strokeColor:'#c8a96e',strokeOpacity:0.85}); pl.setMap(kmap); routeObjs.push(pl); }
+    imps.forEach(function(e){ var ov=new kakao.maps.CustomOverlay({position:new kakao.maps.LatLng(Number(e.lat),Number(e.lng)),content:'<div style="background:#ff5a4a;color:#fff;font-size:10px;padding:2px 6px;border-radius:8px;white-space:nowrap">💥 '+(e.shock!=null?Number(e.shock).toFixed(1)+'g':'충격')+'</div>',yAnchor:1.4}); ov.setMap(kmap); routeObjs.push(ov); });
+  } else {
+    if(pts.length>=2) routeObjs.push(L.polyline(pts,{color:'#c8a96e',weight:4,opacity:0.85}).addTo(lmap));
+    imps.forEach(function(e){ routeObjs.push(L.circleMarker([Number(e.lat),Number(e.lng)],{radius:7,color:'#ff5a4a',fillColor:'#ff5a4a',fillOpacity:0.8}).bindTooltip('💥 '+(e.shock!=null?Number(e.shock).toFixed(1)+'g':'충격')).addTo(lmap)); });
+  }
 }
 function csvExport(){
   var rows=[['시각','종류','충격구분','층','고도(m)','방향(deg)','속도(km/h)','충격(g)','위도','경도']];
