@@ -1206,11 +1206,21 @@ function caroSaveLicense(lic){
   if(!lic) return Promise.resolve(false);
   var uid=userInfo.uid||(window.FB_AUTH&&window.FB_AUTH.currentUser&&window.FB_AUTH.currentUser.uid)||'';
   if(!fbReady()||!uid) return Promise.resolve(false);
-  var fn=window.FB_FN;
-  return fn.setDoc(fn.doc(window.FB_DB,'users',uid),
+  var fn=window.FB_FN, ref=fn.doc(window.FB_DB,'users',uid);
+  window.__caroLicErr='';
+  return fn.setDoc(ref,
       {license:lic, licenseText:lic.number, licenseRegisteredAt:new Date().toISOString()},{merge:true})
-    .then(function(){ caroApplyLicenseLocal(lic); return true; })
-    .catch(function(e){ console.error('🔴 면허 저장 실패:',e&&e.code||e); return false; });
+    .then(function(){
+      /* 서버에 실제로 들어갔는지 다시 읽어 확인 — 확인되면 로컬 반영 */
+      return fn.getDoc(ref).then(function(s){
+        var d=(s&&s.exists&&s.exists())?s.data():null;
+        var got=d&&((d.license&&d.license.number)||d.licenseText)||'';
+        if(String(got)!==String(lic.number)){ window.__caroLicErr='서버 확인 실패(값 없음)'; console.error('🔴 면허 저장 확인 실패: 서버에 값이 없음', uid); return false; }
+        console.log('✅ 면허 서버 저장 확인 uid='+uid);
+        caroApplyLicenseLocal(lic); return true;
+      });
+    })
+    .catch(function(e){ window.__caroLicErr=(e&&e.code)||String(e); console.error('🔴 면허 저장 실패:',e&&e.code||e); return false; });
 }
 window.caroNormLicense=caroNormLicense; window.caroApplyLicenseLocal=caroApplyLicenseLocal; window.caroSaveLicense=caroSaveLicense;
 
@@ -5465,7 +5475,7 @@ function saveLicenseFromPI(){
   if(!fbReady()||!userInfo.uid){ showToast('로그인 상태를 확인할 수 없어 저장하지 못했어요. 잠시 후 다시 시도해 주세요.'); return; }
   caroSaveLicense(lic).then(function(ok){
     if(ok){ showToast('운전면허가 저장되었습니다 ✅'); try{ renderPaymentInfoScreen(); }catch(e){} }
-    else showToast('면허 저장에 실패했어요. 네트워크를 확인한 뒤 다시 시도해 주세요.');
+    else showToast('면허 저장에 실패했어요. 네트워크를 확인한 뒤 다시 시도해 주세요.'+(window.__caroLicErr?' ('+window.__caroLicErr+')':''));
   });
 }
 
@@ -11361,7 +11371,7 @@ window.devUploadAllCars=function(){
   function fsGet(){
     if(!ready()||typeof window.FB_FN.getDoc!=='function') return Promise.resolve(null);
     try{ return window.FB_FN.getDoc(window.FB_FN.doc(db(),'users',uid()))
-      .then(function(s){ return (s&&s.exists&&s.exists())?s.data():null; }).catch(function(){return null;}); }
+      .then(function(s){ return (s&&s.exists&&s.exists())?s.data():null; }).catch(function(e){ console.warn('[CARO] users 읽기 실패:',e&&e.code||e); return null; }); }
     catch(e){ return Promise.resolve(null); }
   }
 
@@ -11411,7 +11421,7 @@ window.devUploadAllCars=function(){
         try{ if(window.renderPaymentInfoScreen) renderPaymentInfoScreen(); }catch(e){}
         try{ if(window.renderPICardList) renderPICardList(); }catch(e){}
         try{ if(window.saveUserData) saveUserData(); }catch(e){}
-        console.log('[CARO] ✅ 카드·면허 복원 완료 (면허:'+(lic?'O':'-')+' 카드:'+(cards?cards.length:0)+'개)');
+        console.log('[CARO] ✅ 카드·면허 복원 완료 (면허:'+(lic?'O':'-')+' 카드:'+(cards?cards.length:0)+'개) uid='+uid()+' 서버필드:'+(d.license?'license ':'')+(d.licenseText?'licenseText ':''));
       }catch(e){}
     });
   }
