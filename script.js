@@ -6635,6 +6635,10 @@ window.devUploadAllCars=function(){
   window.globalActiveReservations = [];
 
   function startGlobalReservationsListener(){
+    /* ★[15차] 서버 모드에서는 '모든 예약' 컬렉션을 읽지 않는다 — 다른 고객의 이름·전화번호가 함께 내려오고,
+       보안 규칙이 본인 예약만 허용하므로 읽으면 거부된다. 다른 사람의 예약 시간은 caro-secure.js 가
+       개인정보 없는 availability 컬렉션으로 구독한다. (테스트 모드 SECURE_SERVER:false 에서만 예전 방식) */
+    if(window.CARO_CONFIG && window.CARO_CONFIG.SECURE_SERVER) return;
     if(typeof window.fbReady !== 'function' || !window.fbReady()) return;
     /* ⭐ 인증 확인 — 로그인된 사용자만 */
     if(!window.FB_AUTH || !window.FB_AUTH.currentUser){
