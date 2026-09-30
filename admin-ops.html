@@ -1929,8 +1929,13 @@
     });
     document.getElementById('lg-btn').addEventListener('click', doLogin);
     document.getElementById('lg-pw').addEventListener('keydown', function(e){ if(e.key==='Enter') doLogin(); });
-    /* ★ FIX: 관리자 '나가기' — signOut 금지(고객 앱과 세션 공유라 로그아웃하면 앱 데이터까지 끊김). 대기화면으로 복귀만. */
-    document.getElementById('logoutBtn').addEventListener('click', function(){ location.href='index.html'; });
+    /* ★[14차] 관리자 '나가기' — 고객앱으로 보내지 않고 진짜 로그아웃한다(관제 단독 운영).
+       관제센터 안(iframe)에서 누르면 부모(관제)가 로그아웃을 처리한다. */
+    document.getElementById('logoutBtn').addEventListener('click', function(){
+      try{ if(window.__CARO_INFRAME){ window.parent.postMessage('caro-admin-exit', location.origin); return; } }catch(e){}
+      var done=function(){ location.reload(); };
+      try{ Promise.resolve(FN.signOut(A)).then(done, done); }catch(e){ done(); }
+    });
   }
   // ── init ──
   renderKPIs(); renderFleet(); resizeChart(); renderLive();

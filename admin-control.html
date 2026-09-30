@@ -1140,8 +1140,21 @@ function waitAuth(n){
   }
   $('g-btn').addEventListener('click',doLogin);
   $('g-pw').addEventListener('keydown',function(e){ if(e.key==='Enter')doLogin(); });
-  /* ★ FIX: '나가기' — signOut 금지(공유 세션 보호). 앱 대기화면으로 복귀. iframe이면 부모가 처리. */
-  $('lgout').addEventListener('click',function(){ try{ if(window.top!==window.self){ window.parent.postMessage('caro-admin-exit','*'); return; } }catch(e){} location.href='index.html'; });
+  /* ★[14차] '나가기' — 관제는 고객앱 없이 단독으로 운영한다.
+     예전: 로그아웃하지 않고 고객앱(index.html)으로 이동 → ① 단독 운영이 안 되고 ② 세션이 살아 있어 누구나 다시 열 수 있었다.
+     지금: 진짜 로그아웃 → 이 화면의 로그인 창으로 돌아온다. (고객앱으로 가지 않는다)
+     ※ 이 브라우저에서 같은 계정으로 고객앱을 함께 쓰고 있었다면 그쪽도 로그아웃된다 — 관제 전용 태블릿이면 무관. */
+  function adminExit(){
+    var done=function(){ location.reload(); };
+    try{ if(A && FN && typeof FN.signOut==='function'){ Promise.resolve(FN.signOut(A)).then(done,done); return; } }catch(e){}
+    done();
+  }
+  $('lgout').addEventListener('click',function(){
+    try{ if(window.top!==window.self){ window.parent.postMessage('caro-admin-exit',location.origin); return; } }catch(e){}
+    adminExit();
+  });
+  /* 운영 관리 화면(iframe)의 나가기도 여기로 온다 */
+  window.addEventListener('message',function(ev){ if(ev.origin===location.origin && ev.data==='caro-admin-exit') adminExit(); });
   /* 비밀번호 재설정: 아이디 칸의 계정(별명이면 최고관리자 이메일)으로 재설정 메일 발송 */
   $('g-reset').addEventListener('click',function(){
     var em=$('g-em').value.trim();
