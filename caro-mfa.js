@@ -33,7 +33,7 @@
   function msgOf(e){
     var c = (e && e.code) || '';
     if(/invalid-verification-code|code-expired/.test(c)) return '코드가 맞지 않습니다. 앱에 지금 떠 있는 6자리를 다시 입력하세요.';
-    if(/requires-recent-login/.test(c)) return '보안을 위해 다시 로그인이 필요합니다. 나가기 → 다시 로그인한 뒤 등록하세요.';
+    if(/requires-recent-login/.test(c)) return '보안을 위해 다시 로그인이 필요합니다. 로그아웃 → 다시 로그인한 뒤 등록하세요.';
     if(/unverified-email/.test(c)) return '이메일 인증이 먼저 필요합니다.';
     if(/operation-not-allowed|admin-restricted|second-factor-limit|unsupported-first-factor/.test(c)) return '서버에서 2단계 인증(인증앱)이 아직 켜져 있지 않습니다. (콘솔 설정 필요)';
     if(/network/.test(c)) return '네트워크 오류 — 인터넷을 확인하세요.';
@@ -164,7 +164,7 @@
           go.disabled = true; status('확인 중…', '#9aa0ab');
           Promise.resolve(mf.enroll(f.TotpMultiFactorGenerator.assertionForEnrollment(secret, inp.value), '인증앱')).then(function(){
             clear(); head('✅ 등록되었습니다');
-            line('★지금 "나가기" 후 다시 로그인하세요. 다음 로그인부터 6자리 코드를 묻습니다.', '#e6c34b');
+            line('★지금 "로그아웃" 후 다시 로그인하세요. 다음 로그인부터 6자리 코드를 묻습니다.', '#e6c34b');
             line('★휴대폰을 잃어버리면 로그인이 안 됩니다. 복구 방법은 읽어보세요.txt 를 확인해 두세요.', '#e6c34b');
             btn('확인', GOLD, ov.close);
           }).catch(function(e){ go.disabled = false; inp.value = ''; status(msgOf(e)); });

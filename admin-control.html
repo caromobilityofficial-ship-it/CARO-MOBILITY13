@@ -35,6 +35,9 @@ button{font-family:inherit;cursor:pointer;}
 .adm{font-size:12px;color:var(--muted);}
 .lgout{background:none;border:1px solid var(--border2);color:var(--muted);border-radius:8px;padding:6px 14px;font-size:12px;}
 .lgout:hover{border-color:var(--bad);color:var(--bad);}
+/* ★[14차] 태블릿 세로(≈820px)에서 버튼 글자가 두 줄로 꺾이던 것 → 한 줄 고정, 자리가 모자라면 다음 줄로 */
+.topbar{flex-wrap:wrap;row-gap:8px;}
+.lgout,#mfabtn,.adm,.clock,.ntab{white-space:nowrap;flex:0 0 auto;}
 .navtabs{display:flex;gap:6px;margin-left:10px;}
 .ntab{background:none;border:1px solid var(--border2);color:var(--muted);border-radius:9px;
   padding:7px 16px;font-size:12.5px;font-weight:700;letter-spacing:.5px;transition:all .15s;}
@@ -261,7 +264,7 @@ html,body{max-width:100%;overflow-x:hidden;}
   <span class="clock" id="clock">--:--:--</span>
   <span class="adm" id="adm">—</span>
   <button class="lgout" id="mfabtn" onclick="if(window.CaroMFA)CaroMFA.openSetup()">🔐 2단계 인증</button>
-  <button class="lgout" id="lgout">나가기</button>
+  <button class="lgout" id="lgout">로그아웃</button>
 </div>
 
 <!-- 운영 관리 (요금·예약·회원·공지·정산 — 기존 시스템 전체 내장) -->
@@ -1140,7 +1143,7 @@ function waitAuth(n){
   }
   $('g-btn').addEventListener('click',doLogin);
   $('g-pw').addEventListener('keydown',function(e){ if(e.key==='Enter')doLogin(); });
-  /* ★[14차] '나가기' — 관제는 고객앱 없이 단독으로 운영한다.
+  /* ★[14차] '로그아웃'(예전 이름 '나가기') — 관제는 고객앱 없이 단독으로 운영한다.
      예전: 로그아웃하지 않고 고객앱(index.html)으로 이동 → ① 단독 운영이 안 되고 ② 세션이 살아 있어 누구나 다시 열 수 있었다.
      지금: 진짜 로그아웃 → 이 화면의 로그인 창으로 돌아온다. (고객앱으로 가지 않는다)
      ※ 이 브라우저에서 같은 계정으로 고객앱을 함께 쓰고 있었다면 그쪽도 로그아웃된다 — 관제 전용 태블릿이면 무관. */
@@ -1153,7 +1156,7 @@ function waitAuth(n){
     try{ if(window.top!==window.self){ window.parent.postMessage('caro-admin-exit',location.origin); return; } }catch(e){}
     adminExit();
   });
-  /* 운영 관리 화면(iframe)의 나가기도 여기로 온다 */
+  /* 운영 관리 화면(iframe)의 로그아웃도 여기로 온다 */
   window.addEventListener('message',function(ev){ if(ev.origin===location.origin && ev.data==='caro-admin-exit') adminExit(); });
   /* 비밀번호 재설정: 아이디 칸의 계정(별명이면 최고관리자 이메일)으로 재설정 메일 발송 */
   $('g-reset').addEventListener('click',function(){

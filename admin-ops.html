@@ -407,7 +407,7 @@
         <span class="av">C</span>
         <span class="nm" id="adminNm">관리자<small id="adminEmail">—</small></span>
       </div>
-      <button class="logout-btn" id="logoutBtn">나가기</button>
+      <button class="logout-btn" id="logoutBtn">로그아웃</button>
     </div>
   </div>
   <!-- TABS -->
@@ -1929,7 +1929,7 @@
     });
     document.getElementById('lg-btn').addEventListener('click', doLogin);
     document.getElementById('lg-pw').addEventListener('keydown', function(e){ if(e.key==='Enter') doLogin(); });
-    /* ★[14차] 관리자 '나가기' — 고객앱으로 보내지 않고 진짜 로그아웃한다(관제 단독 운영).
+    /* ★[14차] 관리자 '로그아웃'(예전 이름 '나가기') — 고객앱으로 보내지 않고 진짜 로그아웃한다(관제 단독 운영).
        관제센터 안(iframe)에서 누르면 부모(관제)가 로그아웃을 처리한다. */
     document.getElementById('logoutBtn').addEventListener('click', function(){
       try{ if(window.__CARO_INFRAME){ window.parent.postMessage('caro-admin-exit', location.origin); return; } }catch(e){}
