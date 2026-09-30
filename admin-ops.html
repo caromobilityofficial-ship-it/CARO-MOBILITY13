@@ -371,8 +371,8 @@
   <div class="login-card">
     <div class="lg">CARO MOBILITY</div>
     <div class="lt">관제 대시보드 · 관리자 로그인</div>
-    <label>관리자 이메일</label>
-    <input id="lg-email" type="email" value="caro.mobility.official@gmail.com" autocomplete="username" />
+    <label>관리자 아이디</label>
+    <input id="lg-email" type="text" value="CAROMOBILITY" placeholder="관리자 아이디 또는 이메일" autocomplete="username" autocapitalize="off" spellcheck="false" />
     <label>비밀번호</label>
     <input id="lg-pw" type="password" placeholder="비밀번호 입력" autocomplete="current-password" />
     <button class="lbtn" id="lg-btn">로그인</button>
@@ -1890,7 +1890,8 @@
     var A=window.FB_AUTH, FN=window.FB_FN;
     var em=document.getElementById('lg-email').value.trim();
     var pw=document.getElementById('lg-pw').value;
-    if(!em||!pw){ document.getElementById('lg-err').textContent='이메일과 비밀번호를 입력하세요'; return; }
+    if(em.toUpperCase()==='CAROMOBILITY') em=ADMIN_EMAIL;   /* ★[14차] 실시간 관제·고객앱과 같은 최고관리자 별명 — 예전엔 운영 관리 로그인만 이걸 몰라 '로그인 실패' 였다 */
+    if(!em||!pw){ document.getElementById('lg-err').textContent='아이디와 비밀번호를 입력하세요'; return; }
     document.getElementById('lg-btn').textContent='로그인 중…';
     FN.signInWithEmailAndPassword(A, em, pw)
       .then(function(){ })
@@ -1900,7 +1901,11 @@
         document.getElementById('lg-err').textContent =
           (m.indexOf('wrong-password')>=0||m.indexOf('invalid-cred')>=0)?'비밀번호가 올바르지 않습니다':
           (m.indexOf('user-not-found')>=0)?'존재하지 않는 계정입니다 (Firebase 인증에 추가 필요)':
-          '로그인 실패: 이메일/비밀번호를 확인하세요';
+          (m.indexOf('too-many-requests')>=0)?'시도가 너무 잦습니다 — 잠시 후 다시':
+          (m.indexOf('network-request-failed')>=0)?'네트워크 오류 — 인터넷 연결을 확인하세요':
+          (m.indexOf('mfa-cancelled')>=0)?'2단계 인증을 취소했습니다':
+          (m.indexOf('mfa-unsupported')>=0)?'2단계 인증 방식을 처리하지 못했습니다 — 최고관리자에게 문의':
+          '로그인 실패: 아이디/비밀번호를 확인하세요';
       });
   }
   function waitAuth(tries){
@@ -1922,7 +1927,9 @@
             hideGate(); document.getElementById('adminEmail').textContent=u.email+(d.name?(' · '+d.name):''); startOnce();
           } else {
             /* iframe(관제센터)에선 로그아웃 금지(공유 세션이라 부모까지 로그아웃됨). 부모가 이미 접근제어함. */
-            if(!window.__CARO_INFRAME){ FN.signOut(A); showGate('운영 관리 권한이 없습니다 — 최고관리자에게 권한을 요청하세요'); }
+            if(!window.__CARO_INFRAME){ FN.signOut(A); showGate(pm.control===true
+              ? '이 계정은 실시간 관제 전용입니다 — 운영 관리 권한이 없습니다. 실시간 관제 화면(admin-control.html)에서 로그인하세요'
+              : '운영 관리 권한이 없습니다 — 최고관리자에게 권한을 요청하세요'); }
           }
         }).catch(function(){ if(!window.__CARO_INFRAME){ FN.signOut(A); showGate('권한 확인 실패 — 다시 시도하세요'); } });
       } else { if(!window.__CARO_INFRAME) showGate(''); }   /* iframe(관제센터)에선 로그인창 안 띄우고 공유 세션 복원을 기다림 */

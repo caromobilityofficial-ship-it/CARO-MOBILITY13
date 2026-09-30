@@ -1112,9 +1112,15 @@ function waitAuth(n){
         var ex=s&&(typeof s.exists==='function'?s.exists():s.exists);
         var d=ex?(s.data()||{}):{}; var pm=(ex&&d.active!==false&&d.perms)?d.perms:{};
         var hasCtrl=pm.control===true, hasOps=!!(pm.ops||pm.cars||pm.pricing||pm.notices||pm.resv);
-        if(hasCtrl||hasOps){ enter(u.email+(d.name?(' · '+d.name):''), pm, false); }
+        /* ★[15차] 프로그램별 로그인 분리: 이 화면(실시간 관제)은 '관제' 권한이 있는 계정만 들어온다.
+           운영 권한만 있는 계정은 여기서 로그인되지 않는다(운영 관리 화면에서 로그인). 두 화면을 모두 쓰려면
+           최고관리자가 두 권한을 모두 부여해야 한다. 최고관리자는 위 분기에서 항상 통과. */
+        if(hasCtrl){ enter(u.email+(d.name?(' · '+d.name):''), pm, false); }
         else {
-          FN.signOut(A); $('g-err').textContent='접근 권한이 없습니다 — 최고관리자에게 권한을 요청하세요';
+          FN.signOut(A);
+          $('g-err').textContent = hasOps
+            ? '이 계정은 운영 관리 전용입니다 — 실시간 관제 권한이 없습니다. 운영 관리 화면(admin-ops.html)에서 로그인하세요'
+            : '접근 권한이 없습니다 — 최고관리자에게 권한을 요청하세요';
           $('gate').style.display='flex';
         }
       }).catch(function(){
