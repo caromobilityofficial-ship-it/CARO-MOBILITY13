@@ -238,7 +238,7 @@
     if(!r){ _ctrlToast('⚠️ 이 차량의 유효한 예약이 없습니다'); return Promise.resolve(false); }
     return call('issueCommand', { bookNo: r.bookNo, type: cmdType }).then(function(res){
       if(!res || !res.cmdId) return false;
-      _ctrlToast('📡 명령 전송 (' + (cmdType === 'unlock' ? '문 열기' : cmdType === 'lock' ? '문 잠금' : cmdType) + ')');
+      _ctrlToast('📡 명령 전송 (' + (cmdType === 'unlock' ? '문 열기' : cmdType === 'lock' ? '문 잠금' : cmdType === 'horn' ? '경적' : cmdType === 'hazard' ? '비상등' : cmdType) + ')');
       return new Promise(function(resolve){
         try{
           var fn = window.FB_FN, db = window.FB_DB;
@@ -250,7 +250,7 @@
             if(d.status === 'acked') _ctrlToast('📡 디바이스 응답 받음');
             if(d.status === 'done' || d.status === 'failed'){
               if(done) return; done = true; clearTimeout(to); try{ unsub && unsub(); }catch(e){}
-              _ctrlToast(d.status === 'done' ? (cmdType === 'unlock' ? '✅ 차량 문 열림' : '✅ 차량 문 잠김') : '❌ 명령 실패: ' + (d.error || ''));
+              _ctrlToast(d.status === 'done' ? (cmdType === 'unlock' ? '✅ 차량 문 열림' : cmdType === 'lock' ? '✅ 차량 문 잠김' : cmdType === 'horn' ? '✅ 경적이 울렸습니다' : '✅ 명령 완료') : '❌ 명령 실패: ' + (d.error || ''));
               resolve(d.status === 'done');
             }
           }, function(){ if(done) return; done = true; clearTimeout(to); resolve(true); });

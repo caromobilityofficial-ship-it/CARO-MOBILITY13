@@ -2855,6 +2855,25 @@ function ctrlActionHome(type){
       }
       return;
     }
+  /* ★[15차] 경적(클락션) — 주차장에서 내 차를 찾을 때. 짧게(0.5초) 울리고, 연타는 15초에 한 번만 받는다. */
+  if(type==='horn'){
+      var b4=document.getElementById('ctrl-btn-horn');
+      var nowH=Date.now();
+      if(window.__caroHornAt && nowH-window.__caroHornAt<15000){
+        showCtrlToast('📣 경적은 15초에 한 번만 울릴 수 있습니다');
+        return;
+      }
+      var carIdK=(ctrlResIdx>=0 && myReservations[ctrlResIdx]) ? myReservations[ctrlResIdx].car.id : null;
+      var devK=(carIdK!=null && window.caroResolveDeviceId) ? caroResolveDeviceId(carIdK) : null;
+      if(!devK){ showCtrlToast('⚠️ 이 차량은 경적을 울릴 수 없습니다 (기기 미연결)'); return; }
+      window.__caroHornAt=nowH;
+      if(b4){ b4.classList.add('ctrl-sq-btn-active'); setTimeout(function(){ b4.classList.remove('ctrl-sq-btn-active'); },2000); }
+      sendDeviceCommand(carIdK,'horn').then(function(ok){
+        if(ok) showCtrlToast('📣 경적 명령 전송됨');
+        else window.__caroHornAt=0;
+      });
+      return;
+    }
   var pkText=document.getElementById('home-ctrl-park')?document.getElementById('home-ctrl-park').textContent:'확인 중';
   var msgs={
     locate:'📍 주차 위치: '+pkText,
@@ -3741,7 +3760,7 @@ window.renderDevScreen=renderDevScreen;
 var homeCtrlTimer=null;
 
 function setCtrlButtonsActive(active){
-  var ids=['ctrl-btn-unlock','ctrl-btn-lock','ctrl-btn-hazard','ctrl-photo-toggle',
+  var ids=['ctrl-btn-unlock','ctrl-btn-lock','ctrl-btn-hazard','ctrl-btn-horn','ctrl-photo-toggle',
            'ctrl-btn-locate','ctrl-btn-extend','ctrl-btn-return'];
   ids.forEach(function(id){
       var btn=document.getElementById(id);

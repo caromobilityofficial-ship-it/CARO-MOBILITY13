@@ -811,6 +811,7 @@
     lock:   svg('<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>'),
     hazard: svg('<path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>'),
     camera: svg('<path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/>'),
+    horn:   svg('<path d="M3 11v2a1 1 0 0 0 1 1h2l5 4V6L6 10H4a1 1 0 0 0-1 1z"/><path d="M15 8a5 5 0 0 1 0 8"/><path d="M18 5a9 9 0 0 1 0 14"/>'),
     pin:    svg('<path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>'),
     clock:  svg('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'),
     ret:    svg('<polyline points="9 10 4 15 9 20"/><path d="M20 4v7a4 4 0 0 1-4 4H4"/>'),
@@ -934,6 +935,7 @@
       'ctrl-btn-unlock':[ICON.unlock,'#1d7a3a'],
       'ctrl-btn-lock':[ICON.lock,''],
       'ctrl-btn-hazard':[ICON.hazard,'#b07800'],
+      'ctrl-btn-horn':[ICON.horn,''],
       'ctrl-photo-toggle':[ICON.camera,''],
       'ctrl-btn-locate':[ICON.pin,''],
       'ctrl-btn-extend':[ICON.clock,''],
@@ -952,7 +954,7 @@
     if(wrap.dataset.caroArranged){ setIcons(); return; }
     var byId=function(id){return document.getElementById(id);};
     var unlock=byId('ctrl-btn-unlock'), lock=byId('ctrl-btn-lock'),
-        hazard=byId('ctrl-btn-hazard'), photo=byId('ctrl-photo-toggle'), locate=byId('ctrl-btn-locate'),
+        hazard=byId('ctrl-btn-hazard'), horn=byId('ctrl-btn-horn'), photo=byId('ctrl-photo-toggle'), locate=byId('ctrl-btn-locate'),
         ext=byId('ctrl-btn-extend'), ret=byId('ctrl-btn-return');
     if(!unlock||!lock||!ret){ return; }
     var accBtn=mkBtn('사고 신고','caro-btn-acc');
@@ -962,7 +964,7 @@
     wrap.innerHTML='';
     wrap.appendChild(mkRow('caro-row-2',[unlock,lock]));
     wrap.appendChild(mkLab('차량 이용'));
-    wrap.appendChild(mkRow('caro-row-3',[hazard,photo,locate]));
+    wrap.appendChild(mkRow('caro-row-3',[hazard,horn,photo,locate]));   /* (이 wrap 은 스마트키 시트가 켜지면 숨겨진다 — 버튼을 잃지 않게 horn 도 유지) */
     wrap.appendChild(mkLab('예약 관리'));
     wrap.appendChild(mkRow('caro-row-3',[ext,ret,accBtn]));
     wrap.dataset.caroArranged='1';
@@ -4635,10 +4637,11 @@
     '#caro-sk-sheet .sk-main{display:flex;gap:10px;}',
     '#caro-sk-sheet .sk-main > .ctrl-sq-btn{flex:1;}',
     /* 펼침 때 위로 슬라이드되어 올라오는 줄: 반납하기·비상등 */
-    '#caro-sk-sheet .sk-extra{display:flex;gap:10px;max-height:0;opacity:0;overflow:hidden;margin-top:0;',
+    '#caro-sk-sheet .sk-extra{display:flex;flex-direction:column;gap:10px;max-height:0;opacity:0;overflow:hidden;margin-top:0;',
       'transition:max-height .34s cubic-bezier(.4,0,.2,1),opacity .26s ease,margin-top .34s cubic-bezier(.4,0,.2,1);}',
-    '#caro-sk-sheet .sk-extra > .ctrl-sq-btn{flex:1;}',
-    '#caro-sk-sheet.expanded .sk-extra{max-height:120px;opacity:1;margin-top:10px;}',
+    '#caro-sk-sheet .sk-row{display:flex;gap:10px;}',
+    '#caro-sk-sheet .sk-row > .ctrl-sq-btn{flex:1;}',
+    '#caro-sk-sheet.expanded .sk-extra{max-height:190px;opacity:1;margin-top:10px;}',
 
     /* 반납(return) — 밝은 카드 + 새로고침 아이콘 */
     '#caro-sk-sheet #ctrl-btn-return{background:#eef1f6 !important;border-color:transparent !important;}',
@@ -4656,7 +4659,7 @@
   var B={};
   function grabButtons(){
     B.unlock=byId('ctrl-btn-unlock'); B.lock=byId('ctrl-btn-lock');
-    B.hazard=byId('ctrl-btn-hazard'); B.photo=byId('ctrl-photo-toggle');
+    B.hazard=byId('ctrl-btn-hazard'); B.horn=byId('ctrl-btn-horn'); B.photo=byId('ctrl-photo-toggle');
     B.locate=byId('ctrl-btn-locate'); B.ext=byId('ctrl-btn-extend');
     B.ret=byId('ctrl-btn-return'); B.acc=byId('caro-btn-acc');
     return !!(B.unlock && B.lock && B.ret);
@@ -4709,7 +4712,13 @@
 
   function renderStage(){
     var ex=byId('sk-extra'), mn=byId('sk-main');
-    if(ex){ /* 위로 슬라이드되어 올라오는 줄 */ if(B.ret) ex.appendChild(B.ret); if(B.hazard) ex.appendChild(B.hazard); }
+    if(ex){ /* 위로 슬라이드되어 올라오는 줄: 2줄째 [비상등·경적], 3줄째 [반납하기(길게)] */
+      var r2=byId('sk-row2'), r3=byId('sk-row3');
+      if(!r2){ r2=document.createElement('div'); r2.id='sk-row2'; r2.className='sk-row'; ex.appendChild(r2); }
+      if(!r3){ r3=document.createElement('div'); r3.id='sk-row3'; r3.className='sk-row sk-row-long'; ex.appendChild(r3); }
+      if(B.hazard) r2.appendChild(B.hazard); if(B.horn) r2.appendChild(B.horn);
+      if(B.ret) r3.appendChild(B.ret);
+    }
     if(mn){ /* 항상 보이는 줄 */ if(B.unlock) mn.appendChild(B.unlock); if(B.lock) mn.appendChild(B.lock); }
     styleReturn();
   }
