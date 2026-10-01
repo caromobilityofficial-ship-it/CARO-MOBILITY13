@@ -7397,13 +7397,15 @@
     try{ var a=JSON.parse(localStorage.getItem('caro_apd_cards')||'[]'); if(a&&a.length) return true; }catch(e){}
     return false;
   }
+  /* ★[v103] true: 카드 사전등록 불가(결제창에서 입력) — PG 빌링키 계약 후 false 로 바꾸면 카드 등록 항목이 다시 나타난다 */
+  var CARD_AT_PAYMENT = true;
   function readyState(){
     var logged=!!window._caroLoggedIn;
     var lic=!!(window.userInfo&&window.userInfo.license&&String(window.userInfo.license).trim());
     /* ★ [v102] 서버 복원이 늦거나 한 박자 어긋나도, 기기에 복원된 면허(caro_license)가 있으면 '등록 완료'로 본다
        (계정관리 화면은 이 값을 보는데 홈 카드만 userInfo.license 를 봐서 서로 다르게 나오던 문제). 로그아웃·계정전환 시 이 값은 지워진다. */
     if(!lic){ try{ var _L=JSON.parse(localStorage.getItem('caro_license')||'null'); if(_L&&_L.number&&String(_L.number).trim()){ lic=true; if(window.userInfo&&!window.userInfo.license) window.userInfo.license=String(_L.number); } }catch(e){} }
-    var card=hasCard();
+    var card=CARD_AT_PAYMENT ? true : hasCard();   /* ★[v103] 카드는 결제 때 토스 결제창에서 입력(등록 기능은 PG 빌링키 계약 후) → 홈 준비 항목에서 제외 */
     return {logged:logged,lic:lic,card:card,sig:logged+'|'+lic+'|'+card};
   }
   function row(cls,label,done){
@@ -7442,9 +7444,10 @@
     _rdSig=s.sig;
     var both=(!s.lic&&!s.card);   /* 둘 다 미등록 → 예약 차단 안내 */
     card.innerHTML='<h3>이용 준비, 조금만 더</h3><p>'
-      +(both?'운전면허와 결제 카드를 등록해야 차량을 예약할 수 있어요':'등록을 마치면 바로 차량을 이용할 수 있어요')+'</p>'
+      +(CARD_AT_PAYMENT?'운전면허를 등록하면 차량을 예약할 수 있어요 (결제 카드는 결제할 때 입력해요)'
+        :(both?'운전면허와 결제 카드를 등록해야 차량을 예약할 수 있어요':'등록을 마치면 바로 차량을 이용할 수 있어요'))+'</p>'
       +row('lic','운전면허 등록',s.lic)
-      +row('card','결제 카드 등록',s.card);
+      +(CARD_AT_PAYMENT?'':row('card','결제 카드 등록',s.card));
     card.querySelectorAll('.hr-rd.todo').forEach(function(el){
       el.addEventListener('click',function(){ go('payment-info-screen'); });
     });
@@ -7468,10 +7471,11 @@
   /* ───── 차량 예약 차단: 운전면허·결제 카드 둘 다 미등록 시 예약 진입 차단 ───── */
   function bothMissing(){
     var s=readyState();
+    if(CARD_AT_PAYMENT) return s.logged && acctLoaded() && profileReady() && !s.lic;   /* ★[v103] 면허 미등록이면 예약 차단 (카드는 결제창에서) */
     return s.logged && acctLoaded() && profileReady() && !s.lic && !s.card;  /* 계정·프로필(카드/면허) 복원 후에만 차단 판단 */
   }
   function blockReserve(){
-    try{ if(window.showToast) showToast('운전면허와 결제 카드를 먼저 등록해 주세요.'); }catch(e){}
+    try{ if(window.showToast) showToast(CARD_AT_PAYMENT?'운전면허를 먼저 등록해 주세요.':'운전면허와 결제 카드를 먼저 등록해 주세요.'); }catch(e){}
     try{ if(window.goTo) goTo('payment-info-screen'); }catch(e){}
   }
   function wrapReserve(name){
