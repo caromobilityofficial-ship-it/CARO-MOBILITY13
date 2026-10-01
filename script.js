@@ -4508,7 +4508,7 @@ function openResDetail(idx){
       if(r.returned) return '<div style="padding:6px 0;text-align:center;font-size:.78rem;color:var(--text-m);">반납 완료된 예약입니다.</div>';
       var now=new Date();
       var diffMin=(r.start.getTime()-now.getTime())/60000;
-      if(diffMin<0) return '<div style="padding:8px 0 2px;font-size:.76rem;color:var(--text-m);text-align:center;">대여 중에는 취소 대신 <b>반납</b> 버튼으로 조기 반납해 주세요</div>';
+      if(diffMin<-20) return '<div style="padding:8px 0 2px;font-size:.76rem;color:var(--text-m);text-align:center;">대여 시작 20분이 지나 취소할 수 없어요. 이용을 마치려면 <b>반납</b> 버튼을 눌러 주세요</div>';
       var pol=getRefundPolicy(diffMin, r.total);
       if(pol.pct===-1) return '<div style="padding:8px 0 2px;font-size:.76rem;color:var(--error);text-align:center;">출발 10분 이내 취소 불가</div>';
       var btnColor=pol.pct===100?'rgba(29,122,58,.12);border:1px solid rgba(29,122,58,.3)':
@@ -4548,6 +4548,8 @@ function cancelReservation(idx){
   if(ctrlResIdx===idx&&photoDone){ showToast('🚗 운행 중에는 예약 취소가 불가합니다.'); return; }
   var now=new Date();
   var startTime=new Date(r.start);
+  /* ★[17차] 대여 시작 20분이 지나면 취소 불가 (서버 cancelReservation 도 같은 규칙) */
+  if(now.getTime() > startTime.getTime()+20*60000){ showToast('대여 시작 20분이 지나 예약을 취소할 수 없어요. 이용을 마치려면 반납해 주세요.'); return; }
   var diffMin=(startTime.getTime()-now.getTime())/60000;
   var pol=getRefundPolicy(diffMin, r.total);
   cancelTargetIdx=idx;

@@ -5209,6 +5209,9 @@
   }
   function toast(m){ if(window.showToast) showToast(m); else alert(m); }
 
+  /* getRes() 는 window.getActiveRes 가 없어 비어 있을 수 있다 → 제어 중인 예약(ctrlResIdx)을 우선 사용 */
+  function curRes(){ var r=null; try{ var i=window.ctrlResIdx; if(typeof i==='number'&&i>=0&&window.myReservations) r=window.myReservations[i]; }catch(e){} return r||getRes(); }
+  function cancelLocked(res){ res=res||curRes(); try{ var st=new Date(res&&res.start).getTime(); return !!(st && Date.now() > st + 20*60000); }catch(e){ return false; } }
   function rowsHtml(res){
     var rentT = res ? fmtDT(res.start) : '-';
     var h='';
@@ -5225,7 +5228,9 @@
       +'<button class="cm-row" data-act="accident"><span class="cm-ic" style="color:#b23a3a">'+I.warn+'</span><span class="cm-lb">사고 신고</span><span class="cm-chev">\u203A</span></button>'
       +'</div>';
     /* 예약 취소 */
-    h+='<button class="cm-cancel" data-act="cancel">예약 취소하기</button>';
+    /* ★[17차] 대여 시작 20분이 지나면 취소 버튼 비활성화 */
+    if(cancelLocked(res)) h+='<button class="cm-cancel" data-act="cancel" disabled style="opacity:.45;cursor:not-allowed;">예약 취소 불가 · 대여 시작 20분 경과 (이용 종료는 반납)</button>';
+    else h+='<button class="cm-cancel" data-act="cancel">예약 취소하기</button>';
     return h;
   }
 
@@ -5237,8 +5242,12 @@
     else if(act==='accident') goScreen('accident-screen');
     else if(act==='codriver'){ if(window.caroOpenExtraDriver) caroOpenExtraDriver(); else toast('추가운전자 등록 기능을 불러오지 못했습니다.'); }
     else if(act==='cancel'){
+      var _res=curRes();
+      if(cancelLocked(_res)){ toast('대여 시작 20분이 지나 예약을 취소할 수 없어요. 이용을 마치려면 반납해 주세요.'); return; }
+      /* 예전엔 인자 없이 cancelReservation() 을 불러 아무 일도 안 일어났다 → 이 예약의 번호(idx)를 넘긴다 */
+      var _idx=-1; try{ (window.myReservations||[]).some(function(x,i){ if(x&&_res&&x.bookNo===_res.bookNo){ _idx=i; return true; } return false; }); }catch(e){}
       try{ if(window.closeHomeCtrlDirect) closeHomeCtrlDirect(); }catch(e){}
-      setTimeout(function(){ call('cancelReservation'); },180);
+      setTimeout(function(){ try{ if(_idx>=0 && typeof window.cancelReservation==='function') window.cancelReservation(_idx); else toast('취소할 예약을 찾지 못했어요.'); }catch(e){} },180);
     }
   }
 

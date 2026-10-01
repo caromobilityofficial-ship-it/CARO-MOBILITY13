@@ -940,6 +940,8 @@ function checkAlerts(){
       alertOnce('geo-'+v.id, !!(outside&&!r), '🚨 '+v.name+' 예약 없이 거점 밖 ('+(ns?ns.s.name+' '+Math.round(ns.d)+'m':'')+') — 도난·무단사용 의심');
       alertOnce('mv-'+v.id, !!(v.moving&&!r), '🚨 '+v.name+' 예약 없이 주행 중!'); }
     alertOnce('late-'+v.id, !!(r&&r.live==='반납지연'&&v.moving), '⏰ '+v.name+' 반납시간 지났는데 주행 중 ('+(r?r.user:'')+')');
+    /* ★[17차] 반납 지연(주행 여부와 무관) — 고객센터가 고객에게 바로 연락할 수 있게 이름·전화번호까지 띄운다 */
+    alertOnce('late2-'+v.id, !!(r&&r.live==='반납지연'), '⏰ 반납 지연 — '+v.name+' · '+(r?r.user:'')+(r&&r.phone?' '+r.phone:'')+' · 고객센터에서 연락해 주세요');
     alertOnce('door-'+v.id, !!(v.doorOpen&&!v.acc&&!r), '🚪 '+v.name+' 예약 없이 문 열림 감지');
   });
 }
