@@ -1224,31 +1224,51 @@ function caroSaveLicense(lic){
 }
 window.caroNormLicense=caroNormLicense; window.caroApplyLicenseLocal=caroApplyLicenseLocal; window.caroSaveLicense=caroSaveLicense;
 
+/* ★ [v102] users/{uid} 읽기 — 서버가 아니라 '기기 임시 저장분'(fromCache)이 돌아오면 '아직 모름'으로 보고 재시도.
+   (네트워크가 순간 끊긴 로그인 직후, 방금 쓴 로그인 기록만 든 불완전한 문서가 와서 면허·카드가 '없음'으로 보이던 문제)
+   cb(data|null, stale) — stale=true 이면 서버 확인 전 값이므로 '없음'으로 지우지 말 것. 서버 값이 올 때까지 최대 6번 재시도. */
+function caroLoadUserDoc(uid, cb, n){
+  n=n||0;
+  if(!fbReady()) return;
+  var fn=window.FB_FN, delays=[2000,4000,8000,15000,30000,60000];
+  function still(){ try{ var u=window.FB_AUTH&&window.FB_AUTH.currentUser; return !!(u&&u.uid===uid); }catch(e){ return false; } }
+  function retry(){ if(n<delays.length && still()) setTimeout(function(){ if(still()) caroLoadUserDoc(uid,cb,n+1); }, delays[n]); }
+  fn.getDoc(fn.doc(window.FB_DB,'users',uid)).then(function(snap){
+    var stale=!!(snap&&snap.metadata&&snap.metadata.fromCache);
+    var d=(snap&&snap.exists&&snap.exists())?snap.data():null;
+    if(stale) console.warn('[CARO] users 문서가 서버 확인 전(기기 임시값)이라 다시 확인합니다 ('+(n+1)+'회)');
+    try{ cb(d, stale); }catch(e){ console.error(e); }
+    if(stale) retry();
+  }).catch(function(e){
+    console.warn('[CARO] users 읽기 실패:', e&&e.code||e);
+    retry();
+  });
+}
+window.caroLoadUserDoc=caroLoadUserDoc;
+
 /* Firestore에서 사용자 프로필 불러오기 */
 function loadUserProfile(uid){
   if(!fbReady()) return;
-  var fn=window.FB_FN, dbRef=window.FB_DB;
-  fn.getDoc(fn.doc(dbRef,'users',uid)).then(function(snap){
-    if(snap.exists()){
-      var d=snap.data();
-      userInfo.name    = d.name    || userInfo.id;
-      userInfo.email   = d.email   || '';
-      userInfo.phone   = d.phoneFull || d.phone || '';
-      userInfo.birth   = d.birthFull || d.birth || '';
-      /* ★ [v101] 면허: 서버값이 진실 — 표준형으로 userInfo.license(번호)+caro_license(객체) 동시 갱신 */
-      var lic = caroNormLicense(d.license,{name:d.name,birth:userInfo.birth}) || caroNormLicense(d.licenseText,{name:d.name,birth:userInfo.birth});
-      caroApplyLicenseLocal(lic);
-      window._caroProfileLoaded=true;
-      /* 홈 환영 메시지 갱신 */
-      var wn=document.getElementById('home-welcome-name');
-      if(wn) wn.textContent=(userInfo.name||userInfo.id)+' 님, 안녕하세요 👋';
-      /* 홈 메뉴 패널 갱신 */
-      var hn=document.getElementById('hmenu-name');
-      var hi=document.getElementById('hmenu-id');
-      if(hn) hn.textContent=userInfo.name||userInfo.id;
-      if(hi) hi.textContent=userInfo.id;
-    }
-  }).catch(console.error);
+  caroLoadUserDoc(uid, function(d, stale){
+    if(!d) return;
+    userInfo.name    = d.name    || userInfo.name || userInfo.id;
+    userInfo.email   = d.email   || userInfo.email || '';
+    userInfo.phone   = d.phoneFull || d.phone || userInfo.phone || '';
+    userInfo.birth   = d.birthFull || d.birth || userInfo.birth || '';
+    /* ★ [v101] 면허: 서버값이 진실 — 표준형으로 userInfo.license(번호)+caro_license(객체) 동시 갱신
+       ★ [v102] 서버 확인 전(stale) 값에 면허가 없으면 지우지 않는다(있으면 반영) */
+    var lic = caroNormLicense(d.license,{name:d.name,birth:userInfo.birth}) || caroNormLicense(d.licenseText,{name:d.name,birth:userInfo.birth});
+    if(!stale || lic) caroApplyLicenseLocal(lic);
+    if(!stale) window._caroProfileLoaded=true;
+    /* 홈 환영 메시지 갱신 */
+    var wn=document.getElementById('home-welcome-name');
+    if(wn) wn.textContent=(userInfo.name||userInfo.id)+' 님, 안녕하세요 👋';
+    /* 홈 메뉴 패널 갱신 */
+    var hn=document.getElementById('hmenu-name');
+    var hi=document.getElementById('hmenu-id');
+    if(hn) hn.textContent=userInfo.name||userInfo.id;
+    if(hi) hi.textContent=userInfo.id;
+  });
 }
 
 /* ──────────────────────────────────────────
@@ -11402,15 +11422,16 @@ window.devUploadAllCars=function(){
   var _restored=false;
   function restore(){
     if(_restored||!ready()) return;
-    fsGet().then(function(d){
-      _restored=true;
-      window._caroProfileLoaded=true;   /* ★ 서버 조회 완료(데이터 유무 무관) → 홈 '이용 준비' 카드 판단 시작 허용 */
+    _restored=true;   /* 세션당 1회 시작 — 재시도는 caroLoadUserDoc 이 알아서 */
+    caroLoadUserDoc(uid(), function(d, stale){
+      if(!stale) window._caroProfileLoaded=true;   /* ★ 서버 조회 완료(데이터 유무 무관) → 홈 '이용 준비' 카드 판단 시작 허용 */
       if(!d) return;
       try{
-        /* ★ [v101] 면허 복원 — 서버값(표준형)이 진실. userInfo.license(번호)+caro_license(객체)를 함께 갱신 */
+        /* ★ [v101] 면허 복원 — 서버값(표준형)이 진실. userInfo.license(번호)+caro_license(객체)를 함께 갱신
+           ★ [v102] 서버 확인 전(stale) 값에 면허가 없으면 지우지 않는다 */
         var licObj = (window.caroNormLicense && (caroNormLicense(d.license,{name:d.name,birth:d.birth}) || caroNormLicense(d.licenseText,{name:d.name,birth:d.birth}))) || null;
         var lic = licObj ? licObj.number : '';
-        if(window.caroApplyLicenseLocal) caroApplyLicenseLocal(licObj);
+        if(window.caroApplyLicenseLocal && (!stale || licObj)) caroApplyLicenseLocal(licObj);
         /* 카드 복원 → savedCards + caro_apd_cards (로컬이 비어있을 때만) */
         var cards = (Array.isArray(d.savedCards)&&d.savedCards.length)?d.savedCards
                   : (Array.isArray(d.cards)&&d.cards.length)?d.cards : null;
@@ -11421,7 +11442,7 @@ window.devUploadAllCars=function(){
         try{ if(window.renderPaymentInfoScreen) renderPaymentInfoScreen(); }catch(e){}
         try{ if(window.renderPICardList) renderPICardList(); }catch(e){}
         try{ if(window.saveUserData) saveUserData(); }catch(e){}
-        console.log('[CARO] ✅ 카드·면허 복원 완료 (면허:'+(lic?'O':'-')+' 카드:'+(cards?cards.length:0)+'개) uid='+uid()+' 서버필드:'+(d.license?'license ':'')+(d.licenseText?'licenseText ':''));
+        console.log('[CARO] ✅ 카드·면허 복원 완료 (면허:'+(lic?'O':'-')+' 카드:'+(cards?cards.length:0)+'개)'+(stale?' [서버 확인 전]':'')+' uid='+uid()+' 서버필드:'+(d.license?'license ':'')+(d.licenseText?'licenseText ':''));
       }catch(e){}
     });
   }
