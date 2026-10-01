@@ -92,6 +92,7 @@ window.caroSyncPull=function(u){
     }finally{ window.__caroSilentStorage=false; }
     if(applied>0){
       console.log('☁️ 서버에서 내 설정 복원: '+applied+'개');
+      try{ var _L=JSON.parse(localStorage.getItem('caro_license')||'null'); if(_L&&_L.number&&window.userInfo&&!window.userInfo.license) window.userInfo.license=String(_L.number); }catch(e){}   /* ★[v102] 복원된 면허를 화면 상태에도 반영 */
       ['renderMyReservations','renderUsageHistory','renderCars','updateMapMarkers','renderPaymentInfoScreen','renderPICardList'].forEach(function(f){
         try{ if(typeof window[f]==='function') window[f](); }catch(e){}
       });

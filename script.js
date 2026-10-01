@@ -10418,7 +10418,8 @@ window.devUploadAllCars=function(){
       const data = typeof docSnap.data === 'function' ? docSnap.data() : docSnap.data;
       /* ★ [v101] 서버값을 표준형으로만 로컬 반영 (문자열/빈 객체/마스킹 값이 그대로 저장되던 문제) */
       const lic = (window.caroNormLicense && (caroNormLicense(data.license,{name:data.name,birth:data.birth}) || caroNormLicense(data.licenseText,{name:data.name,birth:data.birth}))) || null;
-      if(window.caroApplyLicenseLocal) caroApplyLicenseLocal(lic);
+      var _stale=!!(docSnap&&docSnap.metadata&&docSnap.metadata.fromCache);   /* ★[v102] 서버 확인 전 값에 면허가 없으면 지우지 않는다 */
+      if(window.caroApplyLicenseLocal && (!_stale || lic)) caroApplyLicenseLocal(lic);
       if(lic){
         console.log('[CARO] ✅ 면허증 정보 불러오기 완료');
         return lic;

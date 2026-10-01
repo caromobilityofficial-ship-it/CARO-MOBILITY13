@@ -7400,6 +7400,9 @@
   function readyState(){
     var logged=!!window._caroLoggedIn;
     var lic=!!(window.userInfo&&window.userInfo.license&&String(window.userInfo.license).trim());
+    /* ★ [v102] 서버 복원이 늦거나 한 박자 어긋나도, 기기에 복원된 면허(caro_license)가 있으면 '등록 완료'로 본다
+       (계정관리 화면은 이 값을 보는데 홈 카드만 userInfo.license 를 봐서 서로 다르게 나오던 문제). 로그아웃·계정전환 시 이 값은 지워진다. */
+    if(!lic){ try{ var _L=JSON.parse(localStorage.getItem('caro_license')||'null'); if(_L&&_L.number&&String(_L.number).trim()){ lic=true; if(window.userInfo&&!window.userInfo.license) window.userInfo.license=String(_L.number); } }catch(e){} }
     var card=hasCard();
     return {logged:logged,lic:lic,card:card,sig:logged+'|'+lic+'|'+card};
   }
