@@ -79,6 +79,7 @@
       FN.onSnapshot(FN.collection(db,'notices'), function(snap){
         var arr=[]; snap.forEach(function(d){ var x=d.data()||{}; arr.push({id:d.id, title:x.title||'', body:x.body||'', type:x.type||'', createdAt:x.createdAt||''}); });
         arr.sort(function(a,b){ return (b.createdAt||'').localeCompare(a.createdAt||''); });
+        try{ window.caroEventNotices=arr.filter(function(n){ return n.type==='이벤트'; }); if(window.caroRefreshHomeBanners) window.caroRefreshHomeBanners(); }catch(e){}   /* ★[25차] 홈 이벤트 배너용 */
         render(arr);
       }, function(err){ console.warn('[공지] 고객 리스너 오류', (err&&(err.code||err.message))||err); });
     }catch(e){ console.warn('[공지] 고객 시작 실패', e); return true; }

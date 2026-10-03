@@ -1452,10 +1452,9 @@ function handleLogin(){
           else if(typeof showToast === 'function'){ showToast('비밀번호가 올바르지 않습니다'); }
         });
       } else {
-        /* Firebase 미연결(오프라인) — 예전처럼 로컬 관리자 진입만 허용 */
-        userInfo.id = 'CAROMOBILITY';
-        userInfo.name = 'CAROMOBILITY';
-        showDevLoginTransition();
+        /* ★[25차] 서버 미연결 상태에서는 관리자 모드를 열지 않는다 (예전엔 비밀번호 확인 없이 열렸다) */
+        if(err) err.textContent='서버에 연결된 뒤 다시 시도해 주세요.';
+        else if(typeof showToast==='function') showToast('서버에 연결된 뒤 다시 시도해 주세요.');
       }
       return;
   }
@@ -1576,6 +1575,12 @@ function handleSignup(){
   var name=val('su-name');
   var license=val('su-license'), birth=val('su-birth');
   var phone=val('su-phone');
+  /* ★[25차] 만 21세 확인 — 앱 안내(만 21세 이상)대로 실제로 막는다 */
+  var ageOk=caroAgeFromBirth(birth);
+  if(ageOk==null){ showToast('생년월일 8자리(YYYYMMDD)를 정확히 입력해 주세요.'); return; }
+  if(ageOk<21){ showToast('만 21세 이상만 가입할 수 있습니다. (현재 만 '+ageOk+'세)'); return; }
+  /* ★[25차] 약관·마케팅 동의 기록 (예전엔 체크만 하고 저장하지 않았다) */
+  var consents={ terms:true, privacy:true, location:true, marketing:!!(document.getElementById('term4')&&document.getElementById('term4').checked), agreedAt:new Date().toISOString() };
 
   var btn=document.querySelector('#signup-step3 .submit-btn');
   if(btn){ btn.disabled=true; btn.textContent='가입 처리 중...'; }
@@ -1617,6 +1622,7 @@ function handleSignup(){
           /* ★ [v101] phoneVerified·certCI 는 서버(verifyCertification 함수)만 기록 — 규칙이 클라이언트 쓰기를 막는다.
              전화 인증 여부는 Firebase 계정에 연결된 번호(phoneE164)로 알 수 있다. */
           phoneE164: (cred.user && cred.user.phoneNumber) || '',
+          consents: consents, birthFull: birth || '',
           createdAt: fn.serverTimestamp(), uid:uid
         }, {merge:true});
       })
@@ -1855,6 +1861,19 @@ function handleFindPw(){
 }
 
 /* 비밀번호 복잡도 검사 */
+/* ★[25차] 생년월일(YYYYMMDD 또는 YYMMDD) → 만 나이. 형식이 이상하면 null */
+function caroAgeFromBirth(b){
+  try{
+    var d=String(b||'').replace(/\D/g,'');
+    if(d.length===6){ var yy=parseInt(d.slice(0,2),10); d=(yy>(new Date().getFullYear()%100)?'19':'20')+d; }
+    if(d.length!==8) return null;
+    var y=+d.slice(0,4), m=+d.slice(4,6), dd=+d.slice(6,8);
+    if(!(y>1900&&m>=1&&m<=12&&dd>=1&&dd<=31)) return null;
+    var now=new Date(); var age=now.getFullYear()-y; if(now.getMonth()+1<m||(now.getMonth()+1===m&&now.getDate()<dd)) age--;
+    return age;
+  }catch(e){ return null; }
+}
+window.caroAgeFromBirth=caroAgeFromBirth;
 function validateInfo(){
   var id=val('su-email').toLowerCase(), pw=val('su-pw'), pw2=val('su-pw2');
   if(!id){ showToast('이메일을 입력해 주세요.'); return false; }
@@ -6282,7 +6301,8 @@ function startReservationsListener(){
           status:d.cancelled?'cancelled':'active',
           /* ★[24차] 사진·첫 문열기·정산 상태(문열기 전 사진 확인·반납 화면용) — 사진 본문(base64)은 메모리에 두지 않고 개수만 */
           photoCount:(d.photoCount>0?d.photoCount:(d.photos&&typeof d.photos==='object'?Object.keys(d.photos).reduce(function(a,k){ return a+((Array.isArray(d.photos[k])?d.photos[k].length:0)); },0):0)),
-          firstUnlockAt:d.firstUnlockAt||null, settlement:d.settlement||null, overdue:!!d.overdue
+          firstUnlockAt:d.firstUnlockAt||null, settlement:d.settlement||null, overdue:!!d.overdue,
+          receiptUrl:(d.payment&&d.payment.receiptUrl)||''   /* ★[25차] 토스 영수증 */
         };
         seen[res.bookNo]=true;
         if(res.car&&!res.car.img){

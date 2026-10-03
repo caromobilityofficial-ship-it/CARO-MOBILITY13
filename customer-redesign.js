@@ -91,12 +91,10 @@
     if(now>=s && now<=e) return '이용 중';
     return fmtD(s)+' 이용 예정'; }
 
-  var EVENTS=[
-    {t:'첫 이용 30% 할인', s:'신규 가입 고객이라면 누구나', ic:'coupon'},
-    {t:'주중 낮 반값 이벤트', s:'월~목 09시~18시 대여요금 50%', ic:'sun'},
-    {t:'친구 초대 5,000원', s:'초대한 분도 받는 분도 함께', ic:'gift'},
-    {t:'심야 이동 특가', s:'22시 이후 출발하면 더 저렴하게', ic:'moon'}
-  ];
+  /* ★[25차] 실제로 적용되는 혜택만 — 예전 배너(30%·반값·친구초대·심야특가)는 요금 계산에 없는 광고였다.
+     운영화면 공지·이벤트에서 '이벤트'로 등록하면 아래에 자동으로 붙는다(window.caroEventNotices) */
+  var EVENTS=[ {t:'쿠폰 CARO30', s:'예약 결제 화면에 코드 입력 시 3,000원 할인 (1인 1회)', ic:'coupon'} ];
+  function eventsNow(){ var ex=(window.caroEventNotices||[]).slice(0,4).map(function(n){ return {t:n.title||'', s:(n.body||'').replace(/<[^>]+>/g,'').slice(0,40), ic:'gift', id:n.id}; }); return ex.concat(EVENTS); }
   var PLANS=[
     {tag:'개인', name:'CARO 라이트', price:'월 4,900원', ic:'user'},
     {tag:'추천', name:'CARO 플러스', price:'월 14,900원', ic:'crown'},
@@ -532,7 +530,7 @@
 
     /* 이벤트 캐러셀 (자동 + 스와이프 + 탭→이벤트 화면) */
     var evView=root.querySelector('.nh-ev');
-    var evSlides=EVENTS.map(function(e){ return '<span class="nh-badge">EVENT</span><h3>'+esc(e.t)+'</h3><span class="nh-sub">'+esc(e.s)+'</span><div class="nh-ev-ic">'+bnIcon(e.ic)+'</div>'; });
+    var evSlides=eventsNow().map(function(e){ return '<span class="nh-badge">EVENT</span><h3>'+esc(e.t)+'</h3><span class="nh-sub">'+esc(e.s)+'</span><div class="nh-ev-ic">'+bnIcon(e.ic)+'</div>'; });
     var evc=carousel(evView, evSlides, { dots:evView.querySelector('.nh-dots') });
     curEv=evc;
     bindSwipe(evView, evc.next, evc.prev, function(){ go('event-screen'); });
@@ -7113,7 +7111,7 @@
       : '<b>'+(r.total!=null?Number(r.total).toLocaleString()+'원':'')+'</b><small>'+(r.hrs?r.hrs+'시간':'')+'</small>';
     var btns='';
     if(st==='active'||st==='overdue') btns='<div class="suh-btn" onclick="openUsageDetail('+gi+')">이용 상세</div><div class="suh-btn dark" onclick="goTo(\'my-reservation-screen\')">차량 제어</div>';
-    else if(st==='returned') btns='<div class="suh-btn" onclick="openUsageDetail('+gi+')">이용 상세</div><div class="suh-btn" onclick="goTo(\'rental-screen\')">다시 예약</div>';
+    else if(st==='returned') btns='<div class="suh-btn" onclick="openUsageDetail('+gi+')">이용 상세</div>'+(r.receiptUrl?'<div class="suh-btn" onclick="window.open(\''+esc(r.receiptUrl)+'\',\'_blank\')">영수증</div>':'')+'<div class="suh-btn" onclick="goTo(\'rental-screen\')">다시 예약</div>';
     else if(st==='reserved') btns='<div class="suh-btn" onclick="openUsageDetail('+gi+')">이용 상세</div><div class="suh-btn dark" onclick="goTo(\'my-reservation-screen\')">예약 확인</div>';
     else btns='<div class="suh-btn" onclick="openUsageDetail('+gi+')">상세 보기</div>';
     return '<div class="suh-card"><div class="suh-row">'+img
