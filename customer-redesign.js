@@ -2920,7 +2920,7 @@
     tel:(window.CARO_CONFIG&&window.CARO_CONFIG.supportPhone)||'010-6872-9807',
     hours:'평일 09:00~18:00 (주말·공휴일 휴무)',
     email:'info@caromobility.kr',
-    privacyOfficer:'허경준 (privacy@caromobility.kr)',
+    privacyOfficer:'허경준 (info@caromobility.kr)',
     host:'Google Firebase'
   };
   /* ▲▲▲ 여기까지 ▲▲▲ */

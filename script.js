@@ -10724,7 +10724,7 @@ window.devUploadAllCars=function(){
         <h4>제6조 (개인정보 보호책임자)</h4>
         <ul>
           <li>책임자: CARO MOBILITY 개인정보보호책임자</li>
-          <li>연락처: privacy@caromobility.kr / 010-6872-9807</li>
+          <li>연락처: info@caromobility.kr / 010-6872-9807</li>
         </ul>
 
         <p style="margin-top:16px;color:#888;font-size:.78rem;text-align:center;">본 방침은 2026년 5월 31일부터 시행합니다.</p>
@@ -10778,7 +10778,7 @@ window.devUploadAllCars=function(){
         <h4>제8조 (위치정보 관리책임자)</h4>
         <ul>
           <li>책임자: CARO MOBILITY 위치정보 관리책임자</li>
-          <li>연락처: location@caromobility.kr / 010-6872-9807</li>
+          <li>연락처: info@caromobility.kr / 010-6872-9807</li>
         </ul>
 
         <p style="margin-top:16px;color:#888;font-size:.78rem;text-align:center;">본 약관은 2026년 5월 31일부터 시행합니다.</p>
@@ -10824,7 +10824,7 @@ window.devUploadAllCars=function(){
         <h4>제4조 (동의 철회)</h4>
         <ul>
           <li>회원은 언제든지 제3자 제공 동의를 철회할 수 있습니다.</li>
-          <li>철회 방법: 고객센터(010-6872-9807) 또는 privacy@caromobility.kr</li>
+          <li>철회 방법: 고객센터(010-6872-9807) 또는 info@caromobility.kr</li>
           <li>철회 시 즉시 처리하며, 이미 제공된 정보는 제공처에 파기 요청</li>
         </ul>
 
@@ -10911,7 +10911,7 @@ window.devUploadAllCars=function(){
         <h4>제5조 (청소년 유해정보 신고)</h4>
         <ul>
           <li>고객센터: 010-6872-9807</li>
-          <li>이메일: youth@caromobility.kr</li>
+          <li>이메일: info@caromobility.kr</li>
           <li>방송통신심의위원회 (1377)</li>
           <li>청소년 사이버상담센터 (1388)</li>
         </ul>
@@ -10920,7 +10920,7 @@ window.devUploadAllCars=function(){
         <ul>
           <li>책임자: CARO MOBILITY 청소년보호 책임자</li>
           <li>소속: 고객지원팀</li>
-          <li>연락처: youth@caromobility.kr / 010-6872-9807</li>
+          <li>연락처: info@caromobility.kr / 010-6872-9807</li>
         </ul>
 
         <h4>제7조 (관련 법령)</h4>
@@ -11065,7 +11065,7 @@ window.devUploadAllCars=function(){
 
       <h4>제9조 (분쟁 처리)</h4>
       <ul>
-        <li>회사 분쟁 처리: 010-6872-9807 / claim@caromobility.kr</li>
+        <li>회사 분쟁 처리: 010-6872-9807 / info@caromobility.kr</li>
         <li>금융감독원 분쟁조정위원회 (1332)</li>
         <li>한국소비자원 분쟁조정 (1372)</li>
       </ul>
