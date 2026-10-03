@@ -1803,7 +1803,38 @@
   function dismKey(){ return 'caro_nfx_'+uid(); }
   function load(k){ try{ return JSON.parse(localStorage.getItem(k)||'[]'); }catch(e){ return []; } }
   function save(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} }
-  function getList(){ return load(listKey()); }
+  /* ★[24차] 서버 알림(notifications/{uid}/items) — 예약 확정·시작 전·반납 전·지연·추가요금·취소. 앱을 껐다 켜도, 다른 기기에서도 보인다 */
+  var srv=[], srvUnsub=null, srvUid='';
+  function srvKey(id){ return 'srv_'+id; }
+  function getList(){
+    var local=load(listKey()), dism=getDism();
+    var merged=local.slice();
+    srv.forEach(function(n){ var id=srvKey(n._id); if(dism.indexOf(id)>=0) return; if(merged.some(function(x){ return x.id===id; })) return; merged.push({ id:id, title:n.title||'', body:n.body||'', ts:n.ts||Date.now(), read:!!n.read, _srv:true, _docId:n._id }); });
+    return merged;
+  }
+  function srvSubscribe(){
+    try{
+      var fn=window.FB_FN, db=window.FB_DB, u=window.FB_AUTH&&window.FB_AUTH.currentUser;
+      if(!fn||!db||!u||!fn.onSnapshot||!fn.collection){ return; }
+      if(srvUid===u.uid) return; srvUid=u.uid; if(srvUnsub){ try{ srvUnsub(); }catch(e){} }
+      srvUnsub=fn.onSnapshot(fn.collection(db,'notifications',u.uid,'items'), function(snap){
+        srv=[]; snap.forEach(function(d){ var x=d.data()||{}; srv.push({ _id:d.id, title:x.title, body:x.body, ts:x.ts||0, read:!!x.read, kind:x.kind }); });
+        updateBadge(); if(document.querySelector('#caro-notif-ov.open')) render();
+      }, function(e){ console.warn('[알림] 서버 알림 구독 실패', e&&e.code); });
+    }catch(e){}
+  }
+  function srvMarkRead(){
+    try{ var fn=window.FB_FN, db=window.FB_DB, u=window.FB_AUTH&&window.FB_AUTH.currentUser; if(!fn||!db||!u||!fn.setDoc) return;
+      srv.filter(function(n){ return !n.read; }).forEach(function(n){ n.read=true; fn.setDoc(fn.doc(db,'notifications',u.uid,'items',n._id),{ read:true, readAt:new Date().toISOString() },{merge:true}).catch(function(){}); });
+    }catch(e){}
+  }
+  if(window.caroOnAuth) window.caroOnAuth(function(u){ if(u) srvSubscribe(); else { srvUid=''; srv=[]; if(srvUnsub){ try{ srvUnsub(); }catch(e){} srvUnsub=null; } } });
+  else { var _nt=0,_niv=setInterval(function(){ if(window.caroOnAuth){ clearInterval(_niv); window.caroOnAuth(function(u){ if(u) srvSubscribe(); }); } if(++_nt>240) clearInterval(_niv); },250); }
+  /* 앱(안드로이드)이 FCM 토큰을 넘겨주면 서버 푸시용으로 저장 — MainActivity 에서 window.caroSetPushToken(token) 호출 */
+  window.caroSetPushToken=function(token){
+    try{ var fn=window.FB_FN, db=window.FB_DB, u=window.FB_AUTH&&window.FB_AUTH.currentUser; if(!fn||!db||!u||!token) return false;
+      fn.setDoc(fn.doc(db,'users',u.uid),{ fcmTokens:(fn.arrayUnion?fn.arrayUnion(String(token)):[String(token)]), pushUpdatedAt:new Date().toISOString() },{merge:true}).catch(function(){}); return true; }catch(e){ return false; }
+  };
   function getDism(){ return load(dismKey()); }
   function fmtDT(d){ var p=function(n){return n<10?'0'+n:n;}; return (d.getMonth()+1)+'/'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes()); }
   function fmtAgo(ts){ var s=Math.floor((Date.now()-ts)/1000); if(s<60)return '방금'; var m=Math.floor(s/60); if(m<60)return m+'분 전'; var h=Math.floor(m/60); if(h<24)return h+'시간 전'; return Math.floor(h/24)+'일 전'; }
@@ -1895,7 +1926,8 @@
     genNotifs();
     var ov=document.getElementById('caro-notif-ov')||buildPanel();
     /* 열면 모두 읽음 처리 → 뱃지 제거 */
-    var list=getList(); list.forEach(function(n){ n.read=true; }); save(listKey(),list);
+    var list=load(listKey()); list.forEach(function(n){ n.read=true; }); save(listKey(),list);
+    srvMarkRead();
     render(); updateBadge();
     requestAnimationFrame(function(){ ov.classList.add('open'); });
   }
@@ -2147,11 +2179,14 @@
   function fmtOverdue(min){ var h=Math.floor(min/60),m=min%60; return (h>0?h+'시간 ':'')+m+'분'; }
 
   /* ───────── 상태 ───────── */
-  var ST={res:null, checks:[false,false], park:'spot', photos:[], costs:null};
+  var ST={res:null, checks:[false,false,false,false], park:'spot', photos:[], retPhotos:[], costs:null};
 
   /* ───────── 반납 화면 ───────── */
   var CHK='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
-  var CHECKS=['차량에 두고 내린 물건이 없는지 확인했습니다','차량 외관에 새로운 파손이 없음을 확인했습니다'];
+  /* ★[24차] 쏘카식 반납 확인 항목 + 반납 외관 사진 */
+  var CHECKS=['차량에 두고 내린 물건이 없는지 확인했습니다','차량 외관에 새로운 파손이 없음을 확인했습니다','시동과 전조등을 끄고 창문을 모두 닫았습니다','지정 주차구역에 바르게 주차했습니다'];
+  var CHECK_KEYS=['belongings','damage','engineOff','parked'];
+  var RET_PHOTO_MIN=2;
 
   function build(){
     var ov=document.createElement('div'); ov.id='caro-ret-ov';
@@ -2159,6 +2194,11 @@
       +'<div class="rt-head"><button class="rt-back" id="rtBack">\u2190</button><span class="rt-title">차량 반납</span></div>'
       +'<div class="rt-body">'
         +'<div class="rt-sec"><div class="rt-lbl">반납 확인</div><div id="rtChecks"></div></div>'
+        +'<div class="rt-sec"><div class="rt-lbl">반납 사진 (외관 · 최소 '+RET_PHOTO_MIN+'장)</div>'
+          +'<div style="font-size:.78rem;color:var(--text-m);margin-bottom:8px;">파손·분쟁을 막기 위한 기록입니다. 앞·뒤를 포함해 찍어 주세요.</div>'
+          +'<button class="rt-photo" id="rtRetPhoto">반납 사진 촬영 (0장)</button>'
+          +'<div class="rt-photos" id="rtRetPhotos"></div>'
+        +'</div>'
         +'<div class="rt-sec"><div class="rt-lbl">주차 위치</div>'
           +'<div class="rt-park"><button class="rt-pk" data-p="spot">지정 장소에 주차</button><button class="rt-pk" data-p="other">다른 장소에 주차</button></div>'
           +'<div class="rt-other" id="rtOther">'
@@ -2173,6 +2213,7 @@
     document.body.appendChild(ov);
     ov.querySelector('#rtBack').addEventListener('click',closeRet);
     ov.querySelector('#rtPhoto').addEventListener('click',addPhoto);
+    ov.querySelector('#rtRetPhoto').addEventListener('click',addRetPhoto);
     ov.querySelectorAll('.rt-pk').forEach(function(b){ b.addEventListener('click',function(){ ST.park=b.getAttribute('data-p'); renderPark(); renderSubmit(); }); });
     ov.querySelector('#rtDesc').addEventListener('input',renderSubmit);
     ov.querySelector('#rtSubmit').addEventListener('click',submit);
@@ -2190,6 +2231,26 @@
   function renderPhotos(){
     var box=document.getElementById('rtPhotos'); if(box) box.innerHTML=ST.photos.map(function(p){ return '<img src="'+p+'"/>'; }).join('');
     var btn=document.getElementById('rtPhoto'); if(btn) btn.textContent='사진 첨부 ('+ST.photos.length+'장)';
+  }
+  function renderRetPhotos(){
+    var box=document.getElementById('rtRetPhotos'); if(box) box.innerHTML=ST.retPhotos.map(function(p){ return '<img src="'+p+'"/>'; }).join('');
+    var btn=document.getElementById('rtRetPhoto'); if(btn) btn.textContent='반납 사진 촬영 ('+ST.retPhotos.length+'장'+(ST.retPhotos.length<RET_PHOTO_MIN?' · '+(RET_PHOTO_MIN-ST.retPhotos.length)+'장 더':'')+')';
+  }
+  function addRetPhoto(){
+    if(ST.retPhotos.length>=6){ toast('최대 6장까지 찍을 수 있습니다.'); return; }
+    function got(dataUrl){ if(!dataUrl) return; ST.retPhotos.push(dataUrl); renderRetPhotos(); renderSubmit(); }
+    if(typeof window._openSimpleCam==='function'){ window._openSimpleCam(got); }
+    else { var inp=document.createElement('input'); inp.type='file'; inp.accept='image/*'; inp.capture='environment'; inp.onchange=function(){ var f=inp.files&&inp.files[0]; if(!f)return; var r=new FileReader(); r.onload=function(){ got(r.result); }; r.readAsDataURL(f); }; inp.click(); }
+  }
+  function shrinkImg(dataUrl,max){ return new Promise(function(res){ try{ var img=new Image(); img.onload=function(){ var w=img.width,h=img.height,sc=Math.min(1,max/Math.max(w,h)); var c=document.createElement('canvas'); c.width=Math.round(w*sc); c.height=Math.round(h*sc); c.getContext('2d').drawImage(img,0,0,c.width,c.height); res(c.toDataURL('image/jpeg',0.55)); }; img.onerror=function(){ res(''); }; img.src=dataUrl; }catch(e){ res(''); } }); }
+  /* 반납 사진 → Storage(returns/{uid}/{bookNo}/ret_n.jpg). 실패하면 개수만 서버에 알린다 */
+  function uploadRetPhotos(res){
+    var FN=window.FB_FN, st=window.FB_STORAGE, u=window.FB_AUTH&&window.FB_AUTH.currentUser;
+    var list=ST.retPhotos.slice(0,6);
+    if(!FN||!st||!u||!FN.storageRef||!FN.uploadString||!list.length) return Promise.resolve([]);
+    var ts=Date.now();
+    return Promise.all(list.map(function(d,i){ return shrinkImg(d,1000).then(function(small){ if(!small) return null; var ref=FN.storageRef(st,'returns/'+u.uid+'/'+res.bookNo+'/ret_'+i+'_'+ts+'.jpg'); return FN.uploadString(ref,small,'data_url',{contentType:'image/jpeg'}).then(function(){ return FN.getDownloadURL(ref); }); }).catch(function(){ return null; }); }))
+      .then(function(urls){ return urls.filter(Boolean); });
   }
   function addPhoto(){
     if(ST.photos.length>=5){ toast('최대 5장까지 첨부 가능합니다.'); return; }
@@ -2212,18 +2273,19 @@
       +((!c.drivenKm&&c.hipass<=0)?'<div class="rt-note">※ 주행거리·하이패스는 디바이스 측정값이 들어오면 자동 합산됩니다.</div>':'');
   }
   function parkOk(){ if(ST.park==='spot') return true; var d=document.getElementById('rtDesc'); return !!(d&&d.value.trim())&&ST.photos.length>0; }
+  function retPhotoOk(){ return ST.retPhotos.length>=RET_PHOTO_MIN; }
   function renderSubmit(){
     var btn=document.getElementById('rtSubmit'); if(!btn) return;
-    var ok=ST.checks.every(Boolean)&&parkOk();
+    var ok=ST.checks.every(Boolean)&&parkOk()&&retPhotoOk();
     btn.disabled=!ok;
     btn.textContent = ST.costs && ST.costs.total>0 ? ('반납 및 결제하기 · '+won(ST.costs.total)+'원') : '반납하기';
   }
 
   function openRet(){
     var res=activeRes(); if(!res){ toast('반납할 차량 정보를 찾을 수 없습니다.'); return; }
-    ST={res:res, checks:[false,false], park:'spot', photos:[], costs:calcCosts(res)};
+    ST={res:res, checks:[false,false,false,false], park:'spot', photos:[], retPhotos:[], costs:calcCosts(res)};
     var ov=document.getElementById('caro-ret-ov')||build();
-    renderChecks(); renderPark(); renderPhotos(); renderSum(); renderSubmit();
+    renderChecks(); renderPark(); renderPhotos(); renderRetPhotos(); renderSum(); renderSubmit();
     requestAnimationFrame(function(){ ov.classList.add('open'); ov.querySelector('.rt-body').scrollTop=0; });
   }
   function closeRet(){ var ov=document.getElementById('caro-ret-ov'); if(ov) ov.classList.remove('open'); }
@@ -2251,9 +2313,22 @@
     try{ if(entry && window.caroDebtFS && window.caroDebtFS.writeDebt) window.caroDebtFS.writeDebt(entry); }catch(e){}
   }
 
+  var _submitting=false;
   function submit(){
     if(!ST.checks.every(Boolean)){ toast('반납 확인 항목을 모두 체크해 주세요.'); return; }
     if(!parkOk()){ toast('다른 장소 주차 시 위치 설명과 사진(1장 이상)을 입력해 주세요.'); return; }
+    if(!retPhotoOk()){ toast('반납 외관 사진을 '+RET_PHOTO_MIN+'장 이상 찍어 주세요.'); return; }
+    if(_submitting) return; _submitting=true;
+    /* ★[24차] 반납 사진 올리고 체크리스트와 함께 서버(completeReturn)에 넘긴다 */
+    var btn=document.getElementById('rtSubmit'); if(btn){ btn.disabled=true; btn.textContent='사진 저장 중…'; }
+    var checklist={}; CHECK_KEYS.forEach(function(k,i){ checklist[k]=!!ST.checks[i]; });
+    uploadRetPhotos(ST.res).then(function(urls){
+      window.__caroReturnExtra={ checklist:checklist, returnPhotos:urls, returnPhotoCount:ST.retPhotos.length, altPark:(ST.park==='other')?{ desc:(document.getElementById('rtDesc')||{}).value||'', photos:ST.photos.length }:null };
+      try{ if(ST.park==='other' && window.caroSaveAltPark) window.caroSaveAltPark((document.getElementById('rtDesc')||{}).value||'', ST.photos.slice()); }catch(e){}
+      _submitting=false; submitAfterPhotos();
+    }).catch(function(){ _submitting=false; window.__caroReturnExtra={ checklist:checklist, returnPhotos:[], returnPhotoCount:ST.retPhotos.length }; submitAfterPhotos(); });
+  }
+  function submitAfterPhotos(){
     if(ST.park==='other'){ try{ ST.res.altPark={desc:document.getElementById('rtDesc').value.trim(), photos:ST.photos.length, at:Date.now()}; }catch(e){} }
     var total=ST.costs.total;
     if(total>0){
@@ -2271,7 +2346,11 @@
     finish();   /* 결제 성공/실패와 무관하게 반납은 항상 완료 */
   }
   function finish(){
-    closeRet(); closePay();
+    closePay();
+    /* ★[24차] 서버 모드에서는 서버가 반납을 승인한 뒤에만 화면을 닫는다(시동 켜짐·문 열림으로 거부되면 그대로 다시 시도) */
+    var secure=!!(window.CARO_CONFIG&&CARO_CONFIG.SECURE_SERVER);
+    if(!secure) closeRet();
+    window.caroCloseReturnScreen=function(){ closeRet(); };
     setTimeout(function(){ try{ if(window.doReturnCar) doReturnCar(); else toast('반납 처리를 찾을 수 없습니다.'); }catch(e){ toast('반납 처리 오류'); } },160);
   }
 

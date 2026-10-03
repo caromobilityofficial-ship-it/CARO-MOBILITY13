@@ -151,13 +151,14 @@
           +'<div class="db-main">'
             +'<div class="db-u">'+esc(d.userName||d.idName||'사용자')
               +'<span class="sub">'+esc(d.idName||'')+(d.license?(' · 면허 '+esc(d.license)):'')+'</span></div>'
-            +'<div class="db-meta">'+esc(d.carName||'차량')+(d.carNumber?(' · '+esc(d.carNumber)):'')
+            +'<div class="db-meta">'+esc(d.title||d.carName||'차량')+(d.carNumber?(' · '+esc(d.carNumber)):'')+(d.phone?(' · <a href="tel:'+esc(d.phone)+'" style="color:inherit">'+esc(d.phone)+'</a>'):'')
               +' · 발생 '+fmtDay(tsOf(d))+' ('+days+'일 경과)'+(d.bookNo?(' · '+esc(d.bookNo)):'')+'</div>'
             +(bdTxt.length?'<div class="db-bd">'+esc(bdTxt.join(' / '))+'</div>':'')
           +'</div>'
           +(isLong?'<span class="db-badge long">장기미납</span>':'')
           +'<div class="db-amt">'+won(d.amount)+'원<small>미납</small></div>'
           +'<button class="db-btn go" onclick="window.caroDebtPay&&caroDebtPay(\''+jsa(d.id)+'\')">납부 처리</button>'
+          +'<button class="db-btn" onclick="window.caroVoidCharge&&caroVoidCharge(\''+jsa(d.id)+'\')" title="잘못 등록된 청구 취소">청구 취소</button>'
           +'</div>';
       });
     }

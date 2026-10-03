@@ -2587,6 +2587,8 @@ window.caroResolveDeviceId = caroResolveDeviceId;
 var _devMapUnsub=null;
 function caroLoadDeviceMap(){
   try{
+    /* ★[24차] 서버 모드에서는 devices 전체를 읽지 않는다(규칙으로 직원 전용). 단말 연결은 서버(issueCommand·myDeviceStatus)가 판단한다 */
+    if(window.CARO_CONFIG && window.CARO_CONFIG.SECURE_SERVER){ return; }
     if(!(typeof fbReady==='function' && fbReady())){ setTimeout(caroLoadDeviceMap,1500); return; }
     /* ★ [v101] devices 는 보안 규칙상 로그인한 사용자만 읽을 수 있다 → 로그인 확정 뒤에 구독 (예전엔 로그인 전에 붙어 조용히 죽었음) */
     if(!(window.FB_AUTH && window.FB_AUTH.currentUser)){
@@ -2723,7 +2725,32 @@ window.sendDeviceCommand = sendDeviceCommand;
     }
   }
 
+  /* ★[24차] 서버 모드: devices 문서를 직접 읽지 않고 myDeviceStatus 를 20초마다 묻는다 (내 예약 차량의 상태만 돌아온다) */
+  function pollDeviceStatus(){
+    if(_deviceStatusUnsub){ try{_deviceStatusUnsub();}catch(e){} _deviceStatusUnsub=null; }
+    var r=(ctrlResIdx>=0 && myReservations[ctrlResIdx]) ? myReservations[ctrlResIdx] : null;
+    if(!r || !r.bookNo || typeof window.FB_CALL!=='function'){ updateBadge('unknown'); return; }
+    var stopped=false, timer=null;
+    function tick(){
+      if(stopped) return;
+      window.FB_CALL('myDeviceStatus',{ bookNo:r.bookNo }).then(function(d){
+        if(stopped||!d) return;
+        if(!d.found){ updateBadge('unknown'); return; }
+        try{ window.CARO_DEVICE_MAP=window.CARO_DEVICE_MAP||{}; if(r.car&&r.car.id!=null&&d.deviceId) window.CARO_DEVICE_MAP[String(r.car.id)]=d.deviceId; }catch(e){}
+        updateBadge(d.online?'online':'offline', d.lastSeen?new Date(d.lastSeen):null);
+        try{
+          var cid=r.car?r.car.id:null;
+          if(cid!=null && d.fuel!=null && isFinite(d.fuel)){ window.fuelLevels=window.fuelLevels||{}; window.fuelLevels[cid]=Math.max(0,Math.min(100,Math.round(d.fuel))); window.fuelRealLevels=window.fuelRealLevels||{}; window.fuelRealLevels[cid]=window.fuelLevels[cid]; if(typeof window.caroRefreshFuel==='function') window.caroRefreshFuel(); }
+          if(d.drivenKm!=null && isFinite(d.drivenKm)) r.deviceKm=Math.round(d.drivenKm);
+        }catch(e){}
+      }).catch(function(e){ if(!stopped) updateBadge('unknown'); });
+      timer=setTimeout(tick, 20000);
+    }
+    tick();
+    _deviceStatusUnsub=function(){ stopped=true; if(timer) clearTimeout(timer); };
+  }
   function subscribeDeviceStatus(deviceId){
+    if(window.CARO_CONFIG && window.CARO_CONFIG.SECURE_SERVER){ pollDeviceStatus(); return; }
     if(_deviceStatusUnsub){ try{_deviceStatusUnsub();}catch(e){} _deviceStatusUnsub=null; }
     if(!fbReady() || !deviceId){ updateBadge('unknown'); return; }
     var fn = window.FB_FN, db = window.FB_DB;
@@ -2805,6 +2832,16 @@ function ctrlActionHome(type){
       var b=document.getElementById('ctrl-btn-unlock');
       if(b){ b.classList.add('ctrl-sq-btn-active'); setTimeout(function(){ b.classList.remove('ctrl-sq-btn-active'); },2000); }
       var carIdU = (ctrlResIdx>=0 && myReservations[ctrlResIdx]) ? myReservations[ctrlResIdx].car.id : null;
+      /* ★[24차] 첫 문열기 전에는 주행 전 사진이 있어야 한다(서버도 확인). 없으면 사진 화면으로 안내 */
+      try{
+        var rU=myReservations[ctrlResIdx], pbU=document.getElementById('ctrl-photo-toggle');
+        var hasPh=!!(rU && ((rU.photoCount>0) || (rU.photos && Object.keys(rU.photos).some(function(k){ return Array.isArray(rU.photos[k]) && rU.photos[k].length; })) || rU.firstUnlockAt || (pbU && pbU.getAttribute('data-photo-done')==='1')));
+        if(!hasPh && window.CARO_CONFIG && window.CARO_CONFIG.SECURE_SERVER){
+          showCtrlToast('📸 주행 전 차량 사진(앞·뒤·좌·우)을 먼저 찍어 주세요. 저장되면 문이 열립니다.');
+          setTimeout(function(){ try{ if(window.toggleCtrlPhoto) toggleCtrlPhoto(); else if(window.openPhotoModal) openPhotoModal(); }catch(e){} }, 700);
+          return;
+        }
+      }catch(e){}
       if(carIdU){
         sendDeviceCommand(carIdU, 'unlock').then(function(ok){
           if(ok) showCtrlToast('🔓 잠금 해제 명령 전송됨');
@@ -2836,7 +2873,7 @@ function ctrlActionHome(type){
       if(b3){ b3.classList.add('ctrl-sq-btn-active'); setTimeout(function(){ b3.classList.remove('ctrl-sq-btn-active'); },2000); }
       var carIdH=(ctrlResIdx>=0 && myReservations[ctrlResIdx]) ? myReservations[ctrlResIdx].car.id : null;
       var devH=(carIdH!=null && window.caroResolveDeviceId) ? caroResolveDeviceId(carIdH) : null;
-      if(devH){
+      if(devH || (carIdH!=null && window.CARO_CONFIG && window.CARO_CONFIG.SECURE_SERVER)){   /* ★[24차] 서버 모드: 서버가 단말을 찾는다 */
         sendDeviceCommand(carIdH,'hazard').then(function(ok){ if(ok) showCtrlToast('⚠️ 비상등 점멸 명령 전송됨'); });
       } else {
         showCtrlToast('⚠️ 이 차량은 아직 단말기가 연결되지 않아 비상등을 켤 수 없어요.');
@@ -2853,7 +2890,7 @@ function ctrlActionHome(type){
       }
       var carIdK=(ctrlResIdx>=0 && myReservations[ctrlResIdx]) ? myReservations[ctrlResIdx].car.id : null;
       var devK=(carIdK!=null && window.caroResolveDeviceId) ? caroResolveDeviceId(carIdK) : null;
-      if(!devK){ showCtrlToast('⚠️ 이 차량은 경적을 울릴 수 없습니다 (기기 미연결)'); return; }
+      if(!devK && !(carIdK!=null && window.CARO_CONFIG && window.CARO_CONFIG.SECURE_SERVER)){ showCtrlToast('⚠️ 이 차량은 경적을 울릴 수 없습니다 (기기 미연결)'); return; }
       window.__caroHornAt=nowH;
       if(b4){ b4.classList.add('ctrl-sq-btn-active'); setTimeout(function(){ b4.classList.remove('ctrl-sq-btn-active'); },2000); }
       sendDeviceCommand(carIdK,'horn').then(function(ok){
@@ -6242,7 +6279,10 @@ function startReservationsListener(){
           extendedMins:d.extendedMins||0, extensionHistory:d.extensionHistory||[],
           refundPct:d.refundPct||0, refundAmt:d.refundAmt||0,
           cancelledAt:resFromServerDate(d.cancelledAt),
-          status:d.cancelled?'cancelled':'active'
+          status:d.cancelled?'cancelled':'active',
+          /* ★[24차] 사진·첫 문열기·정산 상태(문열기 전 사진 확인·반납 화면용) — 사진 본문(base64)은 메모리에 두지 않고 개수만 */
+          photoCount:(d.photoCount>0?d.photoCount:(d.photos&&typeof d.photos==='object'?Object.keys(d.photos).reduce(function(a,k){ return a+((Array.isArray(d.photos[k])?d.photos[k].length:0)); },0):0)),
+          firstUnlockAt:d.firstUnlockAt||null, settlement:d.settlement||null, overdue:!!d.overdue
         };
         seen[res.bookNo]=true;
         if(res.car&&!res.car.img){

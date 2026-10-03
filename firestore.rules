@@ -1,6 +1,6 @@
 rules_version = '2';
 /* ═══════════════════════════════════════════════════════════════════════════
-   CARO Mobility — Firestore 보안 규칙  (2026-10-03, 17차: 미납·정지 본인쓰기 차단, 인증항목 보호, coupon_uses)
+   CARO Mobility — Firestore 보안 규칙  (2026-10-04, 18차: 17차 + 고객 알림(notifications), 단말 데이터 직원 전용, 관리자 클레임)
 
    ★이번에 고친 것 3가지
      1) 단말 계정이 **하나로 박혀 있던 것** → 차량마다 자기 계정으로 (2대째부터 못 쓰던 문제)
@@ -19,10 +19,13 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     /* ───────── 최고관리자(본인) 식별 ───────── */
+    /* ★[18차] 최고관리자 = 이메일 하드코딩 또는 superAdmin 클레임(setAdminAccount 가 부여). 이메일 줄은 클레임이 전원에게 붙은 뒤 지운다 */
     function isAdmin() {
       return request.auth != null &&
-             request.auth.token.email == 'caro.mobility.official@gmail.com';
+             ( request.auth.token.email == 'caro.mobility.official@gmail.com' ||
+               request.auth.token.get('superAdmin', false) == true );
     }
+
 
     /* ───────── ★수정 1 — 차량 단말(ESP32) 계정 식별 ─────────
        예전:  'device-caro001@caro.local' 하나로 고정
@@ -60,6 +63,8 @@ service cloud.firestore {
     }
     /* 관제(사람)인가 — 시동차단처럼 위험한 명령을 보낼 수 있는 사람 */
     function isStaff() { return isAdmin() || can('resv') || can('cars'); }
+    /* ★[18차] 단말 데이터(위치·진단·명령)를 볼 수 있는 사람 = 직원(예약·차량·운영·관제) */
+    function canSeeDevices() { return isStaff() || can('control'); }
 
     /* ★[13차 보안] 차량에 명령을 보낼 수 있는 직원 = 관리자 또는 '실시간 관제(control)' 권한자.
        예전엔 위 isStaff() 를 그대로 써서 두 가지가 어긋났다.
@@ -118,7 +123,7 @@ service cloud.firestore {
       allow update: if request.auth != null &&
                        ( can('resv') ||
                          ( resource.data.userId == request.auth.uid &&
-                           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['photos', 'photosUploadedAt']) ) );
+                           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['photos', 'photosUploadedAt', 'photoCount', 'photoStorage']) ) );   /* ★[18차] 사진 저장 방식·개수 */
       allow delete: if can('resv');
     }
 
@@ -198,20 +203,22 @@ service cloud.firestore {
     }
 
     /* ═══════════ 차량 단말 (ESP32) ═══════════ */
+    /* ★[18차] devices 읽기 = 직원·그 단말만. 예전엔 로그인한 고객 누구나 전 차량의 실시간 위치·배터리·진단을 읽을 수 있었다.
+       고객앱은 서버 함수 myDeviceStatus 로 '내 예약 차량'의 온라인·연료만 받는다. */
     match /devices/{deviceId} {
-      allow read:  if request.auth != null;
+      allow read:  if canSeeDevices() || isDevice(deviceId);
       /* 상태 보고는 그 차량의 단말 계정만. 다른 차 문서에는 손댈 수 없다. */
       allow write: if isAdmin() || isDevice(deviceId);
 
       /* 주행 기록 · 사건 기록 — 단말만 쓴다 (관제·고객앱은 읽기만 한다).
          예전엔 로그인한 사람이면 누구나 가짜 기록을 넣을 수 있었다. */
       match /telemetry/{tsId} {
-        allow read:  if request.auth != null;
+        allow read:  if canSeeDevices();
         allow create: if isDevice(deviceId) || isAdmin();
         allow update, delete: if isAdmin();          /* 기록은 고쳐 쓰지 않는다 */
       }
       match /events/{eventId} {
-        allow read:  if request.auth != null;
+        allow read:  if canSeeDevices();
         allow create: if isDevice(deviceId) || isAdmin();
         allow update, delete: if isAdmin();
       }
@@ -229,7 +236,9 @@ service cloud.firestore {
                   그러면 고객 명령은 전부 서버(issueCommand)가 예약을 확인한 뒤에만 만들어진다.
                   ※ 지금 바꾸면 고객이 차 문을 못 연다. 반드시 앱 배포 뒤에. */
       match /commands/{cmdId} {
-        allow read:   if request.auth != null;
+        /* ★[18차] 고객은 '자기가 보낸 명령' 문서만 읽는다(결과 확인용). 목록 조회는 직원만 */
+        allow read:   if canSeeDevices() || isDevice(deviceId) ||
+                         (request.auth != null && resource.data.issuedBy == request.auth.uid);
         /* ★3단계(이 파일) — 명령은 **서버 함수만** 만든다.
            고객 문열기·잠금  → issueCommand   (내 유효 예약·정지 여부를 서버가 확인)
            관제(직원) 명령   → staffCommand   (관제 권한·2단계 인증·값 형식을 서버가 확인, 기록 남김)
@@ -253,6 +262,13 @@ service cloud.firestore {
     match /command_log/{id}   { allow read: if isStaff() || can('control'); allow write: if false; }
     /* ★[17차] 관제(control) 직원도 알림을 보고 '읽음' 처리할 수 있다 (반납 지연·단말 오프라인 알림은 관제가 본다) */
     match /admin_alerts/{id}  { allow read, write: if isStaff() || can('control'); }
+    /* ★[18차] 고객 알림 — 서버만 만든다. 본인은 읽기 + '읽음' 표시만 */
+    match /notifications/{uid}/items/{id} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow update: if request.auth != null && request.auth.uid == uid &&
+                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read','readAt']);
+      allow create, delete: if false;
+    }
     /* ★[17차] 쿠폰 사용 기록 — 서버만 쓴다. 본인은 자기 것만 조회 */
     match /coupon_uses/{id}   { allow read: if isAdmin() || can('resv') || (request.auth != null && resource.data.uid == request.auth.uid);
                                 allow write: if false; }

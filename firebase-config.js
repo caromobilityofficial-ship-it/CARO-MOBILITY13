@@ -27,6 +27,9 @@ import {
    네임스페이스로 받아 쓴다(없으면 undefined → 화면이 "미지원" 으로 안내). */
 import * as __AUTHNS from "https://www.gstatic.com/firebasejs/12.12.1/firebase-auth.js";
 import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/12.12.1/firebase-functions.js";
+import * as __FSNS from "https://www.gstatic.com/firebasejs/12.12.1/firebase-firestore.js";
+/* ★[24차] 사진 저장소(Storage) — 예약 문서(1MB) 대신 파일로 저장 */
+import * as __STNS from "https://www.gstatic.com/firebasejs/12.12.1/firebase-storage.js";
 import {
   getFirestore,
   doc,
@@ -126,8 +129,12 @@ window.FB_FN = {
   where: where,
   orderBy: orderBy,
   limit: limit,
-  serverTimestamp: serverTimestamp
+  serverTimestamp: serverTimestamp,
+  arrayUnion: __FSNS.arrayUnion, arrayRemove: __FSNS.arrayRemove,   /* ★[24차] 푸시 토큰 목록용 */
+  /* === Storage (★24차) === */
+  storageRef: __STNS.ref, uploadString: __STNS.uploadString, getDownloadURL: __STNS.getDownloadURL
 };
+try { window.FB_STORAGE = __STNS.getStorage(app); } catch (e) { console.warn('storage init', e); }
 
 /* ★ Cloud Functions 호출 (서울 리전). 앱·관제 공용: window.FB_CALL('함수명', {…}) → Promise<result.data> */
 const __fns = getFunctions(app, "asia-northeast3");

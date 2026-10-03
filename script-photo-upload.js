@@ -75,10 +75,31 @@
       });
   }
 
-  function save(bookNo, photos){
+  function saveDoc(bookNo, photos, extra){
     var FN=window.FB_FN, db=window.FB_DB;
     if(!db||typeof FN.setDoc!=='function') return Promise.reject(new Error('DB 미준비'));
-    return FN.setDoc(FN.doc(db,'reservations',bookNo),{ photos:photos, photosUploadedAt:new Date().toISOString() },{merge:true});
+    return FN.setDoc(FN.doc(db,'reservations',bookNo),Object.assign({ photos:photos, photosUploadedAt:new Date().toISOString() },extra||{}),{merge:true});
+  }
+  /* ★[24차] Storage 가 준비돼 있으면 파일로 올리고(1MB 제한·용량 탈락 없음, 서버 시각 기록) 예약 문서에는 주소만 남긴다.
+     Storage 가 없거나 실패하면 예전 방식(문서 안 base64)으로 저장한다. 경로: reservations/{uid}/{bookNo}/pre_{면}_{n}_{시각}.jpg */
+  function uploadToStorage(bookNo, photos){
+    var FN=window.FB_FN, st=window.FB_STORAGE, u=window.FB_AUTH&&window.FB_AUTH.currentUser;
+    if(!st||!u||!FN||typeof FN.storageRef!=='function'||typeof FN.uploadString!=='function') return Promise.reject(new Error('no-storage'));
+    var sides=['front','rear','left','right','misc'], jobs=[], ts=Date.now();
+    sides.forEach(function(side){ (photos[side]||[]).forEach(function(d,i){ jobs.push({side:side,i:i,data:d}); }); });
+    return Promise.all(jobs.map(function(j){
+      var ref=FN.storageRef(st, 'reservations/'+u.uid+'/'+bookNo+'/pre_'+j.side+'_'+j.i+'_'+ts+'.jpg');
+      return FN.uploadString(ref, j.data, 'data_url', { contentType:'image/jpeg', customMetadata:{ bookNo:bookNo, side:j.side } }).then(function(){ return FN.getDownloadURL(ref); }).then(function(url){ return {side:j.side,url:url}; });
+    })).then(function(items){
+      var out={front:[],rear:[],left:[],right:[],misc:[]};
+      items.forEach(function(it){ out[it.side].push(it.url); });
+      return out;
+    });
+  }
+  function save(bookNo, photos){
+    return uploadToStorage(bookNo, photos)
+      .then(function(urls){ return saveDoc(bookNo, urls, { photoStorage:'storage', photoCount:Object.keys(urls).reduce(function(a,k){ return a+urls[k].length; },0) }); })
+      .catch(function(e){ console.warn('[CARO 사진] Storage 저장 실패 → 문서 저장으로 대체', e&&(e.code||e.message)); return saveDoc(bookNo, photos, { photoStorage:'doc' }); });
   }
 
   function run(bookNo, snap){
@@ -116,5 +137,5 @@
     return true;
   }
   if(!hook()){ var t=setInterval(function(){ if(hook()) clearInterval(t); },400); setTimeout(function(){ clearInterval(t); },15000); }
-  console.log('[CARO 사진] ✅ 무료 저장(압축+Firestore) 패치 v2 적용');
+  console.log('[CARO 사진] ✅ 사진 저장 v3 (Storage 우선 · 문서 대체)');
 })();

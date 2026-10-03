@@ -418,6 +418,7 @@
     <button class="tab" data-tab="notice">공지·이벤트</button>
     <button class="tab" data-tab="chat">상담 통계</button>
     <button class="tab" data-tab="debt">미납·정지</button>
+    <button class="tab" data-tab="members">회원</button>
     <button class="tab" data-tab="set">설정</button>
   </div>
   <div class="demo-note">🔗 <b>Firestore 실시간 연결</b> — 차량(<b>cars · bl_cars</b>)·예약을 폰 앱(안드로이드·iOS)과 같은 데이터로 실시간 공유합니다. <b>연료량·층수</b>는 IoT 기기가 설치·전송하면 자동으로 채워집니다.</div>
@@ -583,6 +584,17 @@
           <span class="sub" id="resvCount"></span>
         </div>
       </div>
+      <!-- ★[24차] 검색·상태 필터 -->
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:0 0 10px;">
+        <input id="resvQ" placeholder="검색: 예약번호 · 이름 · 전화 · 이메일 · 차량번호" oninput="setResvFilter()" style="flex:1;min-width:220px;background:var(--panel2,#1f2228);border:1px solid var(--border,#333);color:var(--txt,#ddd);border-radius:10px;padding:9px 12px;font-size:13px;">
+        <select id="resvSt" onchange="setResvFilter()" style="background:var(--panel2,#1f2228);border:1px solid var(--border,#333);color:var(--txt,#ddd);border-radius:10px;padding:9px 10px;font-size:13px;">
+          <option value="">전체 상태</option><option>예약확정</option><option>대여중</option><option>반납지연</option><option>반납완료</option><option>취소</option><option>사고·고장</option>
+        </select>
+        <select id="resvDays" onchange="setResvFilter()" style="background:var(--panel2,#1f2228);border:1px solid var(--border,#333);color:var(--txt,#ddd);border-radius:10px;padding:9px 10px;font-size:13px;">
+          <option value="">전체 기간</option><option value="1">오늘</option><option value="7">최근 7일</option><option value="30">최근 30일</option>
+        </select>
+        <button class="btn sm" onclick="exportResvCsv()">CSV 저장</button>
+      </div>
       <div class="tbl-scroll">
         <table>
           <thead><tr><th>예약번호</th><th>차량</th><th>이용자</th><th>기간</th><th>상태</th><th>동작</th></tr></thead>
@@ -612,6 +624,9 @@
   <!-- ===================== TAB: 미납·정지 ===================== -->
   <section id="tab-debt" class="hide">
     <div id="debtRoot"></div>
+  </section>
+  <section id="tab-members" class="hide">
+    <div id="membersRoot"></div>
   </section>
   <section id="tab-set" class="hide">
     <div class="grid" style="grid-template-columns:1fr 1fr">
@@ -1360,16 +1375,33 @@
     renderResv();
   };
   function stColor(status){ return stCls(status); }
+  /* ★[24차] 검색·필터 */
+  var resvFilter={q:'',st:'',days:''};
+  window.setResvFilter=function(){ resvFilter={ q:((document.getElementById('resvQ')||{}).value||'').trim().toLowerCase(), st:(document.getElementById('resvSt')||{}).value||'', days:(document.getElementById('resvDays')||{}).value||'' }; renderResv(); };
+  function filteredResv(){
+    var q=resvFilter.q, st=resvFilter.st, days=+resvFilter.days||0, since=days?Date.now()-days*86400000:0;
+    return resv.filter(function(r){
+      if(st && liveStatus(r)!==st) return false;
+      if(since && (r.sMs||r.sortMs||0)<since && (r.eMs||0)<since) return false;
+      if(q){ var hay=[r.no,r.user,r.phone,r.email,r.car,r.carNo].join(' ').toLowerCase(); if(hay.indexOf(q)<0) return false; }
+      return true;
+    });
+  }
+  window.exportResvCsv=function(){
+    var rows=[['예약번호','차량','차량번호','이용자','전화','이메일','기간','상태']].concat(filteredResv().map(function(r){ return [r.no,r.car,r.carNo,r.user,r.phone,r.email,r.period,liveStatus(r)]; }));
+    var csv='\uFEFF'+rows.map(function(a){ return a.map(function(v){ return '"'+String(v==null?'':v).replace(/"/g,'""')+'"'; }).join(','); }).join('\n');
+    var a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'})); a.download='caro_reservations_'+new Date().toISOString().slice(0,10)+'.csv'; a.click();
+  };
   function renderResv(){
-    var list = resv.slice().sort(function(a,b){
+    var list = filteredResv().sort(function(a,b){
       return resvSort==='new' ? (b.sortMs-a.sortMs) : (a.sortMs-b.sortMs);
     });
-    document.getElementById('resvCount').textContent='전체 '+list.length+'건';
+    document.getElementById('resvCount').textContent=(resvFilter.q||resvFilter.st||resvFilter.days?'검색 ':'전체 ')+list.length+'건';
     document.getElementById('resvBody').innerHTML = list.map(function(r){
       var sNow=liveStatus(r); var cls=stColor(sNow);
       var carCell = esc(r.car) + (r.carNo?(' <span style="color:var(--muted)">('+esc(r.carNo)+')</span>'):'');
       return '<tr><td style="font-family:Saira;color:var(--muted)">'+esc(r.no)+'</td><td>'+carCell+'</td>'+
-        '<td>'+esc(r.user)+'</td><td style="color:var(--muted)">'+esc(r.period)+'</td>'+
+        '<td>'+esc(r.user)+(r.phone?'<div style="font-size:11px;color:var(--muted)">'+esc(r.phone)+'</div>':'')+'</td><td style="color:var(--muted)">'+esc(r.period)+'</td>'+
         '<td><span class="st '+cls+'"><i></i>'+sNow+'</span></td>'+
         '<td><button class="btn sm" onclick="toast(\'강제변경/취소는 다음 단계에서 연결\')">관리</button></td></tr>';
     }).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:20px">예약이 없습니다.</td></tr>';
@@ -1404,13 +1436,14 @@
     t.addEventListener('click', function(){
       document.querySelectorAll('.tab').forEach(function(x){x.classList.remove('active');});
       t.classList.add('active');
-      ['dash','price','resv','notice','chat','debt','set'].forEach(function(id){
+      ['dash','price','resv','notice','chat','debt','members','set'].forEach(function(id){
         var el=document.getElementById('tab-'+id); if(el) el.classList.toggle('hide', id!==t.dataset.tab);
       });
       if(t.dataset.tab==='dash'){ resizeChart(); setTimeout(function(){ caroMapResize(); },60); }
       if(t.dataset.tab==='price') renderPriceFleet();
       if(t.dataset.tab==='chat' && window.renderSupportStats) window.renderSupportStats();
       if(t.dataset.tab==='debt' && window.renderDebtAdmin) window.renderDebtAdmin();
+      if(t.dataset.tab==='members' && window.renderMembers) window.renderMembers();
     });
   });
   // ── toast ──
@@ -1967,6 +2000,8 @@
 <script src="admin-reports.js?v=2"></script>
 <script src="admin-force-return.js?v=2"></script>
 <script src="admin-debt.js?v=3"></script>
+<script src="admin-members.js?v=1"></script>
+<script src="admin-charges.js?v=1"></script>
 <script src="admin-pricing.js?v=9"></script>
 <script src="lib/qrcode/qrcode.js"></script>
 <script src="caro-mfa.js?v=1"></script>

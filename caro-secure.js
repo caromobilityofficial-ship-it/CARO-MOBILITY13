@@ -269,9 +269,11 @@
     if(!r){ returning = false; toast('반납할 예약을 찾을 수 없습니다.'); return; }
     toast('반납 위치를 확인하고 있습니다…');
     getPosition().then(function(pos){
-      return call('completeReturn', { bookNo: r.bookNo, lat: pos.lat, lng: pos.lng, accuracy: pos.accuracy });
+      var extra = window.__caroReturnExtra || {}; window.__caroReturnExtra = null;   /* ★[24차] 체크리스트·반납 사진 */
+      return call('completeReturn', Object.assign({ bookNo: r.bookNo, lat: pos.lat, lng: pos.lng, accuracy: pos.accuracy }, extra));
     }).then(function(res){
       if(!res || !res.returned){ toast('반납 처리 결과를 확인할 수 없습니다. 고객센터로 문의해 주세요.'); return; }
+      try{ if(window.caroCloseReturnScreen) window.caroCloseReturnScreen(); }catch(e){}
       /* 서버가 반납을 확정(잠금 명령 포함). 로컬 화면 정리는 기존 함수로 */
       try{ if(typeof origReturn === 'function') origReturn(); }catch(e){}
       if(res.amount > 0 && res.orderId){
@@ -281,6 +283,7 @@
       }
       toast('✅ ' + (res.stationName || '거점') + ' 반납 완료. 이용해 주셔서 감사합니다 🚗');
     }).catch(function(e){
+      try{ var rb=document.getElementById('rtSubmit'); if(rb){ rb.disabled=false; rb.textContent='반납하기'; } }catch(x){}
       var m = (e && e.code === 1) ? '위치 권한이 꺼져 있어 반납 위치를 확인할 수 없습니다. 설정에서 위치 권한을 허용해 주세요.'
             : (e && (e.code === 2 || e.code === 3 || e.message === 'nogeo')) ? '현재 위치를 확인할 수 없습니다. 실외에서 잠시 후 다시 시도해 주세요.'
             : errMsg(e, '반납을 처리할 수 없습니다.');
