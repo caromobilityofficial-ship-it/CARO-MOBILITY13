@@ -1829,10 +1829,17 @@
   if(window.caroOnAuth) window.caroOnAuth(function(u){ if(u) srvSubscribe(); else { srvUid=''; srv=[]; if(srvUnsub){ try{ srvUnsub(); }catch(e){} srvUnsub=null; } } });
   else { var _nt=0,_niv=setInterval(function(){ if(window.caroOnAuth){ clearInterval(_niv); window.caroOnAuth(function(u){ if(u) srvSubscribe(); }); } if(++_nt>240) clearInterval(_niv); },250); }
   /* 앱(안드로이드)이 FCM 토큰을 넘겨주면 서버 푸시용으로 저장 — MainActivity 에서 window.caroSetPushToken(token) 호출 */
-  window.caroSetPushToken=function(token){
+  /* ★[27차] 로그인 전에 토큰이 오면 보관했다가 로그인 뒤 저장 — 앱은 켜자마자 토큰을 넘기고, 로그인은 그 뒤에 되기 때문 */
+  var _pushSaved='';
+  function _savePush(token){
     try{ var fn=window.FB_FN, db=window.FB_DB, u=window.FB_AUTH&&window.FB_AUTH.currentUser; if(!fn||!db||!u||!token) return false;
-      fn.setDoc(fn.doc(db,'users',u.uid),{ fcmTokens:(fn.arrayUnion?fn.arrayUnion(String(token)):[String(token)]), pushUpdatedAt:new Date().toISOString() },{merge:true}).catch(function(){}); return true; }catch(e){ return false; }
-  };
+      if(_pushSaved===u.uid+'|'+token) return true; _pushSaved=u.uid+'|'+token;
+      fn.setDoc(fn.doc(db,'users',u.uid),{ fcmTokens:(fn.arrayUnion?fn.arrayUnion(String(token)):[String(token)]), pushUpdatedAt:new Date().toISOString() },{merge:true}).catch(function(){ _pushSaved=''; }); return true; }catch(e){ return false; }
+  }
+  window.caroSetPushToken=function(token){ if(token) window.__caroPushToken=String(token); return _savePush(window.__caroPushToken); };
+  function _pushOnAuth(u){ if(u && window.__caroPushToken) setTimeout(function(){ _savePush(window.__caroPushToken); }, 800); }
+  if(window.caroOnAuth) window.caroOnAuth(_pushOnAuth);
+  else { var _pt=0,_piv=setInterval(function(){ if(window.caroOnAuth){ clearInterval(_piv); window.caroOnAuth(_pushOnAuth); } if(++_pt>240) clearInterval(_piv); },250); }
   function getDism(){ return load(dismKey()); }
   function fmtDT(d){ var p=function(n){return n<10?'0'+n:n;}; return (d.getMonth()+1)+'/'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes()); }
   function fmtAgo(ts){ var s=Math.floor((Date.now()-ts)/1000); if(s<60)return '방금'; var m=Math.floor(s/60); if(m<60)return m+'분 전'; var h=Math.floor(m/60); if(h<24)return h+'시간 전'; return Math.floor(h/24)+'일 전'; }

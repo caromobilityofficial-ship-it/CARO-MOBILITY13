@@ -5940,7 +5940,7 @@ function detectDeviceInfo(){
   else if(/iPhone|iPad|iPod/i.test(ua)) platform = 'iOS';
   else if(/Mac/i.test(ua)) platform = 'Mac';
   else if(/Windows/i.test(ua)) platform = 'Windows';
-  var isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+  var isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true || /CaroApp\//.test(ua);
   return { platform: platform, isApp: isStandalone, screenW: screen.width, screenH: screen.height, lang: currentLang||'ko', ua: ua.slice(0,200) };
 }
 window.detectDeviceInfo = detectDeviceInfo;
