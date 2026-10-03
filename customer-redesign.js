@@ -2910,17 +2910,18 @@
    ─────────────────────────────────────────────────────────── */
 (function(){ 'use strict';
   /* ▼▼▼ 실제 회사 정보 입력 ▼▼▼ */
-  var BIZ={
-    name:'(주)카로 모빌리티',
-    ceo:'',            /* 대표자명 */
-    bizNo:'',          /* 사업자등록번호 (000-00-00000) */
-    mailOrderNo:'',    /* 통신판매업 신고번호 (제0000-지역-0000호) */
-    addr:'',           /* 사업장 주소 */
-    tel:'',            /* 고객센터 전화 */
+  /* ★[26차] 회사 정보 — 통신판매업신고번호·대표번호(1661)는 나오는 대로 여기만 고치면 됨 */
+    var BIZ={
+    name:'(주)카로모빌리티',
+    ceo:'허경준',
+    bizNo:'851-88-03946',
+    mailOrderNo:'신고 진행 중',
+    addr:'인천광역시 연수구 센트럴로 313, 씨동 2304호 4-7 (송도동, 송도씨워크 인테라스한라)',
+    tel:(window.CARO_CONFIG&&window.CARO_CONFIG.supportPhone)||'010-6872-9807',
     hours:'평일 09:00~18:00 (주말·공휴일 휴무)',
-    email:'',          /* 고객센터 이메일 */
-    privacyOfficer:'', /* 개인정보 보호책임자 */
-    host:'Google Firebase'  /* 호스팅 제공 */
+    email:'info@caromobility.kr',
+    privacyOfficer:'허경준 (privacy@caromobility.kr)',
+    host:'Google Firebase'
   };
   /* ▲▲▲ 여기까지 ▲▲▲ */
 

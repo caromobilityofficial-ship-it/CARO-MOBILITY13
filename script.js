@@ -9451,15 +9451,15 @@ window.devUploadAllCars=function(){
         <div class="apd-row"><span class="apd-row-label">상호</span><span class="apd-row-value">(주)카로모빌리티</span></div>
         <div class="apd-row"><span class="apd-row-label">대표자</span><span class="apd-row-value">허경준</span></div>
         <div class="apd-row"><span class="apd-row-label">사업자등록번호</span><span class="apd-row-value">851-88-03946</span></div>
-        <div class="apd-row"><span class="apd-row-label">통신판매업신고</span><span class="apd-row-value">신고 준비 중</span></div>
+        <div class="apd-row"><span class="apd-row-label">통신판매업신고</span><span class="apd-row-value">신고 진행 중</span></div>
         <div class="apd-row"><span class="apd-row-label">주소</span><span class="apd-row-value">인천광역시 연수구 센트럴로 313, 씨동 2304호 4-7 (송도동, 송도씨워크 인테라스한라)</span></div>
-        <div class="apd-row"><span class="apd-row-label">고객센터</span><span class="apd-row-value">info@caromobility.kr (전화 준비 중)</span></div>
+        <div class="apd-row"><span class="apd-row-label">고객센터</span><span class="apd-row-value">info@caromobility.kr · 010-6872-9807 (평일 09:00~18:00)</span></div>
       </div>
 
       <div class="apd-section">
         <div class="apd-section-title"><span class="apd-section-title-icon">📌</span>버전 정보</div>
-        <div class="apd-row"><span class="apd-row-label">앱 버전</span><span class="apd-row-value">v3.0.0</span></div>
-        <div class="apd-row"><span class="apd-row-label">최종 업데이트</span><span class="apd-row-value">2026.05.20</span></div>
+        <div class="apd-row"><span class="apd-row-label">앱 버전</span><span class="apd-row-value">v3.2 (25차)</span></div>
+        <div class="apd-row"><span class="apd-row-label">최종 업데이트</span><span class="apd-row-value">2026.10.04</span></div>
         <div class="apd-row"><span class="apd-row-label">서비스 약관 버전</span><span class="apd-row-value">v2.1 (2026.01.01)</span></div>
       </div>
 
