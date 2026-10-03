@@ -111,6 +111,7 @@
      + '<div class="rm-sec"><div class="rm-sec-t">대여 정보</div><div class="rm-grid">'
      +   '<span class="k">대여자</span><span class="v">'+esc(d.userName||d.name||'-')+'</span>'
      +   '<span class="k">이메일</span><span class="v">'+esc(d.userEmail||'-')+'</span>'
+     +   '<span class="k">전화</span><span class="v">'+(d.userPhone||d.phone?('<a href="tel:'+esc(d.userPhone||d.phone)+'" style="color:inherit">'+esc(d.userPhone||d.phone)+'</a>'):'<span style="color:var(--muted)">미등록 (10월 이후 예약부터 자동 기록)</span>')+'</span>'
      +   '<span class="k">차량</span><span class="v">'+carLine+'</span>'
      +   '<span class="k">보험</span><span class="v">'+esc((d.ins&&d.ins.name)||'없음')+'</span>'
      + '</div></div>'
@@ -126,7 +127,15 @@
      +   (d.cancelled?('<span class="k">취소 시각</span><span class="v">'+fmtDate(d.cancelledAt)+'</span>'
         +'<span class="k">환불</span><span class="v">'+(Number(d.refundPct)||0)+'% \u00b7 '+won(d.refundAmt)+'</span>'):'')
      + '</div></div>'
+     + (d.settlement?('<div class="rm-sec"><div class="rm-sec-t">반납 정산</div><div class="rm-grid">'
+     +   '<span class="k">추가 요금</span><span class="v">'+won(d.settlement.amount||0)+(d.settlement.paid?' · 결제됨':(d.settlement.waived?' · 면제':' · <b style="color:var(--bad)">미납</b>'))+'</span>'
+     +   ((d.settlement.breakdown||[]).map(function(b){ return '<span class="k">'+esc(b.label||b.key)+'</span><span class="v">'+won(b.amount)+'</span>'; }).join(''))
+     +   (d.forceReturned?('<span class="k">강제 반납</span><span class="v">'+esc(d.forcedBy||d.forceReturnedBy||'')+' · '+esc(d.forceReason||'')+'</span>'):'')
+     + '</div></div>'):'')
      + '<div class="rm-sec"><div class="rm-sec-t">사용 전 사진</div>'+photoHTML(d)+'</div>'
+     + '<div class="rm-sec"><div class="rm-sec-t">이용 정지</div><div id="rmSuspBox" style="font-size:12.5px;color:var(--muted)">확인 중…</div>'
+     +   '<div style="display:flex;gap:8px;margin-top:8px;"><button class="btn" id="rmSuspOn" style="flex:1;justify-content:center;color:#d57a68;">이 고객 이용 정지</button><button class="btn" id="rmSuspOff" style="flex:1;justify-content:center;">정지 해제</button></div>'
+     + '</div>'
      + '<div class="rm-sec"><div class="rm-sec-t">비고 \u00b7 콜센터 문의 기록</div>'
      +   '<textarea class="rm-note" id="rmNote" rows="3" placeholder="고객 문의 내용, 특이사항 등을 기록하세요">'+esc(d.adminNote||'')+'</textarea>'
      + '</div>'
@@ -137,6 +146,37 @@
      +   '<textarea class="rm-note" id="rmAccNote" rows="3" placeholder="사고 경위, 파손 정도 등">'+esc(d.accidentNote||'')+'</textarea>'
      + '</div></div>'
      + (d.noteUpdatedAt?('<div style="font-size:11px;color:var(--muted2,#5e636b);text-align:right;">마지막 기록: '+fmtDate(d.noteUpdatedAt)+'</div>'):'');
+    wireSusp(d);
+  }
+
+  /* ★[23차] 예약 상세에서 바로 고객 이용 정지/해제 — 반납 지연·사고·연락 두절 고객을 센터가 바로 막을 수 있게 (suspensions/{uid}) */
+  function wireSusp(d){
+    var box=ov.querySelector('#rmSuspBox'), on=ov.querySelector('#rmSuspOn'), off=ov.querySelector('#rmSuspOff');
+    var FN=window.FB_FN, db=window.FB_DB, uid=d.userId||'';
+    if(!box||!on||!off) return;
+    if(!uid||!FN||!db){ box.textContent='고객 계정 정보가 없어 정지할 수 없습니다.'; on.disabled=off.disabled=true; return; }
+    function show(){
+      FN.getDoc(FN.doc(db,'suspensions',uid)).then(function(sn){
+        var x=(sn&&sn.exists&&sn.exists())?(sn.data()||{}):null;
+        var active=!!(x&&x.active!==false&&(x.requiresApproval===true||x.habitual===true||((Number(x.untilTs)||Date.parse(x.until)||0)>Date.now())));
+        box.innerHTML=active?('<b style="color:#d57a68">정지 중</b> · '+esc(x.reason||'')+(x.untilTs?(' · 해제 예정 '+fmtDate(x.untilTs)):' · 직원이 해제할 때까지')):'정지 아님';
+        on.disabled=active; off.disabled=!active;
+      }).catch(function(){ box.textContent='정지 상태를 읽을 수 없습니다 (권한 확인)'; });
+    }
+    show();
+    on.onclick=function(){
+      var reason=window.prompt('정지 사유 (고객 앱에 표시됩니다)', '반납 지연 · 고객센터 연락 요망');
+      if(reason===null) return;
+      var days=window.prompt('정지 기간(일). 비워 두면 직원이 해제할 때까지 무기한', '');
+      if(days===null) return;
+      var n=parseInt(days,10); var data={ userId:uid, userName:d.userName||'', idName:d.userEmail||'', active:true, reason:reason, createdAt:new Date().toISOString(), heldBy:(window.FB_AUTH&&window.FB_AUTH.currentUser&&window.FB_AUTH.currentUser.email)||'staff', bookNo:d.bookNo||'' };
+      if(n>0){ data.untilTs=Date.now()+n*86400000; data.until=new Date(data.untilTs).toISOString(); data.requiresApproval=false; } else { data.untilTs=null; data.until=null; data.requiresApproval=true; }
+      FN.setDoc(FN.doc(db,'suspensions',uid),data,{merge:true}).then(function(){ notify('이용 정지를 적용했습니다 — 이 고객은 예약·문 열기가 막힙니다'); show(); }).catch(function(e){ notify('정지 실패: 권한 확인'); console.error(e); });
+    };
+    off.onclick=function(){
+      if(!window.confirm('이 고객의 이용 정지를 해제할까요?')) return;
+      FN.setDoc(FN.doc(db,'suspensions',uid),{ active:false, liftedAt:new Date().toISOString(), liftedBy:(window.FB_AUTH&&window.FB_AUTH.currentUser&&window.FB_AUTH.currentUser.email)||'staff' },{merge:true}).then(function(){ notify('정지를 해제했습니다'); show(); }).catch(function(e){ notify('해제 실패: 권한 확인'); console.error(e); });
+    };
   }
 
   window.openResManage=function(no){

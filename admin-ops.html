@@ -485,7 +485,7 @@
               <button class="cbtn hazard" onclick="caroAdminCmd('hazard')">⚠ 비상등</button>
             </div>
             <div class="fw-wrap">
-              <button class="fw-btn" onclick="caroUpdateFw()">🔄 펌웨어 원격 업데이트 (LTE)</button>
+              <!-- ★[23차] 원격 펌웨어 업데이트는 단말이 지원하지 않음(USB 전용) — 서버도 거부하므로 버튼 제거 -->
             </div>
             <!-- 층 보정 : 해당 차량 위치 조정 (지하10층~지상10층) -->
             <div class="cal-wrap">
@@ -1593,7 +1593,7 @@
   }
   function timeStatus(sMs, eMs){
     var now=Date.now();
-    if(eMs && now>eMs) return (now-eMs <= 2*86400000) ? '반납지연' : '반납완료';
+    if(eMs && now>eMs) return '반납지연';   /* ★[23차] 반납 처리 전엔 며칠이 지나도 '반납지연'(예전엔 2일 뒤 저절로 '반납완료'로 보여 미반납 차량이 숨었다) */
     if(sMs && eMs && now>=sMs && now<=eMs) return '대여중';
     return '예약확정';
   }
@@ -1953,19 +1953,20 @@
 })();
 
 </script>
+<script src="caro-config.js?v=3"></script>   <!-- ★[23차] 거점·설정 공용 -->
 <script src="admin-realtime.js?v=1"></script>
-<script src="admin-manage.js?v=1"></script>
+<script src="admin-manage.js?v=2"></script>
 <script src="admin-notices.js?v=3"></script>
 <script src="admin-settings.js?v=1"></script>
 <script src="admin-accounts.js?v=6"></script>
 <script src="admin-black.js?v=1"></script>
 <script src="admin-cars.js?v=1"></script>
 <script src="admin-monthly.js?v=8"></script>
-<script src="admin-support-stats.js?v=2"></script>
-<script src="admin-inbox.js?v=1"></script>
+<script src="admin-support-stats.js?v=3"></script>
+<script src="admin-inbox.js?v=2"></script>
 <script src="admin-reports.js?v=2"></script>
-<script src="admin-force-return.js?v=1"></script>
-<script src="admin-debt.js?v=2"></script>
+<script src="admin-force-return.js?v=2"></script>
+<script src="admin-debt.js?v=3"></script>
 <script src="admin-pricing.js?v=9"></script>
 <script src="lib/qrcode/qrcode.js"></script>
 <script src="caro-mfa.js?v=1"></script>

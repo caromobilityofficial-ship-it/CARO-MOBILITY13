@@ -112,6 +112,8 @@ window.FB_FN = {
   getMultiFactorResolver: __AUTHNS.getMultiFactorResolver,
   TotpMultiFactorGenerator: __AUTHNS.TotpMultiFactorGenerator,
   sendEmailVerification: __AUTHNS.sendEmailVerification,
+  /* ★[23차] 비밀번호 변경(재인증 후) */
+  updatePassword: __AUTHNS.updatePassword, reauthenticateWithCredential: __AUTHNS.reauthenticateWithCredential, EmailAuthProvider: __AUTHNS.EmailAuthProvider,
   /* === Firestore === */
   doc: doc,
   setDoc: setDoc,

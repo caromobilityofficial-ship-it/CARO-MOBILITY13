@@ -1736,31 +1736,15 @@ function handleFindId(){
   var nm=val('find-name'), ph=val('find-phone');
   if(!nm){ showToast('이름을 입력해 주세요.'); return; }
   if(!ph||!/^01[0-9]{8,9}$/.test(ph)){ showToast('올바른 휴대폰 번호를 입력해 주세요.'); return; }
-  if(!_findCarrier){ showToast('통신사를 선택해 주세요.'); return; }
-
-  window._smsCode = String(Math.floor(100000 + Math.random() * 900000));
-  window._smsExpire = Date.now() + 3 * 60 * 1000;
-  window._findMode = 'id';
-
-  var modal = document.getElementById('pass-auth-modal');
-  if(modal) modal.style.display = 'flex';
-  var spinner = document.getElementById('pass-spinner');
-  var msg = document.getElementById('pass-modal-msg');
-  var successIcon = document.getElementById('pass-success-icon');
-  var completeBtn = document.getElementById('pass-modal-complete-btn');
-  var inputArea = document.getElementById('sms-input-area');
-  if(spinner) spinner.style.display = 'none';
-  if(successIcon) successIcon.style.display = 'none';
-  if(completeBtn) completeBtn.style.display = 'none';
-  if(msg) msg.innerHTML =
-    '📱 인증번호: <strong style="font-size:1.8rem;letter-spacing:.3em;color:#18191c;">' +
-    window._smsCode + '</strong><br>' +
-    '<span style="font-size:.74rem;color:#888;">화면의 번호를 입력해 주세요</span>';
-  if(inputArea){ inputArea.style.display='block'; }
-  /* 입력창 초기화 */
-  var codeInp=document.getElementById('sms-code-input');
-  if(codeInp) codeInp.value='';
-  _startSmsTimer();
+  /* ★[23차] 서버에서 이름+전화번호로 찾아 가린 이메일(ab***@naver.com)만 보여준다 (예전엔 항상 '찾을 수 없음') */
+  var r=document.getElementById('find-id-result');
+  if(typeof window.FB_CALL!=='function'){ showToast('서버에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요.'); return; }
+  showToast('계정을 찾고 있습니다…');
+  window.FB_CALL('findIdByPhone',{name:nm, phone:ph}).then(function(res){
+    if(!r) return; r.style.display='block';
+    if(res&&res.found){ r.style.background='rgba(29,122,58,.08)'; r.style.border='1px solid rgba(29,122,58,.2)'; r.style.color='#1d7a3a'; r.innerHTML='✅ 가입된 이메일<br><strong style="font-size:1.05rem;">'+res.maskedEmail+'</strong><br><span style="font-size:.78rem;font-weight:400;">전체 주소는 고객센터에서 본인 확인 후 안내드립니다.</span>'; }
+    else { r.style.background='rgba(178,58,58,.06)'; r.style.border='1px solid rgba(178,58,58,.2)'; r.style.color='#b23a3a'; r.textContent='일치하는 계정을 찾을 수 없습니다.'; }
+  }).catch(function(e){ if(r){ r.style.display='block'; r.style.color='#b23a3a'; r.textContent=/resource-exhausted/.test(e&&e.code||'')?'시도 횟수를 초과했습니다. 잠시 후 다시 시도해 주세요.':'조회에 실패했습니다. 잠시 후 다시 시도해 주세요.'; } });
 }
 /* ── 비밀번호 찾기 PASS 인증 ── */
 var _findPwCarrier = '';
@@ -1792,43 +1776,17 @@ function checkFindPwReady(){
 window.checkFindPwReady=checkFindPwReady;
 
 function handleFindPwStep1(){
-  var email=val('find-pw-email'), nm=val('find-pw-name'), ph=val('find-pw-phone');
+  var email=val('find-pw-email');
   if(!email||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){ showToast('올바른 이메일을 입력해 주세요.'); return; }
-  if(!nm){ showToast('이름을 입력해 주세요.'); return; }
-  if(!ph||!/^01[0-9]{8,9}$/.test(ph)){ showToast('올바른 휴대폰 번호를 입력해 주세요.'); return; }
-  if(!_findPwCarrier){ showToast('통신사를 선택해 주세요.'); return; }
-
-  /* 로컬 DB에서 계정 존재 여부 확인 */
-  var db=localLoadUsers();
-  var found=db[email];
-  if(!found){
-    var r=document.getElementById('find-pw-result');
-    if(r){ r.style.display='block'; r.style.background='rgba(178,58,58,.06)'; r.style.border='1px solid rgba(178,58,58,.2)'; r.style.color='#b23a3a'; r.textContent='일치하는 계정을 찾을 수 없습니다.'; }
-    return;
-  }
-
-  window._smsCode = String(Math.floor(100000 + Math.random() * 900000));
-  window._smsExpire = Date.now() + 3 * 60 * 1000;
-  window._findMode = 'pw';
-
-  var modal = document.getElementById('pass-auth-modal');
-  if(modal) modal.style.display = 'flex';
-  var spinner = document.getElementById('pass-spinner');
-  var msg = document.getElementById('pass-modal-msg');
-  var successIcon = document.getElementById('pass-success-icon');
-  var completeBtn = document.getElementById('pass-modal-complete-btn');
-  var inputArea = document.getElementById('sms-input-area');
-  if(spinner) spinner.style.display = 'none';
-  if(successIcon) successIcon.style.display = 'none';
-  if(completeBtn) completeBtn.style.display = 'none';
-  if(msg) msg.innerHTML =
-    '📱 인증번호: <strong style="font-size:1.8rem;letter-spacing:.3em;color:#18191c;">' +
-    window._smsCode + '</strong><br>' +
-    '<span style="font-size:.74rem;color:#888;">화면의 번호를 입력해 주세요</span>';
-  if(inputArea) inputArea.style.display='block';
-  var codeInp=document.getElementById('sms-code-input');
-  if(codeInp) codeInp.value='';
-  _startSmsTimer();
+  /* ★[23차] 실제 비밀번호 재설정 메일 발송 (예전엔 기기 안의 가짜 목록을 뒤져 항상 실패) */
+  var r=document.getElementById('find-pw-result');
+  if(!fbReady()||!window.FB_FN.sendPasswordResetEmail){ showToast('서버에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요.'); return; }
+  window.FB_FN.sendPasswordResetEmail(window.FB_AUTH, email).then(function(){
+    if(r){ r.style.display='block'; r.style.background='rgba(29,122,58,.08)'; r.style.border='1px solid rgba(29,122,58,.2)'; r.style.color='#1d7a3a'; r.innerHTML='✅ 가입된 이메일이라면 비밀번호 재설정 메일을 보냈습니다.<br><span style="font-size:.8rem;">메일함(스팸함 포함)에서 링크를 눌러 새 비밀번호를 정해 주세요.</span>'; }
+  }).catch(function(e){
+    var m=(e&&e.code)||'';
+    if(r){ r.style.display='block'; r.style.background='rgba(178,58,58,.06)'; r.style.border='1px solid rgba(178,58,58,.2)'; r.style.color='#b23a3a'; r.textContent=/invalid-email/.test(m)?'이메일 형식이 올바르지 않습니다.':/user-not-found/.test(m)?'가입되지 않은 이메일입니다.':'메일을 보내지 못했습니다. 잠시 후 다시 시도해 주세요.'; }
+  });
 }
 window.handleFindPwStep1=handleFindPwStep1;
 
@@ -2074,8 +2032,8 @@ function updateMapMarkers(){
             '</div>',
             className: '', iconSize: [34,44], iconAnchor: [17,37]
           });
-    var marker=L.marker([car.lat,car.lng],{icon:icon}).addTo(caroMap)
-      .bindPopup('<b>'+getCarName(car)+'</b><br>'+car.fuel+' · '+car.pricePerHour.toLocaleString()+'원/h<br><span style="color:'+col+';font-weight:700;">'+label+'</span>');
+    if(!(isFinite(car.lat)&&isFinite(car.lng))) return; var marker=L.marker([car.lat,car.lng],{icon:icon}).addTo(caroMap)
+      .bindPopup('<b>'+getCarName(car)+'</b><br>'+car.fuel+' · '+(Number(car.pricePerHour)||0).toLocaleString()+'원/h<br><span style="color:'+col+';font-weight:700;">'+label+'</span>');
     mapMarkers.push(marker);
   });
 
@@ -2132,8 +2090,8 @@ function updateCarSheetCount(){
               '</div>',
               className: '', iconSize: [34,44], iconAnchor: [17,37]
             });
-      var marker=L.marker([car.lat,car.lng],{icon:icon}).addTo(caroMap)
-        .bindPopup('<b>⭐ '+car.name+'</b><br>'+car.fuel+' · '+car.pricePerHour.toLocaleString()+'원/h<br><span style="color:#c8a96e;font-weight:700;">CARO THE BLACK</span>');
+      if(!(isFinite(car.lat)&&isFinite(car.lng))) return; var marker=L.marker([car.lat,car.lng],{icon:icon}).addTo(caroMap)
+        .bindPopup('<b>⭐ '+car.name+'</b><br>'+car.fuel+' · '+(Number(car.pricePerHour)||0).toLocaleString()+'원/h<br><span style="color:#c8a96e;font-weight:700;">CARO THE BLACK</span>');
       mapMarkers.push(marker);
     });
   }
@@ -2219,7 +2177,7 @@ function renderCars(){
         '<div class="car-km-info">🛣 '+kmInfo+'</div>'+
         '<div class="car-price-row">'+
           '<span class="car-status '+statusCls+'">'+statusLabel+'</span>'+
-          '<span class="car-price"><strong>'+car.pricePerHour.toLocaleString()+'원</strong>/h</span>'+
+          '<span class="car-price"><strong>'+(Number(car.pricePerHour)||0).toLocaleString()+'원</strong>/h</span>'+
         '</div>'+
         availBar+
       '</div>'+
@@ -2235,7 +2193,7 @@ function goBackFromReservation(){
 window.goBackFromReservation=goBackFromReservation;
 
 function selectCar(carId){
-  selectedCar=CARS_DATA.find(function(c){ return c.id===carId; });
+  selectedCar=CARS_DATA.find(function(c){ return c.id===carId || String(c.id)===String(carId); });   /* ★[23차] 문자열 id 차량도 선택 가능 */
   if(!selectedCar) return;
   setupDateInputs();
   renderReservationCard();
@@ -2247,9 +2205,9 @@ function selectCar(carId){
 function renderReservationCard(){
   var el=document.getElementById('reserve-car-card'); if(!el||!selectedCar) return;
   var carId=selectedCar.id||selectedCar.name;
-  var fuelPct=getFuelLevel(carId)||Math.floor(Math.random()*60)+20;
-  fuelLevels[carId]=fuelPct;
-  var fuelColor=fuelPct>60?'#1d7a3a':fuelPct>30?'#b07800':'#b23a3a';
+  var fuelPct=getFuelLevel(carId);   /* ★[23차] 실기기 값이 없으면 꾸며내지 않는다 */
+  var fuelKnown=fuelPct!=null; if(!fuelKnown) fuelPct=0;
+  var fuelColor=!fuelKnown?'#9aa0a6':fuelPct>60?'#1d7a3a':fuelPct>30?'#b07800':'#b23a3a';
   var fuelLabel=selectedCar.fuel==='전기'?'배터리':'연료';
   el.className='res-car-section';
   el.innerHTML=
@@ -2259,7 +2217,7 @@ function renderReservationCard(){
       '<div class="res-car-sub">'+selectedCar.fuel+'</div>'+
       '<div class="res-car-price">'+selectedCar.pricePerHour.toLocaleString()+'원 / h</div>'+
       '<div style="margin-top:5px;">'+
-        '<div style="font-size:.68rem;color:var(--text-m);margin-bottom:3px;">'+fuelLabel+' '+fuelPct+'%</div>'+
+        '<div style="font-size:.68rem;color:var(--text-m);margin-bottom:3px;">'+fuelLabel+' '+(fuelKnown?fuelPct+'%':'확인 중 (단말 연결 후 표시)')+'</div>'+
         '<div style="height:5px;background:rgba(0,0,0,.1);border-radius:14px;overflow:hidden;">'+
           '<div style="width:'+fuelPct+'%;height:100%;background:'+fuelColor+';border-radius:14px;"></div>'+
         '</div>'+
@@ -2324,7 +2282,7 @@ function updatePriceSummary(){
   var carCost=selectedCar.pricePerHour*hrs;
   var insCost=ins.pricePerHour*hrs;
   var pa=document.getElementById('point-amount');
-  pointDiscount=pa&&pa.value?Math.min(parseInt(pa.value)||0,2500):0;
+  pointDiscount=0;   /* ★[23차] 포인트 장부가 생기기 전까지 0 (서버도 0으로 계산) */
   var total=Math.max(0,carCost+insCost-couponDiscount-pointDiscount);
   var sum=document.getElementById('price-summary');
   if(!sum) return;
@@ -2346,7 +2304,7 @@ function applyCoupon(){
 function togglePoint(cb){
   var row=document.getElementById('point-input-row'), pa=document.getElementById('point-amount');
   if(!row) return;
-  if(cb.checked){ pointDiscount=2500; if(pa) pa.value=2500; }
+  if(cb.checked){ pointDiscount=0; if(pa) pa.value=0; showToast('포인트 사용은 준비 중입니다'); cb.checked=false; }
   else{ pointDiscount=0; if(pa) pa.value=''; }
   updatePriceSummary();
 }
@@ -2376,7 +2334,7 @@ function goToPayment(){
   var hrs=Math.ceil((e-s)/3600000);
   var ins=selectedIns||INSURANCE[0];
   var pa=document.getElementById('point-amount');
-  pointDiscount=pa&&pa.value?Math.min(parseInt(pa.value)||0,2500):0;
+  pointDiscount=0;   /* ★[23차] 포인트 장부가 생기기 전까지 0 (서버도 0으로 계산) */
   var total=Math.max(0,(selectedCar.pricePerHour+ins.pricePerHour)*hrs-couponDiscount-pointDiscount);
   window._payData={car:selectedCar,ins:ins,hrs:hrs,total:total,start:s,end:e};
   var pcc=document.getElementById('pay-car-card');
@@ -2881,7 +2839,7 @@ function ctrlActionHome(type){
       if(devH){
         sendDeviceCommand(carIdH,'hazard').then(function(ok){ if(ok) showCtrlToast('⚠️ 비상등 점멸 명령 전송됨'); });
       } else {
-        showCtrlToast('⚠️ 비상등이 3회 점멸되었습니다.');
+        showCtrlToast('⚠️ 이 차량은 아직 단말기가 연결되지 않아 비상등을 켤 수 없어요.');
       }
       return;
     }
@@ -2977,6 +2935,8 @@ function submitAltPark(){
   if(!desc||!desc.value.trim()){ showToast('주차 위치 설명을 입력해 주세요.'); return; }
   if(altParkPhotos.length===0){ showToast('주차 위치 사진을 최소 1장 첨부해 주세요.'); return; }
   closeModal('alt-park-modal');
+  /* ★[23차] 신고 내용을 실제로 남긴다(support_inquiries) — 예전엔 버려졌다 */
+  try{ if(window.caroSaveAltPark) window.caroSaveAltPark(desc.value.trim(), altParkPhotos.slice()); }catch(e){}
   showToast('📋 대체 주차 신고가 접수되었습니다.');
   setTimeout(function(){ doReturnCar(); }, 600);
 }
@@ -3048,8 +3008,8 @@ window.closeAltParkModalDirect=closeAltParkModalDirect;
 /* 차량별 연료량 시뮬레이션 (id → 0~100%) */
 var fuelLevels={};
 function getFuelLevel(carId){
-  if(fuelLevels[carId]==null) fuelLevels[carId]=Math.floor(Math.random()*60)+20;
-  return fuelLevels[carId];
+  /* ★[23차] 실기기(devices)가 보고한 값만 돌려준다. 없으면 null (예전엔 난수) */
+  var v=fuelLevels[carId]; return (v==null||isNaN(v))?null:v;
 }
 function fuelBar(pct){
   var color=pct>60?'#1d7a3a':pct>30?'#b07800':'#b23a3a';
@@ -3099,7 +3059,7 @@ function devRenderCarOverview(){
       '<img src="'+car.img+'" style="width:44px;height:34px;object-fit:contain;border-radius:14px;background:#1a2030;flex-shrink:0;"/>'+
       '<div style="flex:1;min-width:80px;">'+
         '<div style="font-size:.8rem;color:rgba(180,220,255,.85);font-weight:600;">'+car.name+'</div>'+
-        '<div style="font-size:.68rem;color:rgba(91,200,255,.5);">'+car.pricePerHour.toLocaleString()+'원/h · '+car.fuel+'</div>'+
+        '<div style="font-size:.68rem;color:rgba(91,200,255,.5);">'+(Number(car.pricePerHour)||0).toLocaleString()+'원/h · '+car.fuel+'</div>'+
         fuelBar(fuel)+
       '</div>'+
       '<span class="dev-status-badge '+sc+'">'+status+'</span>';
@@ -3117,7 +3077,7 @@ function devRenderBlOverview(){
       '<img src="'+car.img+'" style="width:44px;height:34px;object-fit:contain;border-radius:14px;background:#1a1c20;flex-shrink:0;"/>'+
       '<div style="flex:1;min-width:80px;">'+
         '<div style="font-size:.8rem;color:rgba(200,169,110,.85);font-weight:600;">'+car.name+'</div>'+
-        '<div style="font-size:.68rem;color:rgba(200,169,110,.4);">'+car.pricePerHour.toLocaleString()+'원/h · '+car.area+'</div>'+
+        '<div style="font-size:.68rem;color:rgba(200,169,110,.4);">'+(Number(car.pricePerHour)||0).toLocaleString()+'원/h · '+car.area+'</div>'+
       '</div>'+
       '<span class="dev-status-badge dev-status-ok">운영중</span>';
     list.appendChild(row);
@@ -3386,7 +3346,7 @@ function devRenderCarDeleteList(){
         '</label>'+
         '<img src="'+car.img+'" style="width:34px;height:26px;object-fit:contain;border-radius:14px;background:#1a2030;flex-shrink:0;"/>'+
         '<span class="dev-label" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+car.name+'</span>'+
-        '<span style="font-size:.68rem;color:rgba(91,200,255,.4);flex-shrink:0;">'+car.pricePerHour.toLocaleString()+'원/h</span>';
+        '<span style="font-size:.68rem;color:rgba(91,200,255,.4);flex-shrink:0;">'+(Number(car.pricePerHour)||0).toLocaleString()+'원/h</span>';
       list.appendChild(row);
     });
   }
@@ -3412,7 +3372,7 @@ function devRenderCarDeleteList(){
         '</label>'+
         '<img src="'+car.img+'" style="width:34px;height:26px;object-fit:contain;border-radius:14px;background:#1a1c20;flex-shrink:0;"/>'+
         '<span class="dev-label" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:rgba(200,169,110,.85);">'+car.name+'</span>'+
-        '<span style="font-size:.68rem;color:rgba(200,169,110,.4);flex-shrink:0;">'+car.pricePerHour.toLocaleString()+'원/h</span>';
+        '<span style="font-size:.68rem;color:rgba(200,169,110,.4);flex-shrink:0;">'+(Number(car.pricePerHour)||0).toLocaleString()+'원/h</span>';
       blList.appendChild(row);
     });
   }
@@ -3867,8 +3827,8 @@ function openHomeCtrl(){
         if(showCarNum && carName){
           carName.innerHTML=name+'<br><span style="font-size:.85rem;color:#1a6cff;font-weight:700;letter-spacing:.05em;">🚗 '+activeRes.car.carNumber+'</span>';
         }
-    var hash=activeRes.bookNo.charCodeAt(activeRes.bookNo.length-1)%5;
-    var pkText=floors[hash]+' · '+spots[hash]+' 구역';
+    /* ★[23차] 주차 위치는 꾸며내지 않는다 — 차량의 거점/구역 정보가 있을 때만 표시 */
+    var pkText=(activeRes.car&&(activeRes.car.zone||activeRes.car.station||activeRes.car.location))||'지정 주차구역 (예약 상세·안내 참조)';
     if(park) park.textContent=pkText;
     /* 시작 전이면 안내 문구 표시 */
     if(notice) notice.textContent = expired
@@ -4460,13 +4420,12 @@ function openResDetail(idx){
   var insDesc=currentLang==='en'?ins.descen:currentLang==='ja'?ins.descja:currentLang==='zh'?ins.desczh:ins.desc;
   var body=document.getElementById('res-detail-body'); if(!body) return;
   var carId=(r.car&&(r.car.id||r.car.name))||'unknown';
-  var fuelPct=getFuelLevel(carId)||Math.floor(Math.random()*60)+20;
-  fuelLevels[carId]=fuelPct;
-  var fuelColor=fuelPct>60?'#1d7a3a':fuelPct>30?'#b07800':'#b23a3a';
+  var fuelPct=getFuelLevel(carId);
+  var fuelKnown=fuelPct!=null; if(!fuelKnown) fuelPct=0;
+  var fuelColor=!fuelKnown?'#9aa0a6':fuelPct>60?'#1d7a3a':fuelPct>30?'#b07800':'#b23a3a';
   var fuelLabel=(r.car&&r.car.fuel)==='전기'?'배터리':'연료';
   var floors=['B1','B2','B2','B3','1F'], spots=['12번','23번','47번','55번','08번'];
-  var hash=r.bookNo?r.bookNo.charCodeAt(r.bookNo.length-1)%5:0;
-  var parkInfo=floors[hash]+' · '+spots[hash]+' 구역';
+  var parkInfo=(r.car&&(r.car.zone||r.car.station||r.car.location))||'지정 주차구역';
   body.innerHTML=
     /* 차량 사진 */
     '<img style="width:100%;height:130px;object-fit:contain;border-radius:14px;margin-bottom:12px;background:#dde2ea;" src="'+r.car.img+'" alt="'+getCarName(r.car)+'"/>'+
@@ -4494,7 +4453,7 @@ function openResDetail(idx){
         '<div style="flex:1;height:8px;background:rgba(0,0,0,.1);border-radius:14px;overflow:hidden;">'+
           '<div style="width:'+fuelPct+'%;height:100%;background:'+fuelColor+';border-radius:14px;transition:width .5s;"></div>'+
         '</div>'+
-        '<span style="font-size:.9rem;font-weight:700;color:'+fuelColor+';min-width:38px;">'+fuelPct+'%</span>'+
+        '<span style="font-size:.9rem;font-weight:700;color:'+fuelColor+';min-width:38px;">'+(fuelKnown?fuelPct+'%':'—')+'</span>'+
       '</div>'+
     '</div>'+
     /* 면책 상품 */
@@ -4668,7 +4627,7 @@ function renderBLCars(){
         '</div>'+
         '<div class="bl-car-options">'+car.options.replace(/\n/g,'<br>')+'</div>'+
         '<div style="display:flex;align-items:center;justify-content:space-between;margin-top:4px;">'+
-          '<div class="bl-car-price">'+car.pricePerHour.toLocaleString()+'<span style="font-size:.72rem;font-family:var(--font);color:rgba(200,169,110,.55);"> 원/h</span></div>'+
+          '<div class="bl-car-price">'+(Number(car.pricePerHour)||0).toLocaleString()+'<span style="font-size:.72rem;font-family:var(--font);color:rgba(200,169,110,.55);"> 원/h</span></div>'+
           '<div class="bl-car-area">'+car.area+'</div>'+
         '</div>'+
         '<button class="bl-rent-btn" onclick="event.stopPropagation();selectBlCar(\''+car.id+'\')">예약하기</button>'+
@@ -4706,7 +4665,7 @@ function openBLDetail(car){
       '<div style="font-size:.84rem;color:var(--text-2);line-height:1.9;">'+car.options.replace(/\n/g,'<br>')+'</div>'+
       '<div style="margin-top:16px;padding:14px;background:rgba(24,25,28,.06);border-radius:14px;display:flex;justify-content:space-between;align-items:center;">'+
         '<span style="font-size:.82rem;color:var(--text-m);">대여 가격</span>'+
-        '<span style="font-size:1.1rem;font-weight:700;color:var(--accent);">'+car.pricePerHour.toLocaleString()+'원 / h</span>'+
+        '<span style="font-size:1.1rem;font-weight:700;color:var(--accent);">'+(Number(car.pricePerHour)||0).toLocaleString()+'원 / h</span>'+
       '</div>'+
     '</div>';
   goTo('bl-detail-screen');
@@ -4761,7 +4720,7 @@ function closeEventDetail(e){
 var NOTICES=[
   {
     title:'2026년 하절기 차량 점검 일정 안내',
-    body:'<h4>점검 개요</h4><p>CARO 모빌리티는 안전한 차량 서비스 제공을 위해 2026년 하절기 정기 차량 점검을 실시합니다.</p><h4>점검 일정</h4><ul><li>점검 기간: 2026년 7월 14일(월) ~ 7월 16일(수)</li><li>점검 시간: 오전 00:00 ~ 오후 23:59</li></ul><h4>서비스 영향</h4><ul><li>점검 기간 동안 일부 차량의 예약이 제한될 수 있습니다.</li><li>이미 예약하신 건은 정상적으로 이용 가능합니다.</li><li>점검 차량은 앱 내 차량 선택 화면에서 별도 표시됩니다.</li></ul><h4>문의</h4><p>고객센터: 1588-0000 (평일 09:00~18:00)</p><p>이용에 불편을 드려 죄송합니다.</p>'
+    body:'<h4>점검 개요</h4><p>CARO 모빌리티는 안전한 차량 서비스 제공을 위해 2026년 하절기 정기 차량 점검을 실시합니다.</p><h4>점검 일정</h4><ul><li>점검 기간: 2026년 7월 14일(월) ~ 7월 16일(수)</li><li>점검 시간: 오전 00:00 ~ 오후 23:59</li></ul><h4>서비스 영향</h4><ul><li>점검 기간 동안 일부 차량의 예약이 제한될 수 있습니다.</li><li>이미 예약하신 건은 정상적으로 이용 가능합니다.</li><li>점검 차량은 앱 내 차량 선택 화면에서 별도 표시됩니다.</li></ul><h4>문의</h4><p>고객센터: 010-6872-9807 (평일 09:00~18:00)</p><p>이용에 불편을 드려 죄송합니다.</p>'
   },
   {
     title:'CARO 앱 v2.0 업데이트 안내',
@@ -7960,7 +7919,7 @@ window.devUploadAllCars=function(){
   'use strict';
 
   /* 카로 고객센터 전화번호 — 실제 번호로 변경하세요 */
-  var CARO_CS_PHONE = '1588-0000';
+  var CARO_CS_PHONE = (window.CARO_CONFIG&&window.CARO_CONFIG.supportPhone)||'010-6872-9807';
 
   /* ─── 공통 유틸 ─── */
   function csEscapeHtml(s) {
@@ -8372,15 +8331,14 @@ window.devUploadAllCars=function(){
       return '예약 취소 방법을 안내드릴게요. 🔁<br><br>'
            + '앱에서 <strong>[예약 내역] → [취소하기]</strong>로 즉시 처리 가능합니다.<br><br>'
            + '▪ 환불은 결제수단으로 자동 반환 (카드 3~5일, 계좌 2~3일)<br>'
-           + '▪ 포인트·쿠폰은 즉시 복원<br>'
            + '▪ 시점에 따라 취소 수수료가 부과될 수 있습니다';
     }
     if (/수수료|취소료|위약/.test(t)) {
       return '취소 수수료 기준을 안내드려요. 💰<br><br>'
-           + '▪ <strong>48시간 전</strong> — 없음 (전액 환불)<br>'
-           + '▪ <strong>48~24시간 전</strong> — 10%<br>'
-           + '▪ <strong>24시간~1시간 전</strong> — 20%<br>'
-           + '▪ <strong>1시간 이내</strong> — 30%<br><br>'
+           + '▪ <strong>이용 10시간 전</strong> — 전액 환불<br>'
+           + '▪ <strong>5~10시간 전</strong> — 70% 환불<br>'
+           + '▪ <strong>3~5시간 전</strong> — 30% 환불<br>'
+           + '▪ <strong>3시간 이내·시작 후</strong> — 환불 없음 (시작 20분 뒤부터는 취소 불가)<br><br>'
            + '회사 귀책 사유 시 수수료 면제이며 전액 환불됩니다.';
     }
     if (/사고|충돌|접촉|긁|파손|접수/.test(t)) {
@@ -8784,12 +8742,17 @@ window.devUploadAllCars=function(){
       if(nw.value.length < 8){ toast('새 비밀번호는 8자 이상이어야 합니다', false); return; }
       if(nw.value !== nw2.value){ toast('새 비밀번호가 일치하지 않습니다', false); return; }
       if(cur.value === nw.value){ toast('현재 비밀번호와 동일합니다', false); return; }
+      /* ★[23차] 실제 변경: 현재 비밀번호로 재인증 → 새 비밀번호 적용 (예전엔 아무것도 안 바꾸고 성공 안내) */
+      if(!window.caroChangePassword){ toast('비밀번호 변경 기능을 불러오지 못했습니다', false); return; }
+      btn.disabled=true;
+      window.caroChangePassword(cur.value, nw.value).then(function(ok){ btn.disabled=false; if(ok!==true){ toast(ok||'비밀번호 변경에 실패했습니다', false); return; }
       result.innerHTML = '<div class="apd-result success">✅ 비밀번호가 성공적으로 변경되었습니다</div>';
       cur.value = ''; nw.value = ''; nw2.value = '';
       strength.className = 'apd-pw-bar-fill';
       hint.textContent = '8자 이상 영문·숫자·특수문자 조합 권장';
       match.textContent = '';
       toast('비밀번호가 변경되었습니다');
+      });
     });
   }
 
@@ -8863,9 +8826,9 @@ window.devUploadAllCars=function(){
     btn.addEventListener('click', () => {
       const num = phoneIn.value;
       const formatted = num.replace(/(\d{3})(\d{4})(\d{4})/, '$1-$2-$3');
-      result.innerHTML = '<div class="apd-result success">📱 PASS 본인인증이 완료되었습니다<br>휴대폰 번호가 ' + formatted + ' 으로 변경되었습니다</div>';
-      STORE.set('phone', formatted);
-      toast('휴대폰 번호가 변경되었습니다');
+      /* ★[23차] 본인인증(PASS/SMS) 연동 전까지 번호 변경은 고객센터에서 처리 — 인증 없이 바꾼 척하지 않는다 */
+      result.innerHTML = '<div class="apd-result">휴대폰 번호 변경은 본인인증이 필요해 현재 고객센터(' + CARO_CS_PHONE + ')에서 처리해 드립니다.<br>요청하신 번호: ' + formatted + '</div>';
+      toast('고객센터로 번호 변경을 요청해 주세요');
       setTimeout(()=> { openMpDetail('휴대폰 번호 재설정'); }, 1500);
     });
   }
@@ -8977,6 +8940,7 @@ window.devUploadAllCars=function(){
     document.getElementById('apd-plan-submit').addEventListener('click', () => {
       const cur = STORE.get('plan', 'lite');
       if(selected === cur){ toast('이미 사용 중인 요금제입니다', false); return; }
+      toast('요금제 변경(정기 결제)은 준비 중입니다. 오픈되면 공지로 안내드릴게요', false); return;   /* ★[23차] 결제 연동 전 */
       STORE.set('plan', selected);
       const names = { lite:'CARO LITE', standard:'CARO STANDARD', premium:'CARO PREMIUM' };
       toast(names[selected] + ' 으로 변경되었습니다');
@@ -9314,8 +9278,8 @@ window.devUploadAllCars=function(){
       applyBtn.addEventListener('click', () => {
         const v = document.getElementById('apd-coupon-code').value.trim();
         if(!v){ toast('쿠폰 코드를 입력해주세요', false); return; }
-        if(v.length < 6){ toast('유효하지 않은 쿠폰 코드입니다', false); return; }
-        toast('쿠폰이 등록되었습니다');
+        if(v.toUpperCase() !== 'CARO30'){ toast('유효하지 않은 쿠폰 코드입니다', false); return; }   /* ★[23차] 실제 존재하는 쿠폰만 */
+        toast('쿠폰 CARO30 — 예약 결제 화면에서 코드를 입력하면 3,000원 할인(1회)됩니다');
         document.getElementById('apd-coupon-code').value = '';
       });
     }
@@ -10700,7 +10664,7 @@ window.devUploadAllCars=function(){
         <h4>제6조 (개인정보 보호책임자)</h4>
         <ul>
           <li>책임자: CARO MOBILITY 개인정보보호책임자</li>
-          <li>연락처: privacy@caromobility.kr / 1588-0000</li>
+          <li>연락처: privacy@caromobility.kr / 010-6872-9807</li>
         </ul>
 
         <p style="margin-top:16px;color:#888;font-size:.78rem;text-align:center;">본 방침은 2026년 5월 31일부터 시행합니다.</p>
@@ -10754,7 +10718,7 @@ window.devUploadAllCars=function(){
         <h4>제8조 (위치정보 관리책임자)</h4>
         <ul>
           <li>책임자: CARO MOBILITY 위치정보 관리책임자</li>
-          <li>연락처: location@caromobility.kr / 1588-0000</li>
+          <li>연락처: location@caromobility.kr / 010-6872-9807</li>
         </ul>
 
         <p style="margin-top:16px;color:#888;font-size:.78rem;text-align:center;">본 약관은 2026년 5월 31일부터 시행합니다.</p>
@@ -10800,7 +10764,7 @@ window.devUploadAllCars=function(){
         <h4>제4조 (동의 철회)</h4>
         <ul>
           <li>회원은 언제든지 제3자 제공 동의를 철회할 수 있습니다.</li>
-          <li>철회 방법: 고객센터(1588-0000) 또는 privacy@caromobility.kr</li>
+          <li>철회 방법: 고객센터(010-6872-9807) 또는 privacy@caromobility.kr</li>
           <li>철회 시 즉시 처리하며, 이미 제공된 정보는 제공처에 파기 요청</li>
         </ul>
 
@@ -10886,7 +10850,7 @@ window.devUploadAllCars=function(){
 
         <h4>제5조 (청소년 유해정보 신고)</h4>
         <ul>
-          <li>고객센터: 1588-0000</li>
+          <li>고객센터: 010-6872-9807</li>
           <li>이메일: youth@caromobility.kr</li>
           <li>방송통신심의위원회 (1377)</li>
           <li>청소년 사이버상담센터 (1388)</li>
@@ -10896,7 +10860,7 @@ window.devUploadAllCars=function(){
         <ul>
           <li>책임자: CARO MOBILITY 청소년보호 책임자</li>
           <li>소속: 고객지원팀</li>
-          <li>연락처: youth@caromobility.kr / 1588-0000</li>
+          <li>연락처: youth@caromobility.kr / 010-6872-9807</li>
         </ul>
 
         <h4>제7조 (관련 법령)</h4>
@@ -11007,7 +10971,7 @@ window.devUploadAllCars=function(){
 
       <h4>제4조 (사고 시 처리 절차)</h4>
       <ul>
-        <li>사고 즉시 회사 콜센터(1588-0000) 신고 (필수)</li>
+        <li>사고 즉시 회사 콜센터(010-6872-9807) 신고 (필수)</li>
         <li>경찰서 신고 (인사사고 시 필수, 도로교통법 제54조)</li>
         <li>보험사 신고 (24시간 이내)</li>
         <li>사고 현장 사진·동영상 보존</li>
@@ -11041,7 +11005,7 @@ window.devUploadAllCars=function(){
 
       <h4>제9조 (분쟁 처리)</h4>
       <ul>
-        <li>회사 분쟁 처리: 1588-0000 / claim@caromobility.kr</li>
+        <li>회사 분쟁 처리: 010-6872-9807 / claim@caromobility.kr</li>
         <li>금융감독원 분쟁조정위원회 (1332)</li>
         <li>한국소비자원 분쟁조정 (1372)</li>
       </ul>
@@ -11126,40 +11090,14 @@ window.devUploadAllCars=function(){
   'use strict';
 
   /* ───── 1. 환불 정책 변경 ───── */
+  /* ★[23차] 환불 규정 — 서버(cancelReservation)와 동일: 10시간 전 100% / 5시간 전 70% / 3시간 전 30% / 그 뒤 0% */
   window.getRefundPolicy = function(diffMin, total){
     var pct, label, note;
-
-    if(diffMin >= 1440){          // 24시간 이전
-      pct = 100;
-      label = '전액 환불 (100%)';
-      note = '24시간 이전 취소';
-    }
-    else if(diffMin >= 720){      // 12 ~ 24시간 전
-      pct = 70;
-      label = '70% 환불';
-      note = '12~24시간 전 취소';
-    }
-    else if(diffMin >= 180){      // 3 ~ 12시간 전
-      pct = 30;
-      label = '30% 환불';
-      note = '3~12시간 전 취소';
-    }
-    else if(diffMin >= 60){       // 1 ~ 3시간 전
-      pct = 10;
-      label = '10% 환불';
-      note = '1~3시간 전 취소';
-    }
-    else if(diffMin > 0){          // 1시간 이내
-      pct = 0;
-      label = '환불 불가';
-      note = '대여 1시간 이내 취소';
-    }
-    else {                          // 대여 시작 후
-      pct = 0;
-      label = '환불 불가';
-      note = '대여 시작 후 (중도해지는 콜센터 문의)';
-    }
-
+    if(diffMin >= 600){ pct = 100; label = '전액 환불 (100%)'; note = '이용 10시간 전 취소'; }
+    else if(diffMin >= 300){ pct = 70; label = '70% 환불'; note = '이용 5~10시간 전 취소'; }
+    else if(diffMin >= 180){ pct = 30; label = '30% 환불'; note = '이용 3~5시간 전 취소'; }
+    else if(diffMin > 0){ pct = 0; label = '환불 불가'; note = '이용 3시간 이내 취소'; }
+    else { pct = 0; label = '환불 불가'; note = '대여 시작 후 (20분까지만 취소 가능)'; }
     var amt = pct > 0 ? Math.round(total * pct / 100) : 0;
     return {pct: pct, label: label, note: note, amt: amt};
   };
@@ -11357,7 +11295,7 @@ window.devUploadAllCars=function(){
               className: '', iconSize: [34,44], iconAnchor: [17,37]
             });
       var marker = L.marker([car.lat, car.lng], { icon: icon }).addTo(caroMap)
-        .bindPopup('<b>' + getCarName(car) + '</b><br>' + car.fuel + ' · ' + car.pricePerHour.toLocaleString() + '원/h<br><span style="color:' + col + ';font-weight:700;">' + label + '</span>');
+        .bindPopup('<b>' + getCarName(car) + '</b><br>' + car.fuel + ' · ' + (Number(car.pricePerHour)||0).toLocaleString() + '원/h<br><span style="color:' + col + ';font-weight:700;">' + label + '</span>');
       mapMarkers.push(marker);
     });
   };

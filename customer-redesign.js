@@ -61,7 +61,7 @@
       var key=carKey(r);
       if(has('getFuelLevel')){ var v=call('getFuelLevel',key); if(typeof v==='number'&&!isNaN(v)) return Math.max(0,Math.min(100,Math.round(v))); }
       if(window.fuelLevels && window.fuelLevels[key]!=null) return Math.max(0,Math.min(100,Math.round(window.fuelLevels[key])));
-      return hashPct(key);
+      return null;   /* ★[23차] 실기기 값이 없으면 게이지를 그리지 않는다(예전엔 차 이름으로 만든 고정 난수) */
     }catch(e){ return null; } }
   function gpt(cx,cy,r,deg){ var a=(deg-90)*Math.PI/180; return [(cx+r*Math.cos(a)).toFixed(2),(cy+r*Math.sin(a)).toFixed(2)]; }
   function arcPath(cx,cy,r,a0,a1){ var p0=gpt(cx,cy,r,a0),p1=gpt(cx,cy,r,a1); var large=(a1-a0)>180?1:0; return 'M'+p0[0]+' '+p0[1]+' A'+r+' '+r+' 0 '+large+' 1 '+p1[0]+' '+p1[1]; }
@@ -889,9 +889,8 @@
     if(window.fuelLevels && id!=null && window.fuelLevels[id]!=null && isFinite(window.fuelLevels[id])){
       return Math.max(0,Math.min(100,Math.round(window.fuelLevels[id])));
     }
-    var pct=(window.getFuelLevel?getFuelLevel(id):0);
-    if(!pct){ pct=Math.floor(Math.random()*60)+20; try{ if(window.fuelLevels&&id!=null) fuelLevels[id]=pct; }catch(e){} }
-    return pct;
+    var pct=(window.getFuelLevel?getFuelLevel(id):null);
+    return (pct==null||isNaN(pct))?null:pct;   /* ★[23차] 모르면 null */
   }
   function injectHeader(){
     var box=document.querySelector('#home-ctrl-modal .home-ctrl-box'); if(!box) return;
@@ -2135,7 +2134,7 @@
   function calcCosts(res){
     var car=res.car||{};
     var kmRate=+car.kmRate||0, freeKm=+car.fuelFreeKm||0;
-    var drivenKm=+res.drivenKm||0;
+    var drivenKm=+(res.drivenKm!=null?res.drivenKm:res.deviceKm)||0;   /* ★[23차] 단말이 기록한 deviceKm 도 읽는다 */
     var billKm=Math.max(0, drivenKm-freeKm);
     var distCost=Math.round(billKm*kmRate);
     var hipass=+res.hipassFee||0;
@@ -4862,6 +4861,7 @@
   window.caroDebtFS={
     /* 미납(채권) 1건 기록 → unpaid_debts/{id} */
     writeDebt:function(entry){
+      return;   /* ★[23차] 미납은 서버(반납 정산)가 만든다 */
       if(!fsReady()||!entry) return;
       try{
         var db=window.FB_DB, fn=window.FB_FN, u=userIdentity();
@@ -4878,6 +4878,7 @@
     },
     /* 본인 미납 전부 납부처리 */
     markAllPaid:function(){
+      return;   /* ★[23차] 납부는 토스 결제(confirmPayment)로만 — 앱이 직접 '납부됨'으로 바꾸지 않는다 */
       if(!fsReady()) return;
       try{
         var db=window.FB_DB, fn=window.FB_FN, u=userIdentity();
@@ -4890,6 +4891,7 @@
     },
     /* 이용 정지 기록 → suspensions/{uid} */
     writeSuspension:function(until,reason,opts){
+      return;   /* ★[23차] 정지는 직원·서버만 기록한다(규칙에서 본인 쓰기 차단) */
       if(!fsReady()) return;
       try{
         var db=window.FB_DB, fn=window.FB_FN, u=userIdentity();
@@ -4927,11 +4929,11 @@
     /* 미납 동기화 (FS를 진실원본으로) */
     try{
       if(fn.query&&fn.where){
-        var q=fn.query(fn.collection(db,'unpaid_debts'),fn.where('userId','==',u.uid),fn.where('status','==','unpaid'));
+        var q=fn.query(fn.collection(db,'unpaid_debts'),fn.where('userId','==',u.uid));   /* ★[23차] 상태는 아래서 거른다(서버 due / 앱 unpaid 둘 다) */
         _debtUnsubs.push(fn.onSnapshot(q,function(snap){
           var list=[];
-          snap.forEach(function(d){ var x=d.data()||{};
-            list.push({ id:x.id||d.id, title:'차량 반납 정산 미결제 — '+(x.carName||'차량'),
+          snap.forEach(function(d){ var x=d.data()||{}; if(x.status!=='unpaid'&&x.status!=='due') return;
+            list.push({ id:x.id||d.id, orderId:x.orderId||'', title:(x.title||'차량 반납 정산')+' 미결제 — '+(x.carName||'차량'),
               date:(x.createdAt||'').slice(0,10).replace(/-/g,'.'), ts:x.createdTs||Date.parse(x.createdAt)||Date.now(),
               amount:+x.amount||0, bookNo:x.bookNo||'', carNumber:x.carNumber||'', carName:x.carName||'', breakdown:x.breakdown||null }); });
           list.sort(function(a,b){ return b.ts-a.ts; });
@@ -4998,36 +5000,28 @@
   window.caroHasUnpaid=hasUnpaid;
   window.caroIsSuspended=isSuspended;
 
-  /* ── 납부 ── */
+  /* ── 납부 ★[23차] 실제 결제: 미납 건의 정산 주문(orderId)으로 토스 결제창 → 돌아오면 confirmPayment 가 서버에서 '납부'로 바꾼다.
+     예전엔 버튼만 누르면 결제 없이 납부 처리되고(데모) 정지도 앱이 스스로 걸었다. 정지는 이제 직원·서버만 건다. ── */
+  var _paying=false;
   function payAll(){
-    var total=unpaidTotal();
-    if(total<=0){ toast('납부할 미납금이 없습니다.'); return; }
-    var longOverdue=oldestUnpaidDays()>=LONG_DAYS;
-    /* (데모) 등록 카드로 결제 처리 — 실제 PG 연동 시 성공 콜백에서 아래 실행 */
-    clearUnpaid();
-    try{ if(window.caroDebtFS&&window.caroDebtFS.markAllPaid) window.caroDebtFS.markAllPaid(); }catch(e){}  /* Firestore 납부처리 */
-    var finishPay=function(count){
-      if(count>=HABITUAL_COUNT){
-        /* 상습(누적 3회+): 완납해도 자동 해제 없이 관리자 승인 대기 */
-        applyAdminHold(count);
-        toast('미납금 '+won(total)+'원이 납부되었습니다. 다만 상습 미납(누적 '+count+'회)으로 관리자 승인 전까지 이용이 제한됩니다.');
-      } else if(longOverdue){
-        var until=applySuspension(SUSPEND_DAYS);
-        toast('미납금 '+won(total)+'원이 납부되었습니다. 다만 장기(3주 이상) 미납으로 '+SUSPEND_DAYS+'일간 이용이 정지됩니다. (해제 '+fmtDay(until)+')');
-      } else {
-        toast('미납금 '+won(total)+'원이 모두 납부되었습니다. 정상 이용 가능합니다.');
-      }
-      syncUnpaidBar();
-      try{ if(window.renderCars) renderCars(); if(window.updateMapMarkers) updateMapMarkers(); }catch(e){}
-    };
-    if(window.caroDebtFS&&window.caroDebtFS.countDebts) window.caroDebtFS.countDebts(finishPay);
-    else finishPay(0);
+    var list=unpaidList();
+    if(!list.length){ toast('납부할 미납금이 없습니다.'); return; }
+    if(_paying) return;
+    var withOrder=list.filter(function(x){ return x.orderId; });
+    if(!withOrder.length){ toast('이 미납 건은 앱에서 바로 결제할 수 없어요. 고객센터로 연락해 주시면 처리해 드립니다.'); return; }
+    if(typeof window.caroRequestToss!=='function'){ toast('결제 모듈을 불러오지 못했습니다. 앱을 다시 열어 주세요.'); return; }
+    var d=withOrder.sort(function(a,b){ return (a.ts||0)-(b.ts||0); })[0];   /* 오래된 것부터 1건씩 */
+    _paying=true;
+    toast('미납금 '+won(d.amount)+'원 결제 화면으로 이동합니다'+(withOrder.length>1?' (남은 '+(withOrder.length-1)+'건은 이어서 결제)':''));
+    setTimeout(function(){
+      Promise.resolve(window.caroRequestToss(d.orderId, Number(d.amount)||0, '미납 정산 — '+(d.carName||'차량'), 'settlement'))
+        .then(function(){ _paying=false; }, function(){ _paying=false; });
+    }, 600);
   }
   window.caroPayUnpaid=function(){
     var total=unpaidTotal();
-    var long=oldestUnpaidDays()>=LONG_DAYS;
-    var msg='미납금 '+won(total)+'원을 납부하시겠습니까?'+(long?'\n\n※ 3주 이상 장기 미납으로, 납부하더라도 '+SUSPEND_DAYS+'일간 이용이 정지됩니다.':'');
-    if(confirm(msg)) payAll();
+    if(total<=0){ toast('납부할 미납금이 없습니다.'); return; }
+    if(confirm('미납금 '+won(total)+'원을 결제하시겠습니까?\n(토스페이먼츠 결제창으로 이동합니다)')) payAll();
   };
 
   /* ── 홈 하단 미납/정지 바 ── */

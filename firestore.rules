@@ -1,6 +1,6 @@
 rules_version = '2';
 /* ═══════════════════════════════════════════════════════════════════════════
-   CARO Mobility — Firestore 보안 규칙  (2026-09-29, v9.8 12차 검수 반영)
+   CARO Mobility — Firestore 보안 규칙  (2026-10-03, 17차: 미납·정지 본인쓰기 차단, 인증항목 보호, coupon_uses)
 
    ★이번에 고친 것 3가지
      1) 단말 계정이 **하나로 박혀 있던 것** → 차량마다 자기 계정으로 (2대째부터 못 쓰던 문제)
@@ -48,12 +48,30 @@ service cloud.firestore {
       return request.auth != null && exists(acctRef()) &&
              get(acctRef()).data.get('active', false) == true;
     }
+    /* ★[15차] '운영(ops)' 권한 = 예약·차량·요금·공지 등 운영 관리 전체(control 은 제외).
+       관제 계정 화면(admin-accounts.js)은 새 계정에 'control' 과 'ops' 두 권한만 저장하는데,
+       규칙은 예전 이름(resv/cars/pricing/notices)만 봐서 ops 만 가진 직원이 화면에는 들어와도
+       데이터가 거부되는 어긋남이 있었다. 이제 ops 를 가진 직원은 control 을 뺀 나머지 권한으로 인정한다. */
     function can(p) {
       return isAdmin() ||
-        (isActiveAdmin() && get(acctRef()).data.get('perms', {}).get(p, false) == true);
+        (isActiveAdmin() &&
+          ( get(acctRef()).data.get('perms', {}).get(p, false) == true
+            || (p != 'control' && get(acctRef()).data.get('perms', {}).get('ops', false) == true) ));
     }
     /* 관제(사람)인가 — 시동차단처럼 위험한 명령을 보낼 수 있는 사람 */
     function isStaff() { return isAdmin() || can('resv') || can('cars'); }
+
+    /* ★[13차 보안] 차량에 명령을 보낼 수 있는 직원 = 관리자 또는 '실시간 관제(control)' 권한자.
+       예전엔 위 isStaff() 를 그대로 써서 두 가지가 어긋났다.
+         (가) 예약·차량 담당(control 없음)이 개발자도구로 시동차단 명령을 보낼 수 있었다.
+         (나) 관제 화면은 control 권한자만 들여보내는데 규칙은 control 을 몰라서,
+              control 만 가진 직원은 화면에는 들어와도 명령이 거부됐다.
+       ※ 이 규칙을 게시하기 전에 관제를 맡길 직원 계정에 '실시간 관제' 권한이 체크돼 있는지 확인할 것. */
+    function canCommand() { return isAdmin() || can('control'); }
+
+    /* 2단계 인증(MFA)으로 로그인했는가 — 콘솔에서 Authentication 2단계 인증을 켠 뒤에만 쓴다.
+       아래 commands create 조건 끝에 있는 mfaOk() 주석을 풀면, 직원 명령은 2단계 인증 로그인만 통과한다. */
+    function mfaOk() { return request.auth.token.firebase.sign_in_second_factor != null; }
 
     /* 차량 — 모두 읽기, [차량 또는 요금] 권한자 쓰기 */
     match /cars/{carId} {
@@ -87,25 +105,45 @@ service cloud.firestore {
     }
 
     /* 예약 — 본인 것만 + [예약] 권한자/관리자는 전체 */
+    /* ★[15차] 예약 조회 = 본인 예약 + 직원(예약 담당·실시간 관제)·관리자만.
+       예전엔 로그인한 누구나 '모든 고객의 예약'(이름·전화번호·차량·시간)을 읽을 수 있었다.
+       다른 사람의 예약 시간은 개인정보가 없는 availability 컬렉션으로 본다(서버가 만든다).
+       쓰기: 예약은 결제 승인 서버 함수(confirmPayment)가 만든다. 고객은 만들 수 없고,
+             자기 예약에는 '주행 전 사진'(photos·photosUploadedAt)만 올릴 수 있다(금액·시간·반납 조작 차단).
+             삭제·직접 수정은 직원/관리자만. */
     match /reservations/{resId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null &&
-                       request.resource.data.userId == request.auth.uid;
-      allow update, delete: if request.auth != null &&
-                                (resource.data.userId == request.auth.uid || isAdmin() || can('resv'));
+      allow read: if request.auth != null &&
+                     ( resource.data.userId == request.auth.uid || can('resv') || can('control') );
+      allow create: if can('resv');
+      allow update: if request.auth != null &&
+                       ( can('resv') ||
+                         ( resource.data.userId == request.auth.uid &&
+                           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['photos', 'photosUploadedAt']) ) );
+      allow delete: if can('resv');
     }
 
-    /* 사용자 프로필 */
+    /* 사용자 프로필 — ★[16차] 조회 = 본인 + 직원(예약 담당·실시간 관제)·관리자만.
+       예전엔 로그인한 누구나 '모든 회원'의 이름·전화번호·생년월일·면허번호·카드 뒷자리를 읽을 수 있었다.
+       고객앱은 자기 문서(users/내uid)만 읽고 쓰므로 그대로 동작한다. 관리자 화면은 이 컬렉션을 직접 읽지 않는다.
+       (쓰기는 예전과 같음: 본인 또는 최고관리자) */
     match /users/{uid} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null &&
-                      (request.auth.uid == uid || isAdmin());
+      allow read: if request.auth != null &&
+                     ( request.auth.uid == uid || can('resv') || can('control') );
+      /* ★[17차] 본인은 '인증 결과' 항목(phoneVerified·certCI·certDI·verifiedAt)을 쓸 수 없다 — 예전엔 본인인증을 안 하고도 인증됨으로 꾸밀 수 있었다 */
+      allow create: if request.auth != null &&
+                       ( isAdmin() || ( request.auth.uid == uid &&
+                         !request.resource.data.keys().hasAny(['phoneVerified','certCI','certDI','verifiedAt']) ) );
+      allow update: if request.auth != null &&
+                       ( isAdmin() || ( request.auth.uid == uid &&
+                         !request.resource.data.diff(resource.data).affectedKeys().hasAny(['phoneVerified','certCI','certDI','verifiedAt']) ) );
+      allow delete: if isAdmin();
     }
 
-    /* 로그인 이벤트 */
+    /* 로그인 이벤트 — ★[16차] 기록은 본인 것만 남길 수 있고(남의 uid 로 위조 불가), 조회는 관리자·예약 담당 직원만.
+       예전엔 로그인한 누구나 전체 로그인 기록(이메일·기기 정보)을 읽고, 아무 내용이나 만들 수 있었다. */
     match /login_events/{eid} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null;
+      allow read: if isAdmin() || can('resv');
+      allow create: if request.auth != null && request.resource.data.uid == request.auth.uid;
       allow update, delete: if isAdmin();
     }
 
@@ -138,12 +176,12 @@ service cloud.firestore {
     }
 
     /* ───────── 미납(채권) ───────── */
+    /* ★[17차] 미납은 서버(반납 정산)와 직원만 만들고 바꾼다. 본인은 '보기'만.
+       예전엔 본인이 자기 미납 문서를 고쳐 쓸 수 있어서 결제 없이 '납부됨'으로 바꾸거나 금액을 0 으로 만들 수 있었다.
+       납부는 반드시 토스 결제(confirmPayment)를 거친다. */
     match /unpaid_debts/{docId} {
       allow read, write: if isAdmin() || can('resv');
-      allow create: if request.auth != null &&
-                       request.resource.data.userId == request.auth.uid;
-      allow read, update: if request.auth != null &&
-                             resource.data.userId == request.auth.uid;
+      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
     }
 
     /* ───────── ★수정 3 — 이용 정지 (문서 ID = 사용자 uid) ─────────
@@ -151,12 +189,12 @@ service cloud.firestore {
               → 정지당한 사람이 active:false 로 바꿔 **스스로 정지를 풀 수 있었다.**
        지금:  본인은 '정지 걸기'(active:true)만 가능. 푸는 것은 관리자·[예약] 직원만.
               (고객앱 customer-redesign.js 가 장기 미납 시 스스로 기록하는 흐름은 그대로 동작) */
+    /* ★[17차] 정지는 직원·서버만 건다. 본인 쓰기 전면 차단 —
+       예전 '본인은 active:true 로만' 규칙은 untilTs(해제 시각)를 과거로 적어 스스로 푸는 우회가 가능했다. */
     match /suspensions/{uid} {
-      allow read:  if isAdmin() || can('resv') ||
+      allow read:  if isAdmin() || can('resv') || can('control') ||
                       (request.auth != null && request.auth.uid == uid);
       allow write: if isAdmin() || can('resv');
-      allow create, update: if request.auth != null && request.auth.uid == uid
-                            && request.resource.data.active == true;
     }
 
     /* ═══════════ 차량 단말 (ESP32) ═══════════ */
@@ -187,18 +225,18 @@ service cloud.firestore {
                   (시동차단·차단해제·재부팅·입력극성·층보정 등은 막힌다)
                 · status 는 반드시 'pending' 으로 시작해야 한다
          ★[2단계] 앱이 서버 모드(SECURE_SERVER:true)로 배포되고 안정된 뒤에는
-                  아래 create 조건을 `if isStaff();` 한 줄로 바꾼다.
+                  아래 create 조건을 `if canCommand();` 한 줄로 바꾼다.
                   그러면 고객 명령은 전부 서버(issueCommand)가 예약을 확인한 뒤에만 만들어진다.
                   ※ 지금 바꾸면 고객이 차 문을 못 연다. 반드시 앱 배포 뒤에. */
       match /commands/{cmdId} {
         allow read:   if request.auth != null;
-        allow create: if request.auth != null
-                      && request.resource.data.status == 'pending'
-                      && ( request.resource.data.type in
-                              ['unlock','lock','open','hazard','hazard_off','horn','find']
-                           || isStaff() );
-                      /* ↑ 흔한 경우(고객 문열기)를 먼저 본다. isStaff() 는 admin_accounts 문서를
-                           읽어야 해서 호출마다 읽기 비용이 붙는다 — 순서만 바꿔도 비용이 준다. */
+        /* ★3단계(이 파일) — 명령은 **서버 함수만** 만든다.
+           고객 문열기·잠금  → issueCommand   (내 유효 예약·정지 여부를 서버가 확인)
+           관제(직원) 명령   → staffCommand   (관제 권한·2단계 인증·값 형식을 서버가 확인, 기록 남김)
+           서버는 Admin SDK 라 이 규칙을 통과하지 않고 쓴다. 브라우저에서 직접 쓰는 것은 전부 막힌다.
+           ★게시 조건(순서 엄수): ①함수 배포(firebase deploy --only functions)  ②안드로이드 앱 재빌드·배포
+                                   ③관제 화면 14차 업로드  ④그 뒤에 이 규칙 게시.  앞을 안 하고 게시하면 고객이 문을 못 연다. */
+        allow create: if false;
         /* 실행 결과는 그 차량의 단말만 적는다 — 사람이 '실행된 척' 못 하게 */
         allow update: if isDevice(deviceId) || isAdmin();
         allow delete: if isAdmin();
@@ -212,8 +250,12 @@ service cloud.firestore {
     match /orders/{orderId}   { allow read: if isAdmin() || can('resv') ||
                                              (request.auth != null && resource.data.uid == request.auth.uid);
                                 allow write: if false; }
-    match /command_log/{id}   { allow read: if isStaff(); allow write: if false; }
-    match /admin_alerts/{id}  { allow read, write: if isStaff(); }
+    match /command_log/{id}   { allow read: if isStaff() || can('control'); allow write: if false; }
+    /* ★[17차] 관제(control) 직원도 알림을 보고 '읽음' 처리할 수 있다 (반납 지연·단말 오프라인 알림은 관제가 본다) */
+    match /admin_alerts/{id}  { allow read, write: if isStaff() || can('control'); }
+    /* ★[17차] 쿠폰 사용 기록 — 서버만 쓴다. 본인은 자기 것만 조회 */
+    match /coupon_uses/{id}   { allow read: if isAdmin() || can('resv') || (request.auth != null && resource.data.uid == request.auth.uid);
+                                allow write: if false; }
     match /fuel_claims/{id}   { allow read: if isAdmin() || can('resv') ||
                                              (request.auth != null && resource.data.userId == request.auth.uid);
                                 allow create: if request.auth != null &&

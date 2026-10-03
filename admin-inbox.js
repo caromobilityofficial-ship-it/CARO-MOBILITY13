@@ -39,6 +39,7 @@
       +   '<button class="ib-f on" data-f="all">전체</button><button class="ib-f" data-f="new">신규</button>'
       +   '<button class="ib-f" data-f="acc">사고만</button><button class="ib-f" data-f="inq">문의만</button><button class="ib-f" data-f="done">완료</button>'
       + '</div></div>'
+      + '<div id="ib-alerts" class="ib-alerts"></div>'
       + '<div id="ib-list" class="ib-list"><div class="ib-empty">불러오는 중…</div></div>';
     // 마지막 section 뒤에 추가
     var last=null; document.querySelectorAll('section[id^="tab-"]').forEach(function(s){ last=s; });
@@ -100,10 +101,54 @@
     document.head.appendChild(s);
   }
 
+  /* ── ★[23차] 서버 알림(admin_alerts): 반납 지연·수동 환불 필요·단말 오프라인·사고·문의 — 예전엔 아무 화면도 읽지 않았다 ── */
+  var alerts=[], unsubAl=null;
+  var AL={ overdue:['⏰','반납 지연'], manual_refund:['💸','수동 환불 필요'], device_offline:['📡','단말 무응답'], accident:['🚨','사고 접수'], inquiry:['💬','1:1 문의'], force_return:['↩','강제 반납'], force_cancel:['✖','예약 취소'] };
+  function alertsCss(){
+    if(document.getElementById('ib-al-css')) return;
+    var s=document.createElement('style'); s.id='ib-al-css';
+    s.textContent='.ib-alerts{margin:0 0 14px;}'
+      +'.ib-al{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid rgba(213,122,104,.35);background:rgba(213,122,104,.08);border-radius:12px;margin-bottom:6px;font-size:13px;}'
+      +'.ib-al.k-device_offline{border-color:rgba(200,169,110,.35);background:rgba(200,169,110,.08);}'
+      +'.ib-al .t{flex:1;min-width:0;} .ib-al .w{font-size:11px;color:var(--muted,#999);} .ib-al a{color:inherit;}'
+      +'.ib-al button{background:transparent;border:1px solid var(--border,#333);color:var(--txt,#ddd);border-radius:8px;padding:5px 9px;font-size:12px;cursor:pointer;}'
+      +'.ib-al-head{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--muted,#999);margin-bottom:6px;}';
+    document.head.appendChild(s);
+  }
+  function alTs(a){ if(a.createdAt&&a.createdAt.toMillis) return a.createdAt.toMillis(); if(a.createdTs) return a.createdTs; if(typeof a.createdAt==='string'){ var t=Date.parse(a.createdAt); if(t) return t; } return 0; }
+  function renderAlerts(){
+    var box=document.getElementById('ib-alerts'); if(!box) return;
+    alertsCss();
+    var open=alerts.filter(function(a){ return !a.read; }).sort(function(a,b){ return alTs(b)-alTs(a); });
+    if(!open.length){ box.innerHTML=''; return; }
+    box.innerHTML='<div class="ib-al-head"><span>🔔 처리 대기 알림 '+open.length+'건 (서버 자동 감지 포함)</span><button class="ib-f" id="ib-al-all">모두 읽음</button></div>'
+      + open.slice(0,30).map(function(a){
+        var k=AL[a.kind||a.type]||['•',a.kind||a.type||'알림'];
+        var ph=(a.phone||'').replace(/[^\d]/g,'');
+        return '<div class="ib-al k-'+esc(a.kind||a.type||'')+'"><span>'+k[0]+'</span><div class="t"><b>'+esc(k[1])+'</b> · '+esc(a.summary||a.bookNo||a.refId||'')
+          +(ph?' · <a href="tel:'+ph+'">📞 '+esc(a.phone)+'</a>':'')+'<div class="w">'+(alTs(a)?new Date(alTs(a)).toLocaleString('ko-KR'):'')+(a.refId?' · '+esc(a.refId):'')+'</div></div>'
+          +(a.refId&&/^(CR|EX)/.test(a.refId)&&window.openResManage?'<button data-open="'+esc(a.refId)+'">예약 열기</button>':'')
+          +'<button data-read="'+esc(a._id)+'">읽음</button></div>';
+      }).join('');
+    box.querySelectorAll('[data-read]').forEach(function(b){ b.addEventListener('click', function(){ markRead([b.dataset.read]); }); });
+    box.querySelectorAll('[data-open]').forEach(function(b){ b.addEventListener('click', function(){ try{ window.openResManage(b.dataset.open); }catch(e){} }); });
+    var all=document.getElementById('ib-al-all'); if(all) all.addEventListener('click', function(){ markRead(open.map(function(a){ return a._id; })); });
+  }
+  function markRead(ids){
+    var FN=window.FB_FN, db=window.FB_DB; if(!FN||!db) return;
+    ids.forEach(function(id){ FN.setDoc(FN.doc(db,'admin_alerts',id),{ read:true, readBy:me(), readAt:FN.serverTimestamp() },{merge:true}).catch(function(e){ console.warn('[접수함] 알림 읽음 실패', e&&e.code); }); });
+  }
+  function subscribeAlerts(){
+    var FN=window.FB_FN, db=window.FB_DB; if(unsubAl) return;
+    try{ unsubAl=FN.onSnapshot(FN.collection(db,'admin_alerts'), function(s){ alerts=[]; s.forEach(function(d){ alerts.push(Object.assign({}, d.data()||{}, {_id:d.id})); }); renderAlerts(); badge(); },
+      function(e){ console.warn('[접수함] admin_alerts 구독 실패', e&&e.code); }); }catch(e){}
+  }
+
   /* ── 구독 ── */
   function subscribe(){
     if(!ready()){ setTimeout(subscribe, 600); return; }
     var FN=window.FB_FN, db=window.FB_DB;
+    subscribeAlerts();
     if(unsubA||unsubI) return;
     unsubA=FN.onSnapshot(FN.collection(db,'accident_reports'), function(s){ acc=[]; s.forEach(function(d){ acc.push(Object.assign({}, d.data()||{}, {_id:d.id,_col:'accident_reports'})); }); render(); badge(); },
       function(e){ console.warn('[접수함] accident_reports 구독 실패', e&&e.code); showErr(e); });
@@ -115,10 +160,10 @@
     if(e && /permission/i.test(e.code||'')) l.innerHTML='<div class="ib-empty">🔒 접수함을 읽을 권한이 없습니다 — 관리자 권한(Custom Claim) 또는 Firestore 규칙을 확인하세요.</div>';
   }
 
-  function st(d){ var v=d.status||'new'; return (v==='received'||v==='new')?'new':v; }
+  function st(d){ var v=d.status||'new'; if(v==='received'||v==='new') return 'new'; if(v==='progress'||v==='in_progress'||v==='processing') return 'in_progress'; if(v==='done'||v==='closed'||v==='resolved') return 'done'; return v; }   /* ★[23차] 상담통계 탭의 'progress' 도 같은 뜻으로 */
   function ts(d){ if(d.createdTs) return d.createdTs; if(d.createdAtMs) return d.createdAtMs; if(d.createdAt&&d.createdAt.toMillis) return d.createdAt.toMillis(); if(typeof d.createdAt==='string'){ var t=Date.parse(d.createdAt); if(!isNaN(t)) return t; } return 0; }
   function badge(){
-    var n=acc.concat(inq).filter(function(d){ return st(d)==='new'; }).length;
+    var n=acc.concat(inq).filter(function(d){ return st(d)==='new'; }).length + alerts.filter(function(a){ return !a.read; }).length;
     var b=document.getElementById('ib-badge'); if(b){ b.textContent=n; b.style.display=n?'inline-block':'none'; }
     var na=acc.filter(function(d){ return st(d)==='new'; }).length;
     try{ document.title=(na?'🚨('+na+') ':'')+document.title.replace(/^🚨\(\d+\)\s*/,''); }catch(e){}
@@ -138,7 +183,7 @@
       if(filter==='new') return stv==='new';
       if(filter==='done') return stv==='done';
       if(filter==='acc') return d._col==='accident_reports';
-      if(filter==='inq') return d._col==='inquiries';
+      if(filter==='inq') return d._col==='support_inquiries';   /* ★[23차] 오타 수정 — '문의만' 필터가 항상 비어 있었다 */
       return true;
     });
     if(!rows.length){ l.innerHTML='<div class="ib-empty">'+(filter==='all'?'아직 접수된 건이 없습니다.':'해당하는 건이 없습니다.')+'</div>'; return; }
@@ -148,6 +193,7 @@
     l.querySelectorAll('.ib-ph img').forEach(function(im){ im.addEventListener('click', function(){ try{ var w=window.open(); w.document.write('<img src="'+im.src+'" style="max-width:100%">'); }catch(e){} }); });
   }
   var STL={new:'신규',in_progress:'처리중',done:'완료'};
+  function STLv(v){ return STL[v]||v||'-'; }
   function card(d){
     var isAcc=d._col==='accident_reports', stv=st(d);
     var head, body, meta=[];
@@ -175,7 +221,7 @@
     if(stv!=='done') acts+='<button data-act="done" data-col="'+esc(d._col)+'" data-id="'+esc(d._id)+'">완료 처리</button>';
     if(stv==='done') acts+='<button data-act="new" data-col="'+esc(d._col)+'" data-id="'+esc(d._id)+'">다시 열기</button>';
     return '<div class="ib-card '+(isAcc?'acc':'inq')+(stv==='done'?' done':'')+'">'
-      + '<div><div class="ib-kind">'+(isAcc?'🚨 사고 접수':'1:1 문의')+'</div><div class="ib-when">'+when(d)+'</div><span class="ib-st '+stv+'">'+STL[stv]+'</span></div>'
+      + '<div><div class="ib-kind">'+(isAcc?'🚨 사고 접수':'1:1 문의')+'</div><div class="ib-when">'+when(d)+'</div><span class="ib-st '+stv+'">'+STLv(stv)+'</span></div>'
       + '<div class="ib-main"><div class="ib-h">'+head+'</div><div class="ib-p" title="클릭하면 전체 보기">'+body+'</div>'
       +   (meta.length?'<div class="ib-meta">'+meta.join('')+'</div>':'')
       +   (photos?'<div class="ib-ph">'+photos+'</div>':'')

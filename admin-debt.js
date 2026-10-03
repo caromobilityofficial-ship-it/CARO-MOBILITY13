@@ -24,7 +24,7 @@
  function won(n){ try{ return (Number(n)||0).toLocaleString('ko-KR'); }catch(e){ return n; } }
   function fmtDay(v){ try{ var d=(typeof v==='number')?new Date(v):new Date(v); if(isNaN(d.getTime())) return '—';
     var p=function(n){return n<10?'0'+n:n;}; return d.getFullYear()+'.'+p(d.getMonth()+1)+'.'+p(d.getDate()); }catch(e){ return '—'; } }
-  function tsOf(x){ return x.createdTs || Date.parse(x.createdAt) || 0; }
+  function tsOf(x){ return x.createdTs || x.ts || Date.parse(x.createdAt) || 0; }   /* ★[23차] 서버 생성 미납(ts)도 읽는다 */
   function daysSince(ts){ return ts? Math.floor((Date.now()-ts)/DAY) : 0; }
 
   function injectCss(){
@@ -64,7 +64,7 @@
 
   function isHoldSusp(s){ return s && s.active!==false && (s.requiresApproval===true || s.habitual===true); }
   function activeSusps(){ return susps.filter(function(s){ return s.active!==false && ( isHoldSusp(s) || ((s.untilTs||Date.parse(s.until)||0) > Date.now()) ); }); }
-  function unpaidDebts(){ return debts.filter(function(d){ return (d.status||'unpaid')==='unpaid'; }); }
+  function unpaidDebts(){ return debts.filter(function(d){ var st=d.status||'unpaid'; return st==='unpaid'||st==='due'; }); }   /* ★[23차] 서버 생성 due 포함 */
   function suspOf(uid){ for(var i=0;i<susps.length;i++){ if((susps[i].userId||susps[i]._id)===uid) return susps[i]; } return null; }
   /* 사용자별 누적 미납 발생 횟수(완납 포함) */
   function habitualMap(){
@@ -195,7 +195,7 @@
   /* ── 관리 작업 ── */
   window.caroDebtPay=function(id){
     if(!ready()||!id) return;
-    if(!confirm('이 미납 건을 납부 처리할까요?')) return;
+    if(!confirm('이 미납 건을 납부 처리할까요?\n\n※ 고객이 앱에서 토스로 결제하면 자동으로 납부 처리됩니다. 현금·계좌이체 등 앱 밖에서 받은 경우에만 눌러 주세요.')) return;
     var db=window.FB_DB, FN=window.FB_FN;
     try{
       FN.setDoc(FN.doc(db,'unpaid_debts',id),{ status:'paid', paidAt:new Date().toISOString(), paidBy:'admin' },{merge:true})

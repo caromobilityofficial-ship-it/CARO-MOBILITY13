@@ -844,7 +844,7 @@ var RESV={};   /* carDocId → {user, sMs, eMs, status} */
 function toMs(t){ try{ if(!t) return 0; if(t.toDate) return t.toDate().getTime(); if(typeof t==='number') return t; var d=new Date(t); return isNaN(d.getTime())?0:d.getTime(); }catch(e){return 0;} }
 function resvStatus(r){ var now=Date.now(); if(r.cancelled||r.returned) return null;
   var raw=(''+(r.status||'')).toLowerCase(); if(/취소|cancel|반납|returned|complete/.test(raw)) return null;
-  if(r.eMs&&now>r.eMs) return (now-r.eMs<=2*86400000)?'반납지연':null; if(r.sMs&&r.eMs&&now>=r.sMs&&now<=r.eMs) return '대여중'; if(r.sMs&&r.sMs-now<3600000&&r.sMs>now) return '곧 시작'; return null; }
+  if(r.eMs&&now>r.eMs) return (now-r.eMs<=30*86400000)?'반납지연':null;   /* ★[23차] 미반납은 30일까지 계속 '반납지연'으로 추적(예전엔 2일 뒤 사라져 '예약 없이 이동' 오경보) */ if(r.sMs&&r.eMs&&now>=r.sMs&&now<=r.eMs) return '대여중'; if(r.sMs&&r.sMs-now<3600000&&r.sMs>now) return '곧 시작'; return null; }
 function applyResvSnap(s){
   RESV={};
   s.forEach(function(doc){ var d=doc.data()||{}; var cid=(d.car&&typeof d.car==='object'&&d.car.id!=null)?d.car.id:(d.carId!=null?d.carId:d.carNo);

@@ -61,13 +61,13 @@
       return;
     }
 
-    var total=list.length, ok=0, esc=0, ing=0, cats={};
+    var total=list.length, ok=0, escN=0, ing=0, cats={};   /* ★[23차] esc 변수가 esc() 함수를 가려 통계가 깨지던 버그 */
     list.forEach(function(c){
-      if(c.resolved===true) ok++; else if(c.resolved===false) esc++; else ing++;
+      if(c.resolved===true) ok++; else if(c.resolved===false) escN++; else ing++;
       var k=c.categoryLabel||c.category||'기타';
       cats[k]=(cats[k]||0)+1;
     });
-    var done=ok+esc;
+    var done=ok+escN;
     var rate=done? Math.round(ok/done*100):null;
 
     var catArr=Object.keys(cats).map(function(k){return {k:k,n:cats[k]};}).sort(function(a,b){return b.n-a.n;});
@@ -81,7 +81,7 @@
     h+='<div class="ss-kpis">'
       +'<div class="ss-kpi"><div class="v">'+total+'</div><div class="l">총 상담</div></div>'
       +'<div class="ss-kpi"><div class="v" style="color:var(--ok)">'+ok+'</div><div class="l">해결 완료</div></div>'
-      +'<div class="ss-kpi"><div class="v" style="color:var(--warn)">'+esc+'</div><div class="l">상담사 연결</div></div>'
+      +'<div class="ss-kpi"><div class="v" style="color:var(--warn)">'+escN+'</div><div class="l">상담사 연결</div></div>'
       +'<div class="ss-kpi"><div class="v">'+(rate==null?'—':rate+'%')+'</div><div class="l">해결율</div></div>'
       +'</div>';
 
