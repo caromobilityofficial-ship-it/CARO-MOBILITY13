@@ -60,8 +60,10 @@
    + '.rm-photos img{width:100%;height:84px;object-fit:cover;border-radius:8px;border:1px solid var(--border,#2b2e34);cursor:pointer;}'
    + '.rm-photo-empty{font-size:12.5px;color:var(--muted2,#5e636b);line-height:1.6;background:var(--panel2,#1f2228);border:1px dashed var(--border2,#34383f);border-radius:10px;padding:14px;text-align:center;}'
    + '.rm-acc{background:rgba(213,122,104,.06);border:1px solid rgba(213,122,104,.25);border-radius:12px;padding:12px;}'
-   + '.rm-ft{display:flex;gap:8px;padding:14px 18px;border-top:1px solid var(--border,#2b2e34);}'
-   + '.rm-ft .btn{flex:1;justify-content:center;}'
+   + '.rm-ft{display:flex;flex-wrap:wrap;gap:8px;padding:14px 18px;border-top:1px solid var(--border,#2b2e34);}'   /* ★[24차] 버튼이 많아져 두 줄로 — 글씨 세로 깨짐 방지 */
+   + '.rm-ft .btn{flex:1 1 0;min-width:110px;justify-content:center;white-space:nowrap;padding:10px 12px;}'
+   + '.rm-ft .fr-wrap{flex:1 1 100%;margin:0;} .rm-ft .fr-wrap .fr-btn{flex:1;white-space:nowrap;padding:10px 12px;font-size:13px;}'
+   + '.rm-ft .fr-note{order:99;}'
    ;
   var st=document.createElement('style'); st.textContent=css; document.head.appendChild(st);
 

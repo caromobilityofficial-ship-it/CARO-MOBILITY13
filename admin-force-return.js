@@ -25,7 +25,7 @@
     if(document.getElementById('fr-css')) return;
     var s=document.createElement('style'); s.id='fr-css';
     s.textContent=
-      '.fr-wrap{display:flex;gap:8px;flex-wrap:wrap;margin-right:auto;}'
+      '.fr-wrap{display:flex;gap:8px;flex-wrap:wrap;margin-right:auto;}'   /* ★[24차] 모달 바닥에서는 .rm-ft .fr-wrap 규칙이 한 줄 전체를 차지하게 덮어쓴다 */
      +'.fr-btn{background:var(--panel2,#1c1f25);border:1px solid var(--border,#333);color:var(--txt,#ddd);border-radius:9px;padding:8px 12px;font-size:12.5px;cursor:pointer;}'
      +'.fr-btn.ret{border-color:#2f7a55;color:#7cc79a;}'
      +'.fr-btn.can{border-color:#c0392b;color:#ff8f85;}'
