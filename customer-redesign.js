@@ -7496,11 +7496,12 @@
   function readyState(){
     var logged=!!window._caroLoggedIn;
     var lic=!!(window.userInfo&&window.userInfo.license&&String(window.userInfo.license).trim());
+    var oldRec=false; try{ var _O=JSON.parse(localStorage.getItem('caro_license')||'null'); oldRec=!!(_O&&_O.name&&!(_O.number&&String(_O.number).indexOf('*')===-1)); }catch(e){}   /* ★[v106] 번호 없는 옛 기록 */
     /* ★ [v102] 서버 복원이 늦거나 한 박자 어긋나도, 기기에 복원된 면허(caro_license)가 있으면 '등록 완료'로 본다
        (계정관리 화면은 이 값을 보는데 홈 카드만 userInfo.license 를 봐서 서로 다르게 나오던 문제). 로그아웃·계정전환 시 이 값은 지워진다. */
     if(!lic){ try{ var _L=JSON.parse(localStorage.getItem('caro_license')||'null'); if(_L&&_L.number&&String(_L.number).trim()){ lic=true; if(window.userInfo&&!window.userInfo.license) window.userInfo.license=String(_L.number); } }catch(e){} }
     var card=CARD_AT_PAYMENT ? true : hasCard();   /* ★[v103] 카드는 결제 때 토스 결제창에서 입력(등록 기능은 PG 빌링키 계약 후) → 홈 준비 항목에서 제외 */
-    return {logged:logged,lic:lic,card:card,sig:logged+'|'+lic+'|'+card};
+    return {logged:logged,lic:lic,card:card,oldRec:oldRec,sig:logged+'|'+lic+'|'+card+'|'+oldRec};
   }
   function row(cls,label,done){
     return '<div class="hr-rd '+(done?'done':'todo')+'" data-rd="'+cls+'">'
@@ -7537,10 +7538,11 @@
     if(!card){ card=document.createElement('div'); card.className='hr-ready'; grid.insertAdjacentElement('afterend',card); }
     _rdSig=s.sig;
     var both=(!s.lic&&!s.card);   /* 둘 다 미등록 → 예약 차단 안내 */
-    card.innerHTML='<h3>이용 준비, 조금만 더</h3><p>'
-      +(CARD_AT_PAYMENT?'운전면허를 등록하면 차량을 예약할 수 있어요 (결제 카드는 결제할 때 입력해요)'
+    card.innerHTML='<h3>'+(s.oldRec?'면허번호 확인이 필요해요':'이용 준비, 조금만 더')+'</h3><p>'
+      +(s.oldRec?'보안 업데이트로 예전에 등록한 면허번호를 한 번만 다시 입력해 주세요. 이후에는 다시 묻지 않아요.'
+        :CARD_AT_PAYMENT?'운전면허를 등록하면 차량을 예약할 수 있어요 (결제 카드는 결제할 때 입력해요)'
         :(both?'운전면허와 결제 카드를 등록해야 차량을 예약할 수 있어요':'등록을 마치면 바로 차량을 이용할 수 있어요'))+'</p>'
-      +row('lic','운전면허 등록',s.lic)
+      +row('lic',s.oldRec?'면허번호 다시 입력':'운전면허 등록',s.lic)
       +(CARD_AT_PAYMENT?'':row('card','결제 카드 등록',s.card));
     card.querySelectorAll('.hr-rd.todo').forEach(function(el){
       el.addEventListener('click',function(){ go('payment-info-screen'); });

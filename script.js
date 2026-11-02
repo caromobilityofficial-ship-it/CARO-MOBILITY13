@@ -246,7 +246,7 @@ var LANGS = {
     view:'보기', next:'다음', confirm:'확인',
     verify_title:'본인 인증', verify_done:'인증 완료',
     info_title:'회원 정보 입력', dup_check:'중복 확인', email:'이메일',
-    license:'운전면허 번호', license_hint:'차량 이용 시 필요합니다. 나중에 입력 가능합니다.',
+    license:'운전면허 번호', license_hint:'본인 명의 운전면허 12자리. 가입 때 한 번만 등록하면 다시 묻지 않습니다.',
     signup_done:'가입 완료', signup_complete:'가입이 완료되었습니다',
     signup_complete_desc:'CARO 모빌리티 회원이 되신 것을 환영합니다.', go_login:'로그인 하러 가기',
     step1:'약관동의', step2:'본인인증', step3:'정보입력', step4:'완료',
@@ -302,7 +302,7 @@ var LANGS = {
     view:'View', next:'Next', confirm:'Confirm',
     verify_title:'Identity Verification', verify_done:'Verify Complete',
     info_title:'Enter Member Info', dup_check:'Check', email:'Email',
-    license:'Driver\'s License', license_hint:'Required to use vehicles. Can be added later.',
+    license:'Driver\'s License', license_hint:'Required. 12-digit Korean driver\'s license number — entered once at sign-up.',
     signup_done:'Complete', signup_complete:'Registration Complete',
     signup_complete_desc:'Welcome to CARO Mobility!', go_login:'Go to Login',
     step1:'Terms', step2:'Verify', step3:'Info', step4:'Done',
@@ -358,7 +358,7 @@ var LANGS = {
     view:'見る', next:'次へ', confirm:'確認',
     verify_title:'本人認証', verify_done:'認証完了',
     info_title:'会員情報入力', dup_check:'重複確認', email:'メール',
-    license:'運転免許番号', license_hint:'車両利用時に必要です。後で入力可能です。',
+    license:'運転免許番号', license_hint:'必須。本人名義の運転免許番号12桁。登録は一度だけです。',
     signup_done:'登録完了', signup_complete:'登録が完了しました',
     signup_complete_desc:'CAROモビリティへようこそ！', go_login:'ログインへ',
     step1:'規約', step2:'認証', step3:'情報', step4:'完了',
@@ -414,7 +414,7 @@ var LANGS = {
     view:'查看', next:'下一步', confirm:'确认',
     verify_title:'本人验证', verify_done:'验证完成',
     info_title:'填写会员信息', dup_check:'重复确认', email:'电子邮件',
-    license:'驾驶证号码', license_hint:'使用车辆时需要。也可以稍后输入。',
+    license:'驾驶证号码', license_hint:'必填。本人驾驶证号码12位，注册时填写一次即可。',
     signup_done:'注册完成', signup_complete:'注册完成',
     signup_complete_desc:'欢迎加入CARO出行！', go_login:'前往登录',
     step1:'条款', step2:'验证', step3:'信息', step4:'完成',
@@ -1176,11 +1176,13 @@ document.addEventListener('touchstart',function(){ if(userInfo.id) startSessionT
 function caroNormLicense(v, ctx){
   ctx=ctx||{};
   var o=null;
+  /* ★[v106] 번호는 하이픈·공백을 뺀 숫자만 보관 → "12-34-567890-12" 와 "123456789012" 를 같은 번호로 본다 (형식이 달라 '미등록'으로 보이던 것 방지) */
+  function _n(x){ x=String(x==null?'':x).trim(); if(!x||x.indexOf('*')!==-1) return ''; var d=x.replace(/[^0-9]/g,''); return d.length>=10?d:x; }
   if(v&&typeof v==='object'){
-    o={number:String(v.number||'').trim(), name:v.name||'', birth:v.birth||'', type:v.type||'', expiry:v.expiry||'', verified:!!v.verified};
+    o={number:_n(v.number), name:v.name||'', birth:v.birth||'', type:v.type||'', expiry:v.expiry||'', verified:!!v.verified};
   }else if(typeof v==='string'){
-    var s=v.trim();
-    if(s&&s.indexOf('*')===-1) o={number:s, name:'', birth:'', type:'', expiry:'', verified:false};  /* 마스킹된 옛 값(12-0****)은 무효 */
+    var s=_n(v);
+    if(s) o={number:s, name:'', birth:'', type:'', expiry:'', verified:false};  /* 마스킹된 옛 값(12-0****)은 무효 */
   }
   if(o){ if(!o.name&&ctx.name) o.name=ctx.name; if(!o.birth&&ctx.birth) o.birth=ctx.birth; }
   return (o&&o.number)?o:null;
@@ -1575,6 +1577,9 @@ function handleSignup(){
   var name=val('su-name');
   var license=val('su-license'), birth=val('su-birth');
   var phone=val('su-phone');
+  /* ★[v106] 면허번호는 가입 때 한 번 받고 끝 — 비워 두고 가입하면 나중에 홈에서 '등록 필요'가 떠 고객이 두 번 등록하게 되던 것 */
+  license=String(license||'').replace(/[^0-9]/g,'');
+  if(license.length!==12){ showToast('운전면허번호 12자리를 입력해 주세요. (예: 12-34-567890-12)'); try{ var _sl=document.getElementById('su-license'); if(_sl) _sl.focus(); }catch(e){} return; }
   /* ★[25차] 만 21세 확인 — 앱 안내(만 21세 이상)대로 실제로 막는다 */
   var ageOk=caroAgeFromBirth(birth);
   if(ageOk==null){ showToast('생년월일 8자리(YYYYMMDD)를 정확히 입력해 주세요.'); return; }
@@ -9519,7 +9524,14 @@ window.devUploadAllCars=function(){
     try{ extra=JSON.parse(localStorage.getItem('caro_extra_driver')||'null'); }catch(e){}
     var h='<div class="apd-section">';
     h+='<div class="apd-section-title"><span class="apd-section-title-icon">🪪</span>등록된 운전면허증</div>';
-    if(lic&&(lic.number||lic.name)){
+    /* ★[v106] '등록 완료'는 면허번호가 실제로(가려지지 않은 값으로) 있을 때만. 예전 버전이 남긴 번호 없는 기록(이름만 있음)은
+       홈 '이용 준비' 카드와 서버 예약 자격 검사가 '미등록'으로 보므로, 여기서도 같은 기준으로 '번호 재등록 필요' 를 보여 준다. */
+    var _licOk=!!(lic&&lic.number&&String(lic.number).trim()&&String(lic.number).indexOf('*')===-1);
+    if(lic&&lic.name&&!_licOk){
+      h+='<div class="apd-row"><span class="apd-row-label">상태</span><span class="apd-row-value" style="color:#b23a3a;font-weight:700;">면허번호 재등록 필요</span></div>';
+      h+='<div style="padding:10px 4px 4px;color:var(--text-m);font-size:.84rem;line-height:1.6;">예전 버전에서 저장된 기록에 면허번호가 없습니다. 아래 버튼을 눌러 면허번호를 다시 입력하면 바로 예약할 수 있어요.</div>';
+      h+='<button class="apd-btn" style="margin-top:8px;" onclick="goTo(\'payment-info-screen\')">면허번호 입력하러 가기</button>';
+    }else if(_licOk){
       h+='<div class="apd-row"><span class="apd-row-label">상태</span><span class="apd-row-value" style="color:#1d7a3a;font-weight:700;">'+(reg?'등록 완료':'확인 중')+'</span></div>';
       h+='<div class="apd-row"><span class="apd-row-label">이름</span><span class="apd-row-value">'+(lic.name||(window.userInfo&&userInfo.name)||'—')+'</span></div>';   /* ★ [v101] 면허에 이름이 없으면 계정 이름 */
       h+='<div class="apd-row"><span class="apd-row-label">면허번호</span><span class="apd-row-value">'+_licMask(lic.number)+'</span></div>';
@@ -11434,6 +11446,20 @@ window.devUploadAllCars=function(){
         /* ★ [v101] 면허 복원 — 서버값(표준형)이 진실. userInfo.license(번호)+caro_license(객체)를 함께 갱신
            ★ [v102] 서버 확인 전(stale) 값에 면허가 없으면 지우지 않는다 */
         var licObj = (window.caroNormLicense && (caroNormLicense(d.license,{name:d.name,birth:d.birth}) || caroNormLicense(d.licenseText,{name:d.name,birth:d.birth}))) || null;
+        /* ★[v106] 한 번 등록한 면허는 다시 묻지 않는다 — 표준 자리(license/licenseText)에 번호가 없으면
+           예전 버전이 서버에 백업해 둔 기기 설정(caroMirror.caro_license / caro_license_number)과 이 기기의 caro_license 에서 찾아
+           표준형으로 서버에 다시 써 둔다(자가 복구). 그래도 없을 때만 '재등록' 안내가 뜬다. */
+        if(!licObj && !stale){
+          var cand=[];
+          try{ var mir=d.caroMirror||{}; ['caro_license','caro_license_number','caro_lic'].forEach(function(k){ var m=mir[k]; if(m&&typeof m.v==='string') cand.push(m.v); }); }catch(e){}
+          try{ cand.push(localStorage.getItem('caro_license')||''); }catch(e){}
+          for(var ci=0; ci<cand.length && !licObj; ci++){
+            var raw=cand[ci]; if(!raw) continue; var parsed=null;
+            try{ parsed=JSON.parse(raw); }catch(e){ parsed=raw; }
+            licObj=caroNormLicense(parsed,{name:d.name,birth:d.birth})||null;
+          }
+          if(licObj && window.caroSaveLicense){ console.log('[CARO] 🔧 면허 자가 복구 → 서버 표준형 저장'); caroSaveLicense(licObj).catch(function(){}); }
+        }
         var lic = licObj ? licObj.number : '';
         if(window.caroApplyLicenseLocal && (!stale || licObj)) caroApplyLicenseLocal(licObj);
         /* 카드 복원 → savedCards + caro_apd_cards (로컬이 비어있을 때만) */

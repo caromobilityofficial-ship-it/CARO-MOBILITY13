@@ -1236,9 +1236,9 @@
                 <input type="password" id="su-pw2" class="form-input" placeholder="비밀번호를 다시 입력하세요" autocomplete="new-password"/>
             </div>
             <div class="input-group">
-                <label class="input-label" data-i18n="license">운전면허 번호</label>
-                <input type="text" id="su-license" class="form-input" placeholder="예: 12-00-000000-00"/>
-                <span class="input-hint" data-i18n="license_hint">차량 이용 시 필요합니다. 나중에 입력 가능합니다.</span>
+                <label class="input-label">운전면허 번호 <span class="required">*</span></label>
+                <input type="text" id="su-license" class="form-input" inputmode="numeric" maxlength="15" placeholder="예: 12-00-000000-00" required/>
+                <span class="input-hint">본인 명의 운전면허 12자리 (하이픈 없이 입력해도 됩니다). 가입 때 한 번만 등록하면 다시 묻지 않습니다.</span>
             </div>
             <button class="submit-btn" onclick="handleSignup()" data-i18n="signup_done">가입 완료</button>
             <button class="back-bottom-btn" onclick="goSignupStep(2)" data-i18n="back">뒤로</button>
