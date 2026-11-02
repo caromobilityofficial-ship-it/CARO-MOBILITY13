@@ -50,7 +50,7 @@
     if(/unavailable|deadline/.test(c)) return '서버에 연결할 수 없습니다. 네트워크를 확인해 주세요.';
     return (e && e.message) ? e.message : fallback;
   }
-  function tossKey(){ return CFG.TOSS_CLIENT_KEY || 'test_ck_6bJXmgo28eByJonkYwBE3LAnGKWx'; }
+  function tossKey(){ return CFG.TOSS_CLIENT_KEY || ''; }   /* ★[v106] 키는 caro-config.js 한 곳에만 (예전 예비 테스트키 제거) */
   function baseUrl(){ return location.href.split('?')[0].split('#')[0]; }
   function requestToss(orderId, amount, orderName, kind){
     if(typeof TossPayments !== 'function'){ toast('토스페이먼츠를 불러오지 못했습니다. 네트워크를 확인해 주세요.'); return Promise.resolve(false); }

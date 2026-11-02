@@ -22,6 +22,7 @@
      (HTML 규칙상 &#39; 는 읽히는 순간 ' 로 돌아와 문자열을 끊는다) → 코드 문자열 규칙으로 먼저 막고 나서 HTML 로 막는다 */
   function jsa(s){ return esc(String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\n/g,'\\n').replace(/\r/g,'\\r').replace(/\u2028/g,'\\u2028').replace(/\u2029/g,'\\u2029')); }
  function won(n){ try{ return (Number(n)||0).toLocaleString('ko-KR'); }catch(e){ return n; } }
+  function _who(){ try{ return (window.FB_AUTH&&window.FB_AUTH.currentUser&&window.FB_AUTH.currentUser.email)||'admin'; }catch(e){ return 'admin'; } }   /* ★[v106] 처리한 직원 기록 */
   function fmtDay(v){ try{ var d=(typeof v==='number')?new Date(v):new Date(v); if(isNaN(d.getTime())) return '—';
     var p=function(n){return n<10?'0'+n:n;}; return d.getFullYear()+'.'+p(d.getMonth()+1)+'.'+p(d.getDate()); }catch(e){ return '—'; } }
   function tsOf(x){ return x.createdTs || x.ts || Date.parse(x.createdAt) || 0; }   /* ★[23차] 서버 생성 미납(ts)도 읽는다 */
@@ -199,7 +200,7 @@
     if(!confirm('이 미납 건을 납부 처리할까요?\n\n※ 고객이 앱에서 토스로 결제하면 자동으로 납부 처리됩니다. 현금·계좌이체 등 앱 밖에서 받은 경우에만 눌러 주세요.')) return;
     var db=window.FB_DB, FN=window.FB_FN;
     try{
-      FN.setDoc(FN.doc(db,'unpaid_debts',id),{ status:'paid', paidAt:new Date().toISOString(), paidBy:'admin' },{merge:true})
+      FN.setDoc(FN.doc(db,'unpaid_debts',id),{ status:'paid', paidAt:new Date().toISOString(), paidBy:_who() },{merge:true})
         .then(function(){ if(window.toast) toast('납부 처리되었습니다.'); })
         .catch(function(e){ if(window.toast) toast('처리 실패: 권한/규칙을 확인하세요.'); console.warn(e); });
     }catch(e){ console.warn(e); }
@@ -209,7 +210,7 @@
     if(!confirm('이 사용자의 이용 정지를 해제(이용 허용)할까요?')) return;
     var db=window.FB_DB, FN=window.FB_FN;
     try{
-      FN.setDoc(FN.doc(db,'suspensions',uid),{ active:false, liftedAt:new Date().toISOString(), liftedBy:'admin' },{merge:true})
+      FN.setDoc(FN.doc(db,'suspensions',uid),{ active:false, liftedAt:new Date().toISOString(), liftedBy:_who() },{merge:true})
         .then(function(){ if(window.toast) toast('이용을 허용했습니다.'); })
         .catch(function(e){ if(window.toast) toast('처리 실패: 권한/규칙을 확인하세요.'); console.warn(e); });
     }catch(e){ console.warn(e); }
@@ -226,7 +227,7 @@
         userId:uid, idName:(info&&info.idName)||m.idName||'', userName:(info&&info.userName)||m.name||'', license:(info&&info.license)||m.license||'',
         active:true, requiresApproval:true, habitual:true, count:cnt,
         reason:'상습 미납(누적 '+cnt+'회) — 관리자 적용', until:null, untilTs:null,
-        createdAt:new Date().toISOString(), heldBy:'admin'
+        createdAt:new Date().toISOString(), heldBy:_who()
       },{merge:true})
         .then(function(){ if(window.toast) toast('상습 미납으로 이용 정지를 적용했습니다.'); })
         .catch(function(e){ if(window.toast) toast('처리 실패: 권한/규칙을 확인하세요.'); console.warn(e); });

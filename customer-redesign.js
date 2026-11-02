@@ -1469,6 +1469,7 @@
     requestAnimationFrame(function(){ requestAnimationFrame(function(){ ov.classList.add('open'); var b=ov.querySelector('.caro-mr-body'); if(b) b.scrollTop=0; }); });
   }
   function onNext(){
+    if(!(window.CARO_CONFIG&&CARO_CONFIG.FEATURES&&CARO_CONFIG.FEATURES.monthly)){ if(window.showToast)showToast('월 렌트는 준비 중입니다. 오픈하면 알림으로 안내드릴게요.'); return; }   /* ★[v106] */
     if(ST.period==null||!ST.start||ST.age==null||ST.ins==null){ if(window.showToast)showToast('모든 항목을 선택해 주세요'); return; }
     var pr=priceFor(ST.period); var insP=INS[ST.ins].price; var tot=((pr?pr.final:0)+insP)*ST.period;
     var msg=ST.car.name+' · '+ST.period+'개월 · '+(ST.start.getMonth()+1)+'/'+ST.start.getDate()+' 시작 · 만'+ST.age+'세 · '+INS[ST.ins].name+' · 합계 '+won(tot)+'원';
@@ -1509,7 +1510,7 @@
 ═══════════════════════════════════════════════════════════ */
 (function(){
   'use strict';
-  var TOSS_KEY=(window.CARO_CONFIG&&CARO_CONFIG.TOSS_CLIENT_KEY)||'test_ck_6bJXmgo28eByJonkYwBE3LAnGKWx';   /* ★ caro-config.js 에서 한 곳 관리 */
+  var TOSS_KEY=(window.CARO_CONFIG&&CARO_CONFIG.TOSS_CLIENT_KEY)||'';   /* ★ caro-config.js 에서 한 곳 관리 (v106: 예비 테스트키 제거) */
   function won(n){ try{ return Number(n).toLocaleString('ko-KR'); }catch(e){ return n; } }
   function toast(m){ if(window.showToast) showToast(m); else alert(m); }
   function parseWon(s){ return parseInt((''+(s==null?'':s)).replace(/[^0-9]/g,''),10)||0; }
@@ -1635,6 +1636,9 @@
   }
 
   function boot(){
+    /* ★[v106] 서버 모드: 연장은 caro-secure.js(secureExtend → createOrder(extend) → 토스 → confirmPayment)가 처리한다.
+       예전엔 이 훅이 secureExtend 를 덮어써서 주문번호 없이 토스 결제창을 띄웠고, 복귀 후 '주문을 찾을 수 없습니다'로 연장이 안 됐다. */
+    if(window.CARO_CONFIG && CARO_CONFIG.SECURE_SERVER){ handleReturn(); return; }
     function hook(){
       if(typeof window.confirmExtendSheet!=='function' || window.confirmExtendSheet._caroExtPay) return false;
       var orig=window.confirmExtendSheet;
@@ -2161,7 +2165,7 @@
 ═══════════════════════════════════════════════════════════ */
 (function(){
   'use strict';
-  var TOSS_KEY=(window.CARO_CONFIG&&CARO_CONFIG.TOSS_CLIENT_KEY)||'test_ck_6bJXmgo28eByJonkYwBE3LAnGKWx';   /* ★ caro-config.js 에서 한 곳 관리 */
+  var TOSS_KEY=(window.CARO_CONFIG&&CARO_CONFIG.TOSS_CLIENT_KEY)||'';   /* ★ caro-config.js 에서 한 곳 관리 (v106: 예비 테스트키 제거) */
   var PENALTY_UNIT=10000, PENALTY_PER_MIN=10; /* 10분당 10,000원 */
   function won(n){ try{ return Number(n||0).toLocaleString('ko-KR'); }catch(e){ return n; } }
   function toast(m){ if(window.showToast) showToast(m); else alert(m); }
@@ -2922,7 +2926,7 @@
     name:'(주)카로모빌리티',
     ceo:'허경준',
     bizNo:'851-88-03946',
-    mailOrderNo:'신고 진행 중',
+    mailOrderNo:(window.CARO_CONFIG&&CARO_CONFIG.mailOrderNo)||'신고 진행 중',   /* ★[v106] caro-config.js 에서 */
     addr:'인천광역시 연수구 센트럴로 313, 씨동 2304호 4-7 (송도동, 송도씨워크 인테라스한라)',
     tel:(window.CARO_CONFIG&&window.CARO_CONFIG.supportPhone)||'010-6872-9807',
     hours:'평일 09:00~18:00 (주말·공휴일 휴무)',
@@ -5527,6 +5531,8 @@
     carou.addEventListener('click', function(e){
       var b=e.target.closest('.mp-join'); if(!b) return;
       var plan=b.getAttribute('data-plan'), name=b.getAttribute('data-name');
+      /* ★[v106] 결제 연동 전에는 아무것도 저장하지 않고 '준비 중'만 안내 (caro-config.js FEATURES.membership) */
+      if(!(window.CARO_CONFIG&&CARO_CONFIG.FEATURES&&CARO_CONFIG.FEATURES.membership)){ toast('멤버십 가입은 준비 중입니다. 오픈하면 알림으로 안내드릴게요.'); return; }
       if(plan==='BIZ'){ toast('비즈(법인)는 사업자 승인제예요. 대기 신청이 접수되었습니다.'); return; }
       try{
         var next=new Date(); next.setMonth(next.getMonth()+1);
@@ -6675,7 +6681,7 @@
       var timer=setTimeout(function(){ if(!done){ done=true; toAgent(t); } }, 12000);
       Promise.resolve().then(function(){ return window.caroAskBot(t); }).then(function(a){
         if(done) return; done=true; clearTimeout(timer);
-        if(a){ addBot(String(a).replace(/\n/g,'<br>')); log(null,t,'LLM 답변(서버)'); CTX.t=t; endButtons(); }
+        if(a){ addBot((window.caroEsc?caroEsc(String(a)):String(a)).replace(/\n/g,'<br>')); log(null,t,'LLM 답변(서버)'); CTX.t=t; endButtons(); }   /* ★[v106] 이스케이프 */
         else { toAgent(t); }
       }).catch(function(){ if(done) return; done=true; clearTimeout(timer); toAgent(t); });
     }

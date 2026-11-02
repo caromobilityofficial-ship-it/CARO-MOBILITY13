@@ -543,9 +543,9 @@ document.addEventListener('DOMContentLoaded', function(){
       if(shortcut) window._pendingShortcut = shortcut;
     }, 4500);
 
-  /* 토스페이먼츠 결제 성공 처리 */
+  /* 토스페이먼츠 결제 성공 처리 — ★[v106] 서버 모드에서는 caro-secure.js 가 confirmPayment 로 처리하므로 여기서는 손대지 않는다 */
   var urlParams2=new URLSearchParams(window.location.search);
-  if(urlParams2.get('payment')==='success'){
+  if(!(window.CARO_CONFIG&&CARO_CONFIG.SECURE_SERVER) && urlParams2.get('payment')==='success'){
       try{
               var aid=localStorage.getItem('caro_auto_id')||localStorage.getItem('caro_pay_uid')||'';
               var aname=localStorage.getItem('caro_auto_name')||aid;
@@ -2163,7 +2163,8 @@ function renderCars(){
     }
 
     var kmInfo=car.fuel==='전기'?(car.kmRate+'원/km'):'50km 주행 무료';
-    var optLines=(car.options||'').split('\n').map(function(l){return '<div class="car-opt-line">'+l+'</div>';}).join('');
+    var _E=window.caroEsc||function(v){return String(v==null?'':v);};   /* ★[v106] 차량 데이터 이스케이프 */
+    var optLines=(car.options||'').split('\n').map(function(l){return '<div class="car-opt-line">'+_E(l)+'</div>';}).join('');
 
     /* 가용 시간 막대바 */
     var availBar='';
@@ -2189,9 +2190,9 @@ function renderCars(){
 
     var div=document.createElement('div'); div.className='car-item';
     div.innerHTML=
-      '<img class="car-thumb" src="'+car.img+'" alt="'+getCarName(car)+'"/>'+
+      '<img class="car-thumb" src="'+_E(car.img)+'" alt="'+_E(getCarName(car))+'"/>'+
       '<div class="car-info">'+
-        '<div class="car-name">'+getCarName(car)+'</div>'+
+        '<div class="car-name">'+_E(getCarName(car))+'</div>'+
         '<div class="car-opts">'+optLines+'</div>'+
         '<div class="car-km-info">🛣 '+kmInfo+'</div>'+
         '<div class="car-price-row">'+
@@ -2474,7 +2475,7 @@ function handlePayment(){
     showToast('예약 정보가 올바르지 않습니다. 다시 시도해 주세요.'); return;
   }
   var bookNo='CR'+Date.now().toString().slice(-8);
-  var tossPayments=TossPayments((window.CARO_CONFIG&&CARO_CONFIG.TOSS_CLIENT_KEY)||'test_ck_6bJXmgo28eByJonkYwBE3LAnGKWx');   /* ★ caro-config.js 에서 한 곳 관리 */
+  var tossPayments=TossPayments((window.CARO_CONFIG&&CARO_CONFIG.TOSS_CLIENT_KEY)||'');   /* ★[v106] 예비 테스트키 제거 */   /* ★ caro-config.js 에서 한 곳 관리 */
 /* 결제 전 데이터 localStorage에 저장 */
   try{
       localStorage.setItem('caro_pay_uid', userInfo.id||'');
@@ -3526,7 +3527,7 @@ function devRenderSwapDropdowns(){
   if(!resSel||!carSel) return;
   resSel.innerHTML='<option value="">예약 선택</option>';
   myReservations.forEach(function(r,i){
-    if(!r.returned) resSel.innerHTML+='<option value="'+i+'">'+r.bookNo+' — '+r.car.name+'</option>';
+    if(!r.returned) resSel.innerHTML+='<option value="'+i+'">'+(window.caroEsc?caroEsc(r.bookNo):r.bookNo)+' — '+(window.caroEsc?caroEsc(r.car.name):r.car.name)+'</option>';
   });
   carSel.innerHTML='<option value="">변경할 차량 선택</option>';
   CARS_DATA.forEach(function(c){
@@ -9018,10 +9019,7 @@ window.devUploadAllCars=function(){
      5. 결제 카드
   ═══════════════════════════════════════════ */
   function renderCards(){
-    const cards = STORE.get('cards', [
-      { id:1, bank:'신한', last4:'1234', alias:'내 신한카드', isDefault:true },
-      { id:2, bank:'국민', last4:'5678', alias:'국민체크', isDefault:false }
-    ]);
+    const cards = STORE.get('cards', []);   /* ★[v106] 가짜 기본 카드(신한 1234·국민 5678) 제거 */
 
     let html = `
       <div class="apd-section">
@@ -9177,9 +9175,11 @@ window.devUploadAllCars=function(){
     `;
   }
 
+  function creditEnabled(){ return !!(window.CARO_CONFIG && CARO_CONFIG.FEATURES && CARO_CONFIG.FEATURES.credit); }   /* ★[v106] */
   function bindCredit(){
     document.querySelectorAll('[data-charge]').forEach(btn => {
       btn.addEventListener('click', () => {
+        if(!creditEnabled()){ toast('크레딧 충전은 준비 중입니다. 예약 결제는 토스페이먼츠로 바로 진행됩니다.', false); return; }
         const amount = parseInt(btn.dataset.charge);
         if(!confirm(amount.toLocaleString() + '원을 충전하시겠습니까?\n기본 결제 카드로 결제됩니다.')) return;
         const cur = STORE.get('credit', 0);
@@ -9194,6 +9194,7 @@ window.devUploadAllCars=function(){
       });
     });
     document.getElementById('apd-credit-custom').addEventListener('click', () => {
+      if(!creditEnabled()){ toast('크레딧 충전은 준비 중입니다.', false); return; }
       const v = prompt('충전할 금액을 입력해주세요 (1,000원 이상)');
       if(!v) return;
       const amt = parseInt(v.replace(/[^0-9]/g, ''));
@@ -9451,7 +9452,7 @@ window.devUploadAllCars=function(){
         <div class="apd-row"><span class="apd-row-label">상호</span><span class="apd-row-value">(주)카로모빌리티</span></div>
         <div class="apd-row"><span class="apd-row-label">대표자</span><span class="apd-row-value">허경준</span></div>
         <div class="apd-row"><span class="apd-row-label">사업자등록번호</span><span class="apd-row-value">851-88-03946</span></div>
-        <div class="apd-row"><span class="apd-row-label">통신판매업신고</span><span class="apd-row-value">신고 진행 중</span></div>
+        <div class="apd-row"><span class="apd-row-label">통신판매업신고</span><span class="apd-row-value">${(window.CARO_CONFIG&&CARO_CONFIG.mailOrderNo)||'신고 진행 중'}</span></div>
         <div class="apd-row"><span class="apd-row-label">주소</span><span class="apd-row-value">인천광역시 연수구 센트럴로 313, 씨동 2304호 4-7 (송도동, 송도씨워크 인테라스한라)</span></div>
         <div class="apd-row"><span class="apd-row-label">고객센터</span><span class="apd-row-value">info@caromobility.kr · 010-6872-9807 (평일 09:00~18:00)</span></div>
       </div>
@@ -10530,9 +10531,11 @@ window.devUploadAllCars=function(){
 /* ═══════════════════════════════════════════
    등록 카드 결제 시 토스 건너뛰기 v2
    ※ 차량 정보 + 이미지 등 전체 데이터 보존
+   ★[v106] 시연 전용. 서버 모드(SECURE_SERVER) 이거나 DEMO_FAKE_CARD_PAY 가 true 가 아니면 아예 실행하지 않는다.
 ═══════════════════════════════════════════ */
 (function(){
   'use strict';
+  if(!(window.CARO_CONFIG && !CARO_CONFIG.SECURE_SERVER && CARO_CONFIG.DEMO_FAKE_CARD_PAY === true)) return;
 
   /* 선택한 카드 ID 추적 */
   window._caroSelectedCardId = null;

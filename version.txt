@@ -1,1 +1,1 @@
-CARO v101.3 (2026-09-07) 데이터 저장 안정화 + 시스템바 보정 + 탈퇴 서버기록 + 관제 강제반납/취소 + 차량 기본이미지 + DEMO_WALLET 스위치
+CARO v106 (2026-11-02) 출시 정리: 서버함수 6개 추가(staffCommand·staffReturn·staffCharge·findIdByPhone·myDeviceStatus·deleteAccount) + 연장 결제 서버 주문 + 시연 흐름(가짜 결제·크레딧·멤버십·월렌트) 잠금 + 테스트키 단일화 + 관제 클릭재킹·온라인판정·OTA 차단 + 규칙 19차

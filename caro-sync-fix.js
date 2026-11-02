@@ -19,7 +19,7 @@
    ─ 미납(caro_apd_unpaid)은 서버 unpaid_debts 가 진실이므로 제외.
    ─ removeItem(삭제)도 기록해(tombstone) 다른 기기·재설치에서 지운 항목이 되살아나지 않게 한다.
    ─ 로그아웃 중(__caroLoggingOut / __caroSilentStorage)에는 기록·전송하지 않는다. */
-var MIRROR_RE=/^caro_(apd_credit|apd_credit_history|apd_coupons|apd_sns|apd_plan|apd_notif|apd_phone|apd_phone_full|license|license_registered|plan_v1|extra_driver)$/;
+var MIRROR_RE=/^caro_(apd_sns|apd_notif|apd_phone|apd_phone_full|license|license_registered|extra_driver)$/;   /* ★[v106] 크레딧·쿠폰·플랜(폰 안의 시연 값)은 서버에 올리지 않는다 */
 var SKIP_RE=/(pw|ai_key|auto_login|saved_id|auto_id|auto_name|android_banner)/;
 var TS_KEY='caro_mirror_ts';
 var pushTimer=null, pulling=false, blocked=false;

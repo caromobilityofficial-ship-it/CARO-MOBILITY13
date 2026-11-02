@@ -1169,7 +1169,8 @@ function waitAuth(n){
   /* 비밀번호 재설정: 아이디 칸의 계정(별명이면 최고관리자 이메일)으로 재설정 메일 발송 */
   $('g-reset').addEventListener('click',function(){
     var em=$('g-em').value.trim();
-    if(em.toUpperCase()==='CAROMOBILITY'||!em) em=ADMIN_EMAIL;
+    if(em.toUpperCase()==='CAROMOBILITY') em=ADMIN_EMAIL;
+    if(!em){ $('g-err').textContent='재설정할 계정의 이메일을 먼저 입력하세요'; return; }   /* ★[v106] 빈칸이면 최고관리자 메일로 보내던 것 제거 */
     if(em.indexOf('@')<0){ $('g-err').textContent='이메일 형식이 아닙니다'; return; }
     FN.sendPasswordResetEmail(A,em).then(function(){
       $('g-err').style.color='#4db183';

@@ -372,7 +372,7 @@
     <div class="lg">CARO MOBILITY</div>
     <div class="lt">관제 대시보드 · 관리자 로그인</div>
     <label>관리자 아이디</label>
-    <input id="lg-email" type="text" value="CAROMOBILITY" placeholder="관리자 아이디 또는 이메일" autocomplete="username" autocapitalize="off" spellcheck="false" />
+    <input id="lg-email" type="text" value="" placeholder="관리자 아이디 또는 이메일" autocomplete="username" autocapitalize="off" spellcheck="false" />
     <label>비밀번호</label>
     <input id="lg-pw" type="password" placeholder="비밀번호 입력" autocomplete="current-password" />
     <button class="lbtn" id="lg-btn">로그인</button>
@@ -387,7 +387,17 @@
   function jsq(s){ return (s==null?'':String(s)).replace(/[^A-Za-z0-9_\-\.가-힣 ]/g,''); }
   /* ★ 관제센터(admin-control.html) 안의 iframe으로 열렸을 땐, 부모가 이미 로그인·권한 확인을 마쳤다.
      그러니 운영관리 자체 로그인 창은 띄우지 않는다(공유 세션을 조용히 기다림). 깜빡임 방지 위해 파싱 즉시 숨김. */
-  window.__CARO_INFRAME = (function(){ try{ return window.self !== window.top; }catch(e){ return true; } })();
+  /* ★[v106] 같은 사이트(관제센터)가 품었을 때만 '프레임 안' 으로 인정. 다른 사이트가 이 화면을 iframe 으로 끼워 넣으면(클릭재킹) 프레임을 깨고 나온다 */
+  window.__CARO_INFRAME = (function(){
+    try{
+      if(window.self === window.top) return false;
+      if(location.protocol==='file:' || location.protocol==='content:') return true;   /* 앱 안 로컬 사본 */
+      var ref=''; try{ ref=document.referrer||''; }catch(e){}
+      var sameSite = ref.indexOf(location.origin+'/')===0 || ref===location.origin;
+      if(!sameSite){ try{ window.top.location = window.location.href; }catch(e){} document.documentElement.style.display='none'; return false; }
+      return true;
+    }catch(e){ return false; }
+  })();
   if(window.__CARO_INFRAME){ var _lg=document.getElementById('loginGate'); if(_lg) _lg.style.display='none'; }
 </script>
 <div class="wrap">
@@ -1407,11 +1417,7 @@
     }).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:20px">예약이 없습니다.</td></tr>';
   }
   // ── notices ──
-  var notices=[
-    {t:'[이벤트] 신규 가입 1시간 무료 이용권 지급', d:'2026-06-01 · 게시중'},
-    {t:'[공지] 6월 정기 차량 점검 안내', d:'2026-06-05 · 게시중'},
-    {t:'[이벤트] CARO THE BLACK 출시 기념 20% 할인', d:'2026-06-08 · 게시중'}
-  ];
+  var notices=[];   /* ★[v106] 시연용 가짜 공지 제거 — 실제 목록은 admin-notices.js 가 Firestore 에서 그린다 */
   function renderNotice(){
     document.getElementById('noticeList').innerHTML = notices.map(function(n,i){
       return '<div class="list-item"><div><div>'+n.t+'</div><div class="meta">'+n.d+'</div></div>'+
@@ -1424,7 +1430,7 @@
     renderNotice(); toast('공지가 추가되었습니다'); };
   window.delNotice=function(i){ notices.splice(i,1); renderNotice(); toast('삭제되었습니다'); };
   // ── accounts ──
-  var accts=[{n:'CAROMOBILITY', r:'최고관리자'},{n:'operator_song', r:'운영 매니저'},{n:'operator_kim', r:'차량 관리'}];
+  var accts=[];   /* ★[v106] 시연용 가짜 계정 제거 — 실제 목록은 admin-accounts.js 가 그린다 */
   function renderAccts(){
     document.getElementById('acctList').innerHTML = accts.map(function(a){
       return '<div class="acct"><span class="av">'+a.n[0].toUpperCase()+'</span>'+
@@ -1581,7 +1587,8 @@
         shock:num(d.shock), impact:(d.impact===true),
         env:(d.env||''), groundSet:(d.groundSet===true), moving:(d.moving===true),
         fw:(d.fw||''), ota:(d.ota||''),
-        lastSeen:ls, online:(d.status==='online'&&ls&&(Date.now()-ls.getTime()<60000)) };
+        /* ★[v106] 온라인 판정을 관제(admin-control.html)와 동일하게: 평소 150초, 주차 절전 630초, 저전압 1230초 (예전 60초는 주차 중 정상 차량을 '오프라인'으로 보였다) */
+        lastSeen:ls, online:(function(){ if(!(d.status==='online'&&ls)) return false; var park=(d.park===true), low=(num(d.vbat)>0&&num(d.vbat)<11.6&&!(d.acc===true)); var win=(park?630:(low?1230:150))*1000; return (Date.now()-ls.getTime())<win; })() };
     });
     DEV_TELE=next; DEV_IDMAP=idmap;
     devMergeTelemetry();
@@ -1781,8 +1788,9 @@
     if(!db||!FN||!FN.setDoc){ if(window.toast)toast('Firebase 연결 대기'); return; }
     if(!window.confirm(v.name+' — 「'+label+'」 명령을 지금 보낼까요?')) return;
     var cmdId='cmd_'+Date.now()+'_'+Math.random().toString(36).slice(2,8);
-    var payload={ type:type, status:'pending', issuedBy:'admin',
-      issuedByEmail:(typeof ADMIN_EMAIL!=='undefined'?ADMIN_EMAIL:'admin'),
+    var _me=(window.FB_AUTH&&window.FB_AUTH.currentUser&&window.FB_AUTH.currentUser.email)||'admin';   /* ★[v106] 실제 보낸 직원 */
+    var payload={ type:type, status:'pending', issuedBy:_me, by:_me,
+      issuedByEmail:_me,
       issuedAt:FN.serverTimestamp(), timestamp:Date.now() };
     if(extra) Object.keys(extra).forEach(function(k){ payload[k]=extra[k]; });
     /* ★[14차] 서버 함수(staffCommand)가 권한·2단계 인증·값 형식을 확인한 뒤 만든다. 아직 배포 전(not-found)이면 예전처럼 직접 쓴다. */
@@ -1834,6 +1842,8 @@
   // 펌웨어 원격 업데이트: Firebase Storage에 올린 .bin 주소를 기기에 보내 LTE로 자가 업데이트
   var _lastFwUrl='';
   window.caroUpdateFw=function(){
+    /* ★[v106] 정책: 펌웨어는 USB 로만 넣는다(원격 갱신 없음, 관제 화면 안내와 동일). 서버(staffCommand)도 update 명령을 거부한다. */
+    if(window.toast) toast('원격 펌웨어 갱신은 정책상 막혀 있습니다 — 펌웨어는 USB 로만 넣습니다'); return;
     var v=FLEET.find(function(x){return x.id===selectedId;});
     if(!v){ if(window.toast)toast('차량을 먼저 선택하세요'); return; }
     if(!DEV_IDMAP[v.id]){ if(window.toast)toast('이 차량은 IoT 기기 미연결'); return; }

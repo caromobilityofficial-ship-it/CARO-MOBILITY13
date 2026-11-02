@@ -119,7 +119,7 @@
     var p=hasFn()
       ? window.FB_CALL('staffReturn',{ bookNo:no, reason:reason, waiveFees:waive }).then(function(r){
           if(r&&r.already){ notify('이미 반납 처리된 예약입니다'); return; }
-          var amt=Number(r&&r.amount)||0;
+          var amt=Number(r&&(waive?r.amountDue:r.amount))||0;   /* ★[v106] 면제 시 면제된 금액을 보여준다 */
           notify('✅ '+no+' 강제 반납 완료'+(amt>0?(waive?' · 추가요금 '+amt.toLocaleString()+'원 면제':' · 추가요금 '+amt.toLocaleString()+'원 미납 등록(고객 앱에서 결제)'):' · 추가요금 없음')+(r&&r.lockCmdId?' · 문 잠금 명령 전송':' · 단말 미연결(잠금 명령 없음)'));
           logAlert('force_return', no, { amount:amt, waived:waive, reason:reason });
         }).catch(function(e){ if(isNotFound(e)) return legacy(); throw e; })
