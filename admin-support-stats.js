@@ -143,7 +143,7 @@
     var A=window.FB_AUTH, FN=window.FB_FN;
     FN.onAuthStateChanged(A, function(u){ if(u) subscribe(); });
     if(A.currentUser) subscribe();
-    window.addEventListener('caro-perms', function(){ if(window.FB_AUTH && window.FB_AUTH.currentUser) subscribe(); });
+    document.addEventListener('caro-perms', function(){ if(window.FB_AUTH && window.FB_AUTH.currentUser) subscribe(); });
   }
   start();
   // 탭 열릴 때 재렌더

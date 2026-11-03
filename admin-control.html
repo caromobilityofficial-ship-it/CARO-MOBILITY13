@@ -75,7 +75,7 @@ button{font-family:inherit;cursor:pointer;}
 
 /* ── 지도 + 라이브 ── */
 .mapbox{position:relative;height:56vh;min-height:420px;background:var(--panel2);}
-#map{width:100%;height:100%;}
+#map{width:100%;height:100%;position:relative;z-index:0;}   /* ★[v108.1] Leaflet 타일이 지도 위 배지·따라가기 버튼·상단바를 덮지 않게 */
 /* ★지도 상태 배지 — 어느 지도를 쓰는지, 카카오가 왜 안 뜨는지 알려 준다 */
 .mapstat{position:absolute;left:12px;bottom:12px;z-index:21;font-size:11px;line-height:1.5;max-width:min(92%,420px);
   background:rgba(24,26,30,.94);border:1px solid var(--border2);padding:7px 11px;border-radius:9px;
@@ -212,7 +212,11 @@ button{font-family:inherit;cursor:pointer;}
   .mapbox{height:45vh;}
 }
 /* ★ 카로 앱(모바일) 전용 최적화 — 헤더 세로쌓임/가로넘침 제거, 카드·지도 폰 화면에 맞춤 */
-html,body{max-width:100%;overflow-x:hidden;}
+html{max-width:100%;overflow-x:hidden;}
+/* ★[v108.1] 운영 관리 탭일 때: 실시간 관제 본문(지표·지도·하단)을 완전히 숨기고 바깥 페이지 스크롤을 막는다.
+   (예전엔 운영 화면이 '고정 덮개'로만 얹혀 있어서 아래로 내리면 뒤의 관제 화면이 비쳐 보였다) */
+body.ops{overflow:hidden;height:100vh;}
+body.ops .kpis, body.ops .main, body.ops .bottom{display:none!important;}
 @media (max-width:640px){
   .topbar{flex-wrap:wrap;gap:8px 10px;padding:10px 12px;}
   .logo{font-size:15px;letter-spacing:1px;}
@@ -401,9 +405,13 @@ function switchView(v){
   $('nt-live').classList.toggle('on',!ops);
   $('nt-ops').classList.toggle('on',ops);
   syncOpsTop();
+  document.body.classList.toggle('ops',ops);
+  try{ window.scrollTo(0,0); }catch(e){}
   $('opsview').style.display=ops?'block':'none';
   var fr=$('opsframe');
   if(ops && !fr.src){ fr.src='admin-ops.html'; }   /* 첫 진입 때만 로드(관제 성능에 영향 없음) */
+  if(!ops){ setTimeout(function(){ try{ if(window.lmap&&lmap.invalidateSize) lmap.invalidateSize(); }catch(e){}
+                                   try{ if(window.kmap&&kmap.relayout) kmap.relayout(); }catch(e){} },60); }   /* 숨겼다 다시 보이면 지도 크기 재계산 */
 }
 
 /* ── 토스트 ── */
@@ -510,7 +518,7 @@ function useLeaflet(why){
           + '인터넷 연결과 광고 차단 확장을 확인해 주세요. 지도 말고 나머지 기능은 정상 동작합니다.', true);
     mapKind='none'; return;
   }
-  lmap=L.map('map').setView([37.4663,126.678],15);
+  lmap=L.map('map',{zoomControl:false}).setView([37.4663,126.678],15); try{ L.control.zoom({position:'bottomright'}).addTo(lmap); }catch(e){}   /* ★[v108.1] 확대 버튼이 '차량 선택' 배지 밑에 깔리지 않게 오른쪽 아래로 */
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OSM',maxZoom:19}).addTo(lmap);
   mapKind='leaflet'; mapDraw(); bindMapDrag();
   if(why) mapStat(kakaoFailHtml(why), true);
@@ -1126,7 +1134,7 @@ function waitAuth(n){
         $('gate').style.display='flex';
       });
     }
-    else { if(started){ location.reload(); return; } $('gate').style.display='flex'; }   /* ★[v108] 로그아웃·토큰 만료 뒤 죽은 화면이 남지 않게 새로 연다 */
+    else { if(started){ location.reload(); return; } $('gate').style.display='flex'; $('g-btn').textContent='로그인'; }   /* ★[v108] 로그아웃·토큰 만료 뒤 죽은 화면이 남지 않게 새로 연다 */
   });
   function enter(label, pm, isSuper){
     $('gate').style.display='none'; $('adm').textContent=label;

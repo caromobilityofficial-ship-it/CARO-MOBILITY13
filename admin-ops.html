@@ -185,7 +185,7 @@
   .fleet th:nth-child(6), .fleet td:nth-child(6),
   .fleet th:nth-child(7), .fleet td:nth-child(7),
   .fleet th:nth-child(8), .fleet td:nth-child(8){text-align:center;}
-  .vn{display:flex;flex-direction:column;gap:2px;align-items:center;}
+  .ptable .vn{display:flex;flex-direction:column;gap:2px;align-items:center;}   /* ★[v108.1] 요금표 전용 — 차량 현황표의 종모양+이름 가로 배치를 덮어쓰지 않게 */
   .vn b{font-weight:600;}
   .vn small{color:var(--muted2);font-size:11px;}
   .grade{font-size:10.5px;padding:2px 7px;border-radius:5px;letter-spacing:.02em;border:1px solid var(--border2);color:var(--muted);}
@@ -282,7 +282,7 @@
   .acct{display:flex;align-items:center;gap:11px;padding:11px 13px;border:1px solid var(--border);border-radius:11px;margin-bottom:9px;background:var(--panel2);}
   .acct .av{width:30px;height:30px;border-radius:8px;background:var(--accent);color:var(--on-accent);display:flex;align-items:center;justify-content:center;font-weight:700;}
   .hide{display:none!important;}
-  #toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--accent);border:1px solid var(--accent);color:var(--on-accent);padding:11px 20px;border-radius:11px;font-size:13px;opacity:0;transition:.25s;pointer-events:none;z-index:50;box-shadow:0 10px 30px -10px rgba(0,0,0,.4);}
+  #toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--accent);border:1px solid var(--accent);color:var(--on-accent);padding:11px 20px;border-radius:11px;font-size:13px;opacity:0;transition:.25s;pointer-events:none;z-index:100000;box-shadow:0 10px 30px -10px rgba(0,0,0,.4);}
   #toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
   @media (max-width:1200px){ .kpis{grid-template-columns:repeat(3,1fr);} }
   /* ★ 가로회전(landscape) 모드 — 낮은 높이 화면 최적화 */
@@ -398,8 +398,15 @@
       return true;
     }catch(e){ return false; }
   })();
-  if(window.__CARO_INFRAME){ var _lg=document.getElementById('loginGate'); if(_lg) _lg.style.display='none'; }
+  if(window.__CARO_INFRAME){ var _lg=document.getElementById('loginGate'); if(_lg) _lg.style.display='none';
+    /* ★[v108.1] 관제센터 안에 품겼을 땐 상단바의 로고·시계·관리자·로그아웃이 바깥 헤더와 겹쳐 두 번 보이므로 숨긴다(알림·테마 버튼만 남김) */
+    document.documentElement.classList.add('inframe'); }
 </script>
+<style>
+  html.inframe .topbar .brand, html.inframe .topbar .conn, html.inframe .topbar .clock,
+  html.inframe .topbar .admin, html.inframe .topbar .logout-btn{display:none!important;}
+  html.inframe .topbar{padding-top:6px;padding-bottom:6px;justify-content:flex-end;}
+</style>
 <div class="wrap">
   <!-- TOP BAR -->
   <div class="topbar">
@@ -1931,7 +1938,7 @@
   var ADMIN_EMAIL = 'caro.mobility.official@gmail.com';
   var fsStarted = false;
   function startOnce(){ if(fsStarted) return; fsStarted = true; startFirestore(); }
-  function showGate(msg){ var g=document.getElementById('loginGate'); if(g) g.style.display='flex';
+  function showGate(msg){ var g=document.getElementById('loginGate'); if(g) g.style.display='flex'; var b=document.getElementById('lg-btn'); if(b) b.textContent='로그인';
     var e=document.getElementById('lg-err'); if(e) e.textContent = msg||''; }
   function hideGate(){ var g=document.getElementById('loginGate'); if(g) g.style.display='none'; }
   function doLogin(){
@@ -1982,7 +1989,7 @@
               : '운영 관리 권한이 없습니다 — 최고관리자에게 권한을 요청하세요'); }
           }
         }).catch(function(){ if(!window.__CARO_INFRAME){ FN.signOut(A); showGate('권한 확인 실패 — 다시 시도하세요'); } });
-      } else { if(!window.__CARO_INFRAME) showGate(''); }   /* iframe(관제센터)에선 로그인창 안 띄우고 공유 세션 복원을 기다림 */
+      } else { if(!window.__CARO_INFRAME){ var g=document.getElementById('loginGate'); if(g) g.style.display='flex'; var b=document.getElementById('lg-btn'); if(b) b.textContent='로그인'; } }   /* iframe(관제센터)에선 로그인창 안 띄우고 공유 세션 복원을 기다림. ★[v108.1] 권한 거부 직후의 안내문을 지우지 않는다 */
     });
     document.getElementById('lg-btn').addEventListener('click', doLogin);
     document.getElementById('lg-pw').addEventListener('keydown', function(e){ if(e.key==='Enter') doLogin(); });

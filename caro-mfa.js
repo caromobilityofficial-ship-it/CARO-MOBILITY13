@@ -185,7 +185,7 @@
       clearInterval(iv);
       var fs = []; try{ fs = FN().multiFactor(u).enrolledFactors || []; }catch(e){}
       if(fs.length) return;
-      var b = mk('div', 'position:fixed;left:50%;bottom:14px;transform:translateX(-50%);z-index:' + (Z - 2) + ';background:#3a2f12;border:1px solid #c9a227;color:#f3e2a6;border-radius:10px;padding:9px 14px;font-size:13px;display:flex;gap:10px;align-items:center;max-width:94vw;font-family:-apple-system,"Noto Sans KR","Malgun Gothic",sans-serif;');
+      var b = mk('div', 'position:fixed;left:50%;bottom:78px;transform:translateX(-50%);z-index:' + (Z - 2) + ';background:#3a2f12;border:1px solid #c9a227;color:#f3e2a6;border-radius:10px;padding:9px 14px;font-size:13px;display:flex;gap:10px;align-items:center;max-width:94vw;font-family:-apple-system,"Noto Sans KR","Malgun Gothic",sans-serif;');
       b.appendChild(mk('span', '', '🔐 2단계 인증이 꺼져 있습니다'));
       var go = mk('button', BTN + 'background:#c9a227;color:#15161a;padding:6px 12px;', '설정'); go.type = 'button'; go.addEventListener('click', function(){ openSetup(); });
       var x = mk('button', BTN + 'background:none;color:#f3e2a6;padding:6px 8px;', '✕'); x.type = 'button'; x.addEventListener('click', function(){ if(b.parentNode) b.parentNode.removeChild(b); });

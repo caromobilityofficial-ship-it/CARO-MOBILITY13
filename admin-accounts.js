@@ -282,7 +282,10 @@
     });
     render(window.__caroAccts||[]);
     if(!ready()) return false;
-    if(!(window.caroPerms&&window.caroPerms.super)){ return !!(window.caroPerms); }   /* ★[v108] 직원 계정 목록은 최고관리자만 (규칙상 직원은 읽기 거부 → 재시도 폭주 방지) */
+    /* ★[v108.1] 로그인(권한 확정) 전엔 계속 기다리고, 확정 뒤 최고관리자일 때만 한 번 구독 (v108 은 확정 전에 멈춰 목록이 늘 비어 있었다) */
+    if(!(window.caroPerms&&window.caroPerms.ready)) return false;
+    if(!window.caroPerms.super) return true;   /* 직원 계정 목록은 최고관리자만 (규칙상 직원은 읽기 거부) */
+    if(wire._subbed) return true; wire._subbed=true;
     var FN=window.FB_FN, db=window.FB_DB;
     try{
       FN.onSnapshot(FN.collection(db,'admin_accounts'), function(snap){
@@ -294,6 +297,6 @@
     return true;
   }
   if(!wire()){ var t=setInterval(function(){ if(wire()) clearInterval(t); },400); setTimeout(function(){clearInterval(t);},60000); }
-  document.addEventListener('caro-perms', function(){ render(window.__caroAccts||[]); });
+  document.addEventListener('caro-perms', function(){ wire(); });   /* 로그인 뒤 권한이 확정되면 구독 시작(wire 가 render 도 한다) */
   console.log('[계정] ✅ 관리자 계정·권한 관리 v2 (이메일 연결 + 차량/요금/공지/예약)');
 })();
