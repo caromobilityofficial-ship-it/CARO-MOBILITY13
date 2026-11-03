@@ -166,7 +166,7 @@
     var n=acc.concat(inq).filter(function(d){ return st(d)==='new'; }).length + alerts.filter(function(a){ return !a.read; }).length;
     var b=document.getElementById('ib-badge'); if(b){ b.textContent=n; b.style.display=n?'inline-block':'none'; }
     var na=acc.filter(function(d){ return st(d)==='new'; }).length;
-    try{ document.title=(na?'🚨('+na+') ':'')+document.title.replace(/^🚨\(\d+\)\s*/,''); }catch(e){}
+    try{ document.title=(na?'🚨('+na+') ':'')+document.title.replace(/^(?:🚨)?\(\d+\)\s*/,''); }catch(e){}
   }
 
   /* ── 렌더 ── */

@@ -39,7 +39,7 @@
   }
 
   function suspOf(uid){ var s=susps.find(function(x){ return x._id===uid; }); if(!s||s.active===false) return null; var t=Number(s.untilTs)||Date.parse(s.until)||0; return (s.requiresApproval===true||s.habitual===true||t>Date.now())?s:null; }
-  function unpaidOf(uid){ return debts.filter(function(d){ return d.userId===uid && (d.status==='unpaid'||d.status==='due'); }); }
+  function unpaidOf(uid){ return debts.filter(function(d){ var st=d.status||'unpaid'; return d.userId===uid && (st==='unpaid'||st==='due'); }); }   /* ★[v108.2] 미납·정지 탭과 같은 기준(status 없음 = 미납) */
   function licOf(u){ var l=u.license; if(l&&typeof l==='object'&&l.number) return String(l.number); if(typeof l==='string'&&l) return l; return u.licenseText||''; }
   function phoneOf(u){ return u.phoneFull||u.phone||u.phoneE164||''; }
   function nameOf(u){ return u.name||u.id||(u.email?u.email.split('@')[0]:'회원'); }
@@ -97,16 +97,19 @@
     if(a==='hist'){ var c=document.getElementById('mb-'+uid); if(c) c.classList.toggle('open'); return; }
     if(a==='charge'){ if(window.caroOpenCharge) window.caroOpenCharge({ uid:uid, name:nameOf(u), email:u.email||'' }); else notify('추가 청구 모듈이 로드되지 않았습니다'); return; }
     if(a==='susp'){
-      var reason=window.prompt('정지 사유 (고객 앱에 표시됩니다)', '운영팀 확인 필요 · 고객센터로 연락 주세요'); if(reason===null) return;
-      var days=window.prompt('정지 기간(일). 비워 두면 직원이 해제할 때까지', ''); if(days===null) return;
+      caroPrompt('정지 사유 (고객 앱에 표시됩니다)', '운영팀 확인 필요 · 고객센터로 연락 주세요').then(function(reason){ if(reason===null) return;
+      caroPrompt('정지 기간(일). 비워 두면 직원이 해제할 때까지', '').then(function(days){ if(days===null) return;
       var n=parseInt(days,10); var data={ userId:uid, userName:nameOf(u), idName:u.email||u.id||'', license:licOf(u), active:true, reason:reason, createdAt:new Date().toISOString(), heldBy:me() };
       if(n>0){ data.untilTs=Date.now()+n*86400000; data.until=new Date(data.untilTs).toISOString(); data.requiresApproval=false; } else { data.untilTs=null; data.until=null; data.requiresApproval=true; }
       FN.setDoc(FN.doc(db,'suspensions',uid),data,{merge:true}).then(function(){ notify('이용 정지를 적용했습니다'); }).catch(function(e){ notify('정지 실패: 권한 확인'); console.error(e); });
+      });
+      });
       return;
     }
     if(a==='unsusp'){
-      if(!window.confirm('정지를 해제할까요?')) return;
+      caroConfirm('정지를 해제할까요?').then(function(ok){ if(!ok) return;
       FN.setDoc(FN.doc(db,'suspensions',uid),{ active:false, liftedAt:new Date().toISOString(), liftedBy:me() },{merge:true}).then(function(){ notify('정지를 해제했습니다'); }).catch(function(e){ notify('해제 실패: 권한 확인'); console.error(e); });
+      });
     }
   }
 

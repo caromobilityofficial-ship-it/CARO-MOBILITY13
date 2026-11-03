@@ -167,17 +167,20 @@
     }
     show();
     on.onclick=function(){
-      var reason=window.prompt('정지 사유 (고객 앱에 표시됩니다)', '반납 지연 · 고객센터 연락 요망');
+      caroPrompt('정지 사유 (고객 앱에 표시됩니다)', '반납 지연 · 고객센터 연락 요망').then(function(reason){
       if(reason===null) return;
-      var days=window.prompt('정지 기간(일). 비워 두면 직원이 해제할 때까지 무기한', '');
+      caroPrompt('정지 기간(일). 비워 두면 직원이 해제할 때까지 무기한', '').then(function(days){
       if(days===null) return;
       var n=parseInt(days,10); var data={ userId:uid, userName:d.userName||'', idName:d.userEmail||'', active:true, reason:reason, createdAt:new Date().toISOString(), heldBy:(window.FB_AUTH&&window.FB_AUTH.currentUser&&window.FB_AUTH.currentUser.email)||'staff', bookNo:d.bookNo||'' };
       if(n>0){ data.untilTs=Date.now()+n*86400000; data.until=new Date(data.untilTs).toISOString(); data.requiresApproval=false; } else { data.untilTs=null; data.until=null; data.requiresApproval=true; }
       FN.setDoc(FN.doc(db,'suspensions',uid),data,{merge:true}).then(function(){ notify('이용 정지를 적용했습니다 — 이 고객은 예약·문 열기가 막힙니다'); show(); }).catch(function(e){ notify('정지 실패: 권한 확인'); console.error(e); });
+      });
+      });
     };
     off.onclick=function(){
-      if(!window.confirm('이 고객의 이용 정지를 해제할까요?')) return;
+      caroConfirm('이 고객의 이용 정지를 해제할까요?').then(function(ok){ if(!ok) return;
       FN.setDoc(FN.doc(db,'suspensions',uid),{ active:false, liftedAt:new Date().toISOString(), liftedBy:(window.FB_AUTH&&window.FB_AUTH.currentUser&&window.FB_AUTH.currentUser.email)||'staff' },{merge:true}).then(function(){ notify('정지를 해제했습니다'); show(); }).catch(function(e){ notify('해제 실패: 권한 확인'); console.error(e); });
+      });
     };
   }
 

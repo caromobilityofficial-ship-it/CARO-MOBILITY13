@@ -45,17 +45,19 @@
     if(typeof window.FB_CALL!=='function'){ notify('서버 함수 연결이 준비되지 않았습니다'); return; }
     var kind=ov.querySelector('#chKind').value, amt=Math.round(Number(ov.querySelector('#chAmt').value)||0), memo=ov.querySelector('#chMemo').value.trim();
     if(!(amt>0)){ notify('금액을 입력해 주세요'); return; }
-    if(!window.confirm((KINDS.find(function(k){return k[0]===kind;})||['','기타'])[1]+' '+amt.toLocaleString()+'원을 청구할까요?')) return;
+    caroConfirm((KINDS.find(function(k){return k[0]===kind;})||['','기타'])[1]+' '+amt.toLocaleString()+'원을 청구할까요?').then(function(ok){ if(!ok) return;
     var btn=ov.querySelector('#chGo'); btn.disabled=true;
     var data={ kind:kind, amount:amt, memo:memo }; if(target.bookNo) data.bookNo=target.bookNo; else data.uid=target.uid;
     window.FB_CALL('staffCharge', data).then(function(r){ notify('청구 등록 완료 · '+(r&&r.amount||amt).toLocaleString()+'원 (고객 앱 미납에 표시됨)'); ov.classList.remove('on'); })
       .catch(function(e){ notify('등록 실패: '+((e&&e.message)||(e&&e.code)||e)); })
       .then(function(){ btn.disabled=false; });
+    });
   }
   window.caroVoidCharge=function(debtId){
     if(typeof window.FB_CALL!=='function'){ notify('서버 함수 연결이 준비되지 않았습니다'); return; }
-    var reason=window.prompt('청구 취소 사유', '잘못 등록'); if(reason===null) return;
+    caroPrompt('청구 취소 사유', '잘못 등록').then(function(reason){ if(reason===null) return;
     window.FB_CALL('staffCharge',{ action:'void', debtId:debtId, reason:reason }).then(function(){ notify('청구를 취소했습니다'); }).catch(function(e){ notify('취소 실패: '+((e&&e.message)||(e&&e.code)||e)); });
+    });
   };
 
   /* 예약 관리 모달 하단에 '추가 청구' 버튼 */

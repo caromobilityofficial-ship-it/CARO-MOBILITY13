@@ -217,12 +217,13 @@
   /* ── 삭제 / 활성 토글 ── */
   window.delAcct=function(email){
     if(!ready()) return;
-    if(!confirm('이 직원 계정의 권한을 삭제할까요?\n('+email+')')) return;
+    caroConfirm('이 직원 계정의 권한을 삭제할까요?\n('+email+')',{danger:true}).then(function(ok){ if(!ok) return;
     var FN=window.FB_FN, db=window.FB_DB;
     var viaServer=(typeof window.FB_CALL==='function')?window.FB_CALL('setAdminAccount',{email:email, remove:true}):Promise.reject({code:'functions/not-found'});
     viaServer.catch(function(e){ if(e && /not-found|unavailable/.test(String(e.code||'')) && !/계정/.test(String(e.message||''))) return FN.deleteDoc(FN.doc(db,'admin_accounts',email)); throw e; })
       .then(function(){ T('삭제되었습니다'); })
       .catch(function(e){ console.error(e); T('삭제 실패 — '+((e&&e.message)||'')); });
+    });
   };
   window.toggleAcctActive=function(email,next){
     if(!ready()) return;

@@ -190,7 +190,7 @@
         var cv=document.createElement('canvas'); cv.width=w; cv.height=h;
         cv.getContext('2d').drawImage(im,0,0,w,h);
         var data=cv.toDataURL('image/jpeg',0.82);
-        EDIT.img=data; document.getElementById('mrmImg').src=data;
+        EDIT.img=data; var _im=document.getElementById('mrmImg'); _im.src=data; _im.style.visibility='visible';
       };
       im.src=rd.result;
     };
@@ -258,11 +258,12 @@
   function delCar(){
     if(!EDIT.id){ mrCloseEdit(); return; }
     if(!ready()){ T('연결 대기 중'); return; }
-    if(!window.confirm('이 차량을 삭제할까요? 고객 앱에서도 사라집니다.')) return;
+    caroConfirm('이 차량을 삭제할까요? 고객 앱에서도 사라집니다.',{danger:true}).then(function(ok){ if(!ok) return;
     var FN=window.FB_FN, db=window.FB_DB;
     FN.deleteDoc(FN.doc(db,EDIT.col,EDIT.id))
       .then(function(){ T('차량 삭제됨'); mrCloseEdit(); })
       .catch(function(e){ console.error('[월렌트] 삭제 실패',e); T('삭제 실패 — 권한 확인'); });
+    });
   }
 
   /* ── 실시간 연결 ── */

@@ -199,29 +199,31 @@
   /* ── 관리 작업 ── */
   window.caroDebtPay=function(id){
     if(!ready()||!id) return;
-    if(!confirm('이 미납 건을 납부 처리할까요?\n\n※ 고객이 앱에서 토스로 결제하면 자동으로 납부 처리됩니다. 현금·계좌이체 등 앱 밖에서 받은 경우에만 눌러 주세요.')) return;
+    caroConfirm('이 미납 건을 납부 처리할까요?\n\n※ 고객이 앱에서 토스로 결제하면 자동으로 납부 처리됩니다. 현금·계좌이체 등 앱 밖에서 받은 경우에만 눌러 주세요.').then(function(ok){ if(!ok) return;
     var db=window.FB_DB, FN=window.FB_FN;
     try{
       FN.setDoc(FN.doc(db,'unpaid_debts',id),{ status:'paid', paidAt:new Date().toISOString(), paidBy:_who() },{merge:true})
         .then(function(){ if(window.toast) toast('납부 처리되었습니다.'); })
         .catch(function(e){ if(window.toast) toast('처리 실패: 권한/규칙을 확인하세요.'); console.warn(e); });
     }catch(e){ console.warn(e); }
+    });
   };
   window.caroDebtUnsuspend=function(uid){
     if(!ready()||!uid) return;
-    if(!confirm('이 사용자의 이용 정지를 해제(이용 허용)할까요?')) return;
+    caroConfirm('이 사용자의 이용 정지를 해제(이용 허용)할까요?').then(function(ok){ if(!ok) return;
     var db=window.FB_DB, FN=window.FB_FN;
     try{
       FN.setDoc(FN.doc(db,'suspensions',uid),{ active:false, liftedAt:new Date().toISOString(), liftedBy:_who() },{merge:true})
         .then(function(){ if(window.toast) toast('이용을 허용했습니다.'); })
         .catch(function(e){ if(window.toast) toast('처리 실패: 권한/규칙을 확인하세요.'); console.warn(e); });
     }catch(e){ console.warn(e); }
+    });
   };
   /* 상습 미납자 수동 이용정지(관리자 승인 전까지) */
   window.caroDebtHold=function(uid){
     if(!ready()||!uid) return;
     var m=habitualMap()[uid]||{}, cnt=m.count||0;
-    if(!confirm('이 사용자를 상습 미납으로 이용 정지할까요?\n(누적 '+cnt+'회 · 관리자가 다시 허용하기 전까지 차량 이용 불가)')) return;
+    caroConfirm('이 사용자를 상습 미납으로 이용 정지할까요?\n(누적 '+cnt+'회 · 관리자가 다시 허용하기 전까지 차량 이용 불가)',{danger:true}).then(function(ok){ if(!ok) return;
     var info=null; for(var i=0;i<debts.length;i++){ if(debts[i].userId===uid){ info=debts[i]; break; } }
     var db=window.FB_DB, FN=window.FB_FN;
     try{
@@ -234,6 +236,7 @@
         .then(function(){ if(window.toast) toast('상습 미납으로 이용 정지를 적용했습니다.'); })
         .catch(function(e){ if(window.toast) toast('처리 실패: 권한/규칙을 확인하세요.'); console.warn(e); });
     }catch(e){ console.warn(e); }
+    });
   };
 
   /* ── 구독 ── */

@@ -121,8 +121,9 @@
         line('✅ 2단계 인증이 켜져 있습니다. (' + fs.map(function(x){ return x.displayName || '인증앱'; }).join(', ') + ')', '#4db183');
         line('로그인할 때마다 인증 앱의 6자리를 입력해야 합니다.');
         btn('등록 해제', GRAY, function(){
-          if(!confirm('2단계 인증을 해제할까요?\n해제하면 비밀번호만으로 로그인됩니다.')) return;
+          caroConfirm('2단계 인증을 해제할까요?\n해제하면 비밀번호만으로 로그인됩니다.',{danger:true}).then(function(ok){ if(!ok) return;
           Promise.resolve(mf.unenroll(fs[0])).then(render).catch(function(e){ status(msgOf(e)); });
+          });
         });
         btn('닫기', GOLD, ov.close);
         return;

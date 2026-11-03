@@ -71,24 +71,21 @@
     var map = window.CARO_DEVICE_MAP || {};
     var dev = map[String(carId)] || map[carId];
     if(!dev) return;                                   // IoT 미연결 차량 — 조용히 넘어간다
-    if(!window.confirm('강제 반납했습니다.\n이 차량의 문도 지금 잠글까요?\n(기기 ' + dev + ')')) return;
+    caroConfirm('강제 반납했습니다.\n이 차량의 문도 지금 잠글까요?\n(기기 ' + dev + ')').then(function(ok){ if(!ok) return;
     var f=FN(), db=DB();
     if(!f || !db || typeof f.setDoc!=='function') { notify('⚠ 잠금 명령을 보낼 수 없습니다 (연결 대기)'); return; }
     var cmdId='cmd_'+Date.now()+'_'+Math.random().toString(36).slice(2,8);
-    /* ★[14차] 서버 함수(staffCommand) 우선, 배포 전(not-found)이면 예전처럼 직접 쓰기 */
-    var direct=function(){ return f.setDoc(f.doc(db,'devices',dev,'commands',cmdId), {
-      type:'lock', status:'pending', issuedBy:'admin', issuedByEmail:me(),
-      issuedAt:(typeof f.serverTimestamp==='function'?f.serverTimestamp():new Date()), timestamp:Date.now()
-    }); };
     /* ★[v108] 잠금 명령은 서버 함수만 (규칙이 직접 쓰기를 막음). 관제 권한이 없는 직원은 서버가 거부 → 안내만 */
     var queued=(typeof window.FB_CALL==='function')
       ? window.FB_CALL('staffCommand',{deviceId:dev,type:'lock'})
       : Promise.reject({code:'unavailable'});
     queued.then(function(){ notify('🔒 문 잠금 명령 전송 — 주차 절전 중이면 최대 80초 걸립니다'); })
       .catch(function(e){ notify('⚠ 잠금 명령 전송 실패: '+((e&&e.code)||e)); });
+    });
   }
 
   function hasFn(){ return typeof window.FB_CALL==='function'; }
+  function localStamp(){ var d=new Date(),p=function(n){return n<10?'0'+n:n;}; return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes()); }   /* ★[v108.2] 메모의 시각은 한국 시간으로 (toISOString 은 UTC) */
   function isNotFound(e){ return /not-found|unimplemented/.test((e&&e.code)||'') && /function|not found/i.test(((e&&e.code)||'')+((e&&e.message)||'')); }
 
   /* ★[23차] 강제 반납 = 서버 staffReturn — 고객 반납과 같은 정산(초과요금→미납 기록)·잠금 명령·availability 삭제·사유 기록.
@@ -96,10 +93,12 @@
   function forceReturn(no, btns){
     if(!ready()||!no) { notify('연결 준비 중입니다'); return; }
     var f=FN(), db=DB(), t=nowIso();
-    var reason=window.prompt('강제 반납 사유를 적어 주세요 (고객에게는 보이지 않고 기록용)', '고객 연락 두절');
+    caroPrompt('강제 반납 사유를 적어 주세요 (고객에게는 보이지 않고 기록용)', '고객 연락 두절').then(function(reason){
     if(reason===null){ return; }
-    var waive=false;
-    if(hasFn()) waive=window.confirm('초과 이용 요금을 면제할까요?\n[확인] = 면제(차량 고장·회사 귀책 등)   [취소] = 규정대로 청구');
+    var waiveP=hasFn()
+      ? caroConfirm('초과 이용 요금을 면제할까요?\n(면제 = 차량 고장·회사 귀책 등일 때만)',{ok:'면제',cancel:'규정대로 청구'})
+      : Promise.resolve(false);
+    waiveP.then(function(waive){ waive=!!waive;
     btns.forEach(function(b){ b.disabled=true; });
     var legacy=function(){
       return f.getDoc(f.doc(db,'reservations',no)).then(function(s){
@@ -107,7 +106,7 @@
         if(d.returned){ notify('이미 반납 처리된 예약입니다'); return null; }
         if(d.cancelled){ notify('취소된 예약은 반납 처리할 수 없습니다'); return null; }
         var patch={ returned:true, returnedAt:t, forceReturned:true, forceReturnedBy:me(), forceReturnedAt:t, forceReason:reason,
-                    adminNote:((d.adminNote?d.adminNote+'\n':'')+'['+t.slice(0,16).replace('T',' ')+'] 관제 강제 반납 처리 ('+me()+') '+reason), clientUpdatedAt:t };
+                    adminNote:((d.adminNote?d.adminNote+'\n':'')+'['+localStamp()+'] 관제 강제 반납 처리 ('+me()+') '+reason), clientUpdatedAt:t };
         return f.setDoc(f.doc(db,'reservations',no), patch, {merge:true}).then(function(){
           logAlert('force_return', no, { userId:d.userId||'', carName:(d.car&&d.car.name)||'' });
           notify('✅ '+no+' 강제 반납 처리 완료 (서버 함수 미배포 — 초과요금·가용성은 수동 확인 필요)');
@@ -125,6 +124,8 @@
       : legacy();
     p.catch(function(e){ notify('처리 실패: '+((e&&e.message)||(e&&e.code)||e)); console.error(e); })
      .then(function(){ btns.forEach(function(b){ b.disabled=false; }); refreshModal(no); });
+    });
+    });
   }
 
   /* ★[23차] 예약 취소 = 서버 cancelReservation(직원) — 환불률을 직원이 정하고(기본: 고객 규정) 토스 환불까지 서버가 처리.
@@ -132,9 +133,9 @@
   function forceCancel(no, btns){
     if(!ready()||!no) { notify('연결 준비 중입니다'); return; }
     var f=FN(), db=DB(), t=nowIso();
-    var reason=window.prompt('취소 사유 (기록용)', '고객 요청');
+    caroPrompt('취소 사유 (기록용)', '고객 요청').then(function(reason){
     if(reason===null) return;
-    var pctIn=window.prompt('환불 비율(%)을 적어 주세요. 비워 두면 고객 취소 규정대로 계산합니다.\n(예: 100 = 전액 환불, 0 = 환불 없음)', '');
+    caroPrompt('환불 비율(%)을 적어 주세요. 비워 두면 고객 취소 규정대로 계산합니다.\n(예: 100 = 전액 환불, 0 = 환불 없음)', '').then(function(pctIn){
     if(pctIn===null) return;
     var pct=(pctIn.trim()==='')?null:Math.max(0,Math.min(100,parseInt(pctIn,10)||0));
     btns.forEach(function(b){ b.disabled=true; });
@@ -144,7 +145,7 @@
         if(d.cancelled){ notify('이미 취소된 예약입니다'); return null; }
         if(d.returned){ notify('반납 완료된 예약은 취소할 수 없습니다'); return null; }
         var patch={ cancelled:true, status:'cancelled', cancelledAt:t, cancelledBy:'admin:'+me(), cancelReason:reason, manualRefund:true,
-                    adminNote:((d.adminNote?d.adminNote+'\n':'')+'['+t.slice(0,16).replace('T',' ')+'] 관제 예약 취소 ('+me()+') — 환불은 토스 콘솔에서 수동 처리'), clientUpdatedAt:t };
+                    adminNote:((d.adminNote?d.adminNote+'\n':'')+'['+localStamp()+'] 관제 예약 취소 ('+me()+') — 환불은 토스 콘솔에서 수동 처리'), clientUpdatedAt:t };
         return f.setDoc(f.doc(db,'reservations',no), patch, {merge:true}).then(function(){
           logAlert('force_cancel', no, { userId:d.userId||'', manualRefund:true, total:d.total||0 });
           notify('✅ '+no+' 취소 처리 완료 — 결제된 금액은 토스 콘솔에서 수동 환불하세요 (서버 함수 미배포)');
@@ -160,6 +161,8 @@
       : legacy();
     p.catch(function(e){ notify('처리 실패: '+((e&&e.message)||(e&&e.code)||e)); console.error(e); })
      .then(function(){ btns.forEach(function(b){ b.disabled=false; }); refreshModal(no); });
+    });
+    });
   }
 
   /* 예약 관리 모달 하단에 버튼 주입 */

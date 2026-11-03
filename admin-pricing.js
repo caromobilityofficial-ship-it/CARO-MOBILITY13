@@ -28,7 +28,7 @@
     try{
       var db=window.FB_DB, fn=window.FB_FN;
       if(db && fn && fn.setDoc && fn.doc){
-        return fn.setDoc(fn.doc(db,'settings','pricing'), {season:cfg.season, models:cfg.models}, {merge:true});
+        return fn.setDoc(fn.doc(db,'settings','pricing'), {season:cfg.season, models:cfg.models}, {mergeFields:['season','models']});   /* ★[v108.2] merge:true 는 비운 요금을 서버에서 못 지웠다 → 두 필드를 통째로 교체 */
       }
     }catch(e){}
     return null;
@@ -128,7 +128,8 @@
     if(o) o.classList.toggle('on', cfg.season!=='peak');
   }
   function collect(){
-    var models={};
+    var models=Object.assign({},cfg.models);   /* ★[v108.2] 검색으로 가려진 차종의 요금은 그대로 두고, 화면에 보이는 차종만 새로 쓴다 */
+    ov.querySelectorAll('.cpx-card').forEach(function(c){ var k=c.getAttribute('data-card'); if(k) delete models[k]; });
     ov.querySelectorAll('.cpx-fld input').forEach(function(inp){
       var nm=inp.getAttribute('data-nm'), k=inp.getAttribute('data-k');
       var v=parseInt(inp.value,10);
@@ -264,7 +265,7 @@
   }
   function watchAuth(){
     try{ var A=window.FB_AUTH, fn=window.FB_FN;
-      if(A && fn && typeof fn.onAuthStateChanged==='function' && !watchAuth.__h){ watchAuth.__h=true; fn.onAuthStateChanged(A, place); }
+      if(A && fn && typeof fn.onAuthStateChanged==='function' && !watchAuth.__h){ watchAuth.__h=true; fn.onAuthStateChanged(A, function(u){ if(u){ try{ loadRemote(syncApplied); }catch(e){} } place(); }); }   /* ★[v108.2] 로그인되면 서버 요금 설정을 바로 받아 표·성수기 칩을 맞춘다 */
     }catch(e){}
   }
 

@@ -38,7 +38,9 @@
 
   var STATUS = {
     received:  { label:'접수',   cls:'rp-st-new'  },
+    'new':     { label:'접수',   cls:'rp-st-new'  },   /* ★[v108.2] 접수함(admin-inbox)이 쓰는 값도 같은 뜻으로 */
     progress:  { label:'처리중', cls:'rp-st-prog' },
+    in_progress:{ label:'처리중', cls:'rp-st-prog' },
     done:      { label:'완료',   cls:'rp-st-done' }
   };
 
@@ -183,7 +185,7 @@
       add('장소', r.location);
       add('차량', r.vehicle);
       add('사고종류', r.accidentType);
-      add('부상', r.injury + (r.injuryDetail ? ' — '+r.injuryDetail : ''));
+      add('부상', r.injury ? r.injury + (r.injuryDetail ? ' — '+r.injuryDetail : '') : (r.injuryDetail||''));
       add('경찰신고', r.police);
       add('상대차량', r.otherVehicle);
       add('상대연락처', r.otherPhone);

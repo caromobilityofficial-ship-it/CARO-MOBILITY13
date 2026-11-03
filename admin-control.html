@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&family=Saira:wght@500;600;700&display=swap" rel="stylesheet">
 <script type="module" src="firebase-config.js?v=5"></script>
+<script src="caro-dialog.js"></script>   <!-- ★[v108] 앱 웹뷰용 확인/입력창 (native confirm 대체) -->
 <style>
 /* ═══════════ CARO 관제센터 — 다크 럭셔리 테마 (v1.0 재설계) ═══════════ */
 :root{
@@ -310,10 +311,10 @@ body.ops .kpis, body.ops .main, body.ops .bottom{display:none!important;}
     <div class="card">
       <h3><span class="dot"></span>원격 제어</h3>
       <div class="ctrl">
-        <button class="cbtn" onclick="if(confirm('차량 문을 원격으로 엽니다. 실행할까요?')) sendCmd('unlock')">🔓 문 열기</button>
+        <button class="cbtn" onclick="caroConfirm('차량 문을 원격으로 엽니다. 실행할까요?').then(function(ok){ if(ok) sendCmd('unlock'); })">🔓 문 열기</button>
         <button class="cbtn" onclick="sendCmd('lock')">🔒 문 잠금</button>
         <button class="cbtn warn" onclick="sendCmd('hazard')">⚠ 비상등</button>
-        <button class="cbtn" id="hazackbtn" style="display:none" onclick="if(confirm('차량 비상등이 실제로 꺼져 있는 것을 확인했습니까? (누르지 않고 상태만 확정합니다)')) sendCmd('hazard_off',{value:'ack'})">✔ 비상등 꺼짐 확인</button>
+        <button class="cbtn" id="hazackbtn" style="display:none" onclick="caroConfirm('차량 비상등이 실제로 꺼져 있는 것을 확인했습니까? (누르지 않고 상태만 확정합니다)').then(function(ok){ if(ok) sendCmd('hazard_off',{value:'ack'}); })">✔ 비상등 꺼짐 확인</button>
         <button class="cbtn warn" onclick="hornCmd()">📣 경적 (0.5초)</button>
         <button class="cbtn warn" onclick="immobOn()">⛔ 시동 차단</button>
         <button class="cbtn" onclick="immobOff()">✅ 차단 해제</button>
@@ -799,24 +800,28 @@ function sendCmd(type,extra){
 function calSet(f){ sendCmd('setfloor',{value:String(f)}); }
 function calReset(){ sendCmd('resetfloor'); }
 /* ═══════════ [v9.2] 시동 차단 ═══════════ */
-function hornCmd(){ if(!confirm('경적을 0.5초 울립니다. 실행할까요?')) return; sendCmd('horn',{value:'500'}); }
+function hornCmd(){ caroConfirm('경적을 0.5초 울립니다. 실행할까요?').then(function(ok){ if(!ok) return; sendCmd('horn',{value:'500'}); }); }
 function immobOn(){
   var v=FLEET.find(function(x){return x.id===selId;}); if(!v){ toast('차량을 먼저 선택'); return; }
   if(!v.online){ toast('오프라인 차량은 차단 명령이 전달되지 않습니다'); return; }
   if(v.acc || v.moving || (typeof v.speed==='number' && v.speed>2)){ toast('⛔ 주행/시동 중에는 차단할 수 없습니다 (안전)'); return; }
-  if(!confirm(v.name+' 시동을 차단할까요?\n(스타터 신호를 끊어 시동이 걸리지 않게 합니다. 주행 중 차량엔 영향 없음)')) return;
+  caroConfirm(v.name+' 시동을 차단할까요?\n(스타터 신호를 끊어 시동이 걸리지 않게 합니다. 주행 중 차량엔 영향 없음)',{danger:true}).then(function(ok){ if(!ok) return;
   sendCmd('immobilize');
+  });
 }
 /* ★[v9.8 10차 검수] 입력 극성(점퍼) 교정 — 펌웨어엔 setinmode 가 있는데 화면에 수단이 없었다.
    점퍼(JP4·JP5)와 설정이 어긋나면 '문 열림/닫힘' 이 반대로 보인다. 설치 현장에서 바로 고치는 자리. */
 function inModeCmd(){
   var v=FLEET.find(function(x){return x.id===selId;}); if(!v){ toast('차량을 먼저 선택'); return; }
   var cur=(typeof v.inMode==='number')?v.inMode:0;
-  var a=prompt('입력1 방식 — 0 = 12V 인가식(점퍼 없음) / 1 = 접지식(점퍼 꽂음)', String(cur&1)); if(a===null) return;
-  var b=prompt('입력2 방식 — 0 = 12V 인가식 / 1 = 접지식', String((cur>>1)&1)); if(b===null) return;
+  caroPrompt('입력1 방식 — 0 = 12V 인가식(점퍼 없음) / 1 = 접지식(점퍼 꽂음)', String(cur&1)).then(function(a){ if(a===null) return;
+  caroPrompt('입력2 방식 — 0 = 12V 인가식 / 1 = 접지식', String((cur>>1)&1)).then(function(b){ if(b===null) return;
   a=(a.trim()==='1')?'1':'0'; b=(b.trim()==='1')?'1':'0';
-  if(!confirm('입력 극성을 IN1='+(a==='1'?'접지식':'12V 인가식')+', IN2='+(b==='1'?'접지식':'12V 인가식')+' 로 설정합니다.\n실제로 꽂은 점퍼와 같아야 합니다.')) return;
+  caroConfirm('입력 극성을 IN1='+(a==='1'?'접지식':'12V 인가식')+', IN2='+(b==='1'?'접지식':'12V 인가식')+' 로 설정합니다.\n실제로 꽂은 점퍼와 같아야 합니다.').then(function(ok){ if(!ok) return;
   sendCmd('setinmode',{value:a+','+b});
+  });
+  });
+  });
 }
 /* ★[v9.8 10차 검수] 원격 재부팅 — 먹통 1차 대응 수단이 화면에 없었다.
    시동차단 중이면 재부팅 뒤 저장값으로 복원된다(immobSaveFail 이 떠 있으면 풀릴 수 있어 경고). */
@@ -825,13 +830,15 @@ function rebootCmd(){
   if(v.acc||v.moving){ toast('⛔ 주행/시동 중에는 재부팅하지 않습니다'); return; }
   var w=v.immob?('\n\n⚠ 이 차량은 시동 차단 중입니다. 재부팅 뒤 저장값으로 복원됩니다'
                  +(v.immobSaveFail?' — 다만 지금 "저장 실패" 상태라 차단이 풀릴 수 있습니다.':'.')):'';
-  if(!confirm(v.name+' 단말을 재부팅할까요?\n약 30~60초 동안 오프라인이 됩니다.'+w)) return;
+  caroConfirm(v.name+' 단말을 재부팅할까요?\n약 30~60초 동안 오프라인이 됩니다.'+w,{danger:true}).then(function(ok){ if(!ok) return;
   sendCmd('reboot');
+  });
 }
 function immobOff(){
   var v=FLEET.find(function(x){return x.id===selId;}); if(!v){ toast('차량을 먼저 선택'); return; }
-  if(!confirm(v.name+' 시동 차단을 해제할까요?')) return;
+  caroConfirm(v.name+' 시동 차단을 해제할까요?').then(function(ok){ if(!ok) return;
   sendCmd('release');
+  });
 }
 /* ═══════════ [v9.2] 거점(지오펜스) — caro-config.js 와 동일하게 유지 ═══════════ */
 var STATIONS=(window.CARO_CONFIG&&window.CARO_CONFIG.STATIONS)||[

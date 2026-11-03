@@ -120,7 +120,7 @@
     var FN=window.FB_FN, db=window.FB_DB;
     try{
       FN.onSnapshot(FN.collection(db,'notices'), function(snap){
-        var arr=[]; snap.forEach(function(d){ var x=d.data()||{}; arr.push({id:d.id, title:x.title||'', type:x.type||'', createdAt:x.createdAt||''}); });
+        var arr=[]; snap.forEach(function(d){ var x=d.data()||{}; arr.push({id:d.id, title:x.title||'', type:x.type||'', createdAt:((x.createdAt&&typeof x.createdAt.toDate==='function')?x.createdAt.toDate().toISOString():String(x.createdAt||''))});   /* ★[v108.2] 콘솔/서버가 Timestamp 로 넣은 공지도 목록이 죽지 않게 */ });
         arr.sort(function(a,b){ return (b.createdAt||'').localeCompare(a.createdAt||''); });
         cache=arr; render();
       }, function(err){ console.error('[공지] 리스너 오류', err); });

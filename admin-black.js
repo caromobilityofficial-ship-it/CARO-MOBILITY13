@@ -189,10 +189,11 @@
 
   window.delBlack=function(id){
     if(!ready()) return;
-    if(!confirm('이 블랙 차량을 삭제할까요?')) return;
+    caroConfirm('이 블랙 차량을 삭제할까요?',{danger:true}).then(function(ok){ if(!ok) return;
     var FN=window.FB_FN, db=window.FB_DB;
     FN.deleteDoc(FN.doc(db,'bl_cars',id)).then(function(){ T('삭제되었습니다'); })
       .catch(function(e){ console.error(e); T('삭제 실패'); });
+    });
   };
 
   /* ── 렌더 ── */
