@@ -57,9 +57,10 @@
   }
 
   /* 권한 거부로 죽은 구독을 로그인 후 되살림 */
-  function revive(){
+  function revive(force){
     if(!hasUser()) return;
-    var dead = live.filter(function(i){ return i.denied && !i.active; });
+    if(force) live.forEach(function(i){ if(i.denied && !i.active && !i.dead) i.retries = 0; });   /* 로그인(계정)이 바뀌면 처음부터 다시 */
+    var dead = live.filter(function(i){ return i.denied && !i.active && !i.dead && (i.retries||0) <= 2; });
     if(!dead.length) return;
     console.log('[관제 동기화] 권한거부로 끊긴 구독 ' + dead.length + '건 재연결');
     dead.forEach(function(item){
@@ -85,8 +86,10 @@
         if(code.indexOf('permission') >= 0 || code.indexOf('unauthenticated') >= 0){
           item.active = false;
           item.denied = true;
-          if(hasUser()){
-            setTimeout(function(){ if(item.denied){ item.denied = false; run(item); } }, 800);
+          /* ★[v108] 권한이 정말 없는 구독은 2번만 다시 시도하고 멈춘다 — 예전엔 0.8초마다 영원히 재시도해 Firestore 요청·콘솔 오류가 폭주했다 */
+          item.retries = (item.retries||0) + 1;
+          if(hasUser() && item.retries <= 2){
+            setTimeout(function(){ if(item.denied){ item.denied = false; run(item); } }, 800 * item.retries);
           }
         }
       }
@@ -120,6 +123,7 @@
         return function(){
           var k = pending.indexOf(item);
           if(k >= 0) pending.splice(k, 1);
+          item.active=false; item.denied=false; item.dead=true;
           if(item.unsub){ try{ item.unsub(); }catch(e){} }
         };
       }
@@ -128,7 +132,7 @@
       run(item);
       live.push(item);
       return function(){
-        item.active = false;
+        item.active = false; item.denied=false; item.dead=true;
         if(item.unsub){ try{ item.unsub(); }catch(e){} }
       };
     };
@@ -149,9 +153,9 @@
         if(!authed){
           authed = true;
           /* 인증 토큰이 완전히 반영되도록 아주 짧게 대기 후 실행 */
-          setTimeout(function(){ flush(); revive(); }, 120);
+          setTimeout(function(){ flush(); revive(true); }, 120);
         } else {
-          flush(); revive();
+          flush(); revive(true);
         }
       } else {
         authed = false;

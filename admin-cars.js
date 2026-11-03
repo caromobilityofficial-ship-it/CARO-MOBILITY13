@@ -69,15 +69,17 @@
     if(!ready()){ T('Firestore 연결 대기 중'); return; }
     var name=modal.querySelector('#carName').value.trim();
     if(!name){ T('차량명을 입력하세요'); return; }
-    var FN=window.FB_FN, db=window.FB_DB, refDoc;
-    try{ refDoc=FN.doc(FN.collection(db,'cars')); }catch(e){ T('저장 오류'); return; }
+    if(window.caroCan && !(caroCan('cars')||caroCan('pricing'))){ T('차량 등록은 [차량 관리] 권한이 필요합니다'); return; }
+    var FN=window.FB_FN, db=window.FB_DB, refDoc, newId=String(Date.now());
+    /* ★[v108] 문서 ID 를 숫자로 — 예전엔 무작위 ID 라서 단말(devices.carId)·예약(car.id)과 자동으로 연결되지 않았다 */
+    try{ refDoc=FN.doc(db,'cars',newId); }catch(e){ T('저장 오류'); return; }
     var priceV=parseInt(modal.querySelector('#carPrice').value,10);
     var monthlyV=parseInt(modal.querySelector('#carMonthly').value,10);
     var data={ name:name, plate:modal.querySelector('#carPlate').value.trim(),
       price:(isNaN(priceV)?null:priceV), monthlyPrice:(isNaN(monthlyV)?null:monthlyV),
       status:modal.querySelector('#carStatus').value,
       place:modal.querySelector('#carPlace').value.trim(), image:modal.querySelector('#carImage').value.trim(),
-      grade:'일반', createdAt:(FN.serverTimestamp?FN.serverTimestamp():new Date().toISOString()) };
+      grade:'일반', id:newId, createdAt:(FN.serverTimestamp?FN.serverTimestamp():new Date().toISOString()) };
     FN.setDoc(refDoc,data).then(function(){ T('차량이 등록되었습니다'); closeModal(); })
       .catch(function(e){ console.error('[차량] 저장 실패',e); T('저장 실패 — 권한(cars)을 확인하세요'); });
   };

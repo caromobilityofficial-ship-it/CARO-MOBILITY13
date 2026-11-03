@@ -94,8 +94,7 @@
   function showBlack(){
     document.querySelectorAll('.tabs .tab').forEach(function(x){ x.classList.remove('active'); });
     var b=document.querySelector('.tabs [data-tab="black"]'); if(b) b.classList.add('active');
-    OTHER_TABS.forEach(function(id){ var el=document.getElementById('tab-'+id); if(el) el.classList.add('hide'); });
-    var s=document.getElementById('tab-black'); if(s) s.classList.remove('hide');
+    document.querySelectorAll('section[id^="tab-"]').forEach(function(el){ el.classList.toggle('hide', el.id!=='tab-black'); });   /* ★[v108] 상담·미납·회원·접수함도 같이 숨김 */
   }
 
   /* ── 탭 + 섹션 장착 (1회) ── */

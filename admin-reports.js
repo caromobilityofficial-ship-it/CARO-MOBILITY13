@@ -197,10 +197,11 @@
     }
 
     var photos = '';
-    if(r.photos && r.photos.length){
-      photos = '<div class="rp-row" style="display:block;"><div class="rp-k" style="margin-bottom:6px;">사진 ('+r.photos.length+')</div>'
+    var _ph=(Array.isArray(r.photos)?r.photos:[]).filter(function(s){ return typeof s==='string' && /^(https:\/\/|data:image\/)/i.test(s); });   /* ★[v108] */
+    if(_ph.length){
+      photos = '<div class="rp-row" style="display:block;"><div class="rp-k" style="margin-bottom:6px;">사진 ('+_ph.length+')</div>'
              + '<div class="rp-photos">'
-             + r.photos.map(function(p){ return '<img src="'+esc(p)+'" alt="사진"/>'; }).join('')
+             + _ph.map(function(p){ return '<img src="'+esc(p)+'" alt="사진"/>'; }).join('')
              + '</div></div>';
     }
 

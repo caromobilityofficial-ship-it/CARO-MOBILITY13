@@ -431,7 +431,6 @@
     <button class="tab" data-tab="members">회원</button>
     <button class="tab" data-tab="set">설정</button>
   </div>
-  <div class="demo-note">🔗 <b>Firestore 실시간 연결</b> — 차량(<b>cars · bl_cars</b>)·예약을 폰 앱(안드로이드·iOS)과 같은 데이터로 실시간 공유합니다. <b>연료량·층수</b>는 IoT 기기가 설치·전송하면 자동으로 채워집니다.</div>
   <!-- ===================== TAB: DASHBOARD ===================== -->
   <section id="tab-dash">
     <div class="kpis" id="kpis"></div>
@@ -848,6 +847,7 @@
   }
   window.toggleStatus = function(id){
     var v=FLEET.find(function(x){return x.id===id;}); if(!v) return;
+    if(!(window.caroCan('cars')||window.caroCan('pricing'))){ toast('차량 상태 변경은 [차량 관리] 권한이 필요합니다'); return; }
     var db=window.FB_DB, FN=window.FB_FN;
     var makeUnavail=(v.status!=='점검');
     var newStatus=makeUnavail?'unavailable':'available';
@@ -856,7 +856,7 @@
     if(!db||!FN){ toast('연결 대기 중'); return; }
     FN.setDoc(FN.doc(db, v.col, v.docId), { status:newStatus, devDisabled:makeUnavail }, { merge:true })
       .then(function(){ toast(v.name+(makeUnavail?' → 사용불가 (앱에도 반영)':' → 복구됨')); })
-      .catch(function(e){ toast('저장 실패: 관리자 권한 확인'); console.error(e); });
+      .catch(function(e){ v.status=makeUnavail?'이용가능':'점검'; renderFleet(); renderKPIs(); if(id===selectedId) renderLive(); toast('저장 실패: 관리자 권한 확인'); console.error(e); });   /* ★[v108] 실패 시 화면 되돌림 */
   };
   // ── 차량 수정 모달 ──
   var editId=null;
@@ -1368,7 +1368,9 @@
     var v=FLEET.find(function(x){return x.id===id;}); if(!v) return;
     var db=window.FB_DB, FN=window.FB_FN;
     if(!db||!FN){ toast('연결 대기 중'); return; }
-    var g=function(p){ var el=document.getElementById(p+'_'+id); return el?(Number(el.value)||0):0; };
+    if(!window.caroNeed('pricing')&&!window.caroCan('cars')) return;
+    /* ★[v108] 요금 칸은 성수기/주말이면 '적용 요금'을 보여주므로(admin-pricing.js), 저장은 원래 기본요금(data-cbase)으로 — 예전엔 할증 요금이 기본요금에 덮어써졌다 */
+    var g=function(p){ var el=document.getElementById(p+'_'+id); if(!el) return 0; var raw=(el.dataset&&el.dataset.cbase!=null&&el.dataset.cbase!=='')?el.dataset.cbase:el.value; return Number(raw)||0; };
     var data={ pricePerHour:g('ph'), kmRate:g('km'), fuelFreeKm:g('fk') };
     v.raw=v.raw||{}; v.raw.pricePerHour=data.pricePerHour; v.raw.kmRate=data.kmRate; v.raw.fuelFreeKm=data.fuelFreeKm;
     FN.setDoc(FN.doc(db, v.col, v.docId), data, { merge:true })
@@ -1398,6 +1400,7 @@
     });
   }
   window.exportResvCsv=function(){
+    if(!window.caroNeed('resv','예약 내보내기는 [예약 관리] 권한이 필요합니다')) return;
     var rows=[['예약번호','차량','차량번호','이용자','전화','이메일','기간','상태']].concat(filteredResv().map(function(r){ return [r.no,r.car,r.carNo,r.user,r.phone,r.email,r.period,liveStatus(r)]; }));
     var csv='\uFEFF'+rows.map(function(a){ return a.map(function(v){ return '"'+String(v==null?'':v).replace(/"/g,'""')+'"'; }).join(','); }).join('\n');
     var a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'})); a.download='caro_reservations_'+new Date().toISOString().slice(0,10)+'.csv'; a.click();
@@ -1413,36 +1416,47 @@
       return '<tr><td style="font-family:Saira;color:var(--muted)">'+esc(r.no)+'</td><td>'+carCell+'</td>'+
         '<td>'+esc(r.user)+(r.phone?'<div style="font-size:11px;color:var(--muted)">'+esc(r.phone)+'</div>':'')+'</td><td style="color:var(--muted)">'+esc(r.period)+'</td>'+
         '<td><span class="st '+cls+'"><i></i>'+sNow+'</span></td>'+
-        '<td><button class="btn sm" onclick="toast(\'강제변경/취소는 다음 단계에서 연결\')">관리</button></td></tr>';
+        '<td><button class="btn sm" onclick="if(window.openResManage){openResManage(\''+jsq(r.no)+'\')}else{toast(\'예약 관리 모듈 로딩 중\')}">관리</button></td></tr>';
     }).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:20px">예약이 없습니다.</td></tr>';
   }
-  // ── notices ──
-  var notices=[];   /* ★[v106] 시연용 가짜 공지 제거 — 실제 목록은 admin-notices.js 가 Firestore 에서 그린다 */
-  function renderNotice(){
-    document.getElementById('noticeList').innerHTML = notices.map(function(n,i){
-      return '<div class="list-item"><div><div>'+n.t+'</div><div class="meta">'+n.d+'</div></div>'+
-        '<button class="btn sm" onclick="delNotice('+i+')">삭제</button></div>';
-    }).join('') || '<div style="color:var(--muted);padding:8px">등록된 공지가 없습니다.</div>';
-  }
-  window.addNotice=function(){ var el=document.getElementById('noticeInput'); var t=el.value.trim();
-    if(!t){ toast('제목을 입력하세요'); return; }
-    notices.unshift({t:t, d:new Date().toISOString().slice(0,10)+' · 게시중'}); el.value='';
-    renderNotice(); toast('공지가 추가되었습니다'); };
-  window.delNotice=function(i){ notices.splice(i,1); renderNotice(); toast('삭제되었습니다'); };
-  // ── accounts ──
-  var accts=[];   /* ★[v106] 시연용 가짜 계정 제거 — 실제 목록은 admin-accounts.js 가 그린다 */
-  function renderAccts(){
-    document.getElementById('acctList').innerHTML = accts.map(function(a){
-      return '<div class="acct"><span class="av">'+a.n[0].toUpperCase()+'</span>'+
-        '<div><div>'+a.n+'</div><div class="meta" style="color:var(--muted);font-size:11.5px">'+a.r+'</div></div></div>';
-    }).join('');
-  }
+  // ── notices / accounts: ★[v108] 시연용 코드 제거 — admin-notices.js · admin-accounts.js 가 Firestore 로 그린다 ──
+  function renderNotice(){}
+  function renderAccts(){}
+  window.addNotice=window.addNotice||function(){ toast('공지 모듈 로딩 중'); };
+  window.delNotice=window.delNotice||function(){};
+  // ── ★[v108] 권한별 화면 노출 ──
+  //   최고관리자·전체권한 = 모든 탭.  단일 권한 = 해당 탭만.  (admin_accounts.perms: control/resv/cars/pricing/notices, 옛 ops = 네 권한 전부)
+  var TAB_PERM={ dash:null, price:['pricing','cars'], resv:['resv'], notice:['notices'], chat:['resv'], debt:['resv'], members:['resv'], inbox:['resv'], black:['cars','pricing'], monthly:['cars','pricing'], set:['__super'] };
+  window.caroPerms = window.caroPerms || { super:false, ready:false };
+  window.caroCan=function(p){ var P=window.caroPerms||{}; if(P.super) return true; if(p==='__super') return false; if(P[p]===true) return true; return p!=='control' && P.ops===true; };
+  window.caroCanAny=function(a){ return !a || a.some(function(p){ return window.caroCan(p); }); };
+  window.caroApplyPerms=function(){
+    if(!(window.caroPerms&&window.caroPerms.ready)) return;
+    var firstOk=null, activeHidden=false;
+    document.querySelectorAll('.tabs .tab').forEach(function(t){
+      var id=t.dataset.tab, ok=window.caroCanAny(TAB_PERM[id]);
+      t.style.display=ok?'':'none';
+      var sec=document.getElementById('tab-'+id); if(sec&&!ok) sec.classList.add('hide');
+      if(ok&&!firstOk) firstOk=t;
+      if(!ok&&t.classList.contains('active')) activeHidden=true;
+    });
+    if(activeHidden&&firstOk) firstOk.click();
+    /* 대시보드 안 권한별 버튼 */
+    var ctrl=document.querySelector('.lv-ctrl'); if(ctrl) ctrl.style.display=window.caroCan('control')?'':'none';
+    document.querySelectorAll('#tab-dash .card-hd .btn.gold').forEach(function(b){ if(/차량 등록/.test(b.textContent)) b.style.display=(window.caroCan('cars')||window.caroCan('pricing'))?'':'none'; });
+    document.querySelectorAll('.stbtn').forEach(function(b){ b.style.display=(window.caroCan('cars')||window.caroCan('pricing'))?'':'none'; });
+    var cpx=document.getElementById('cpx-hdbtn'); if(cpx) cpx.style.display=window.caroCan('pricing')?'':'none';
+    try{ document.dispatchEvent(new CustomEvent('caro-perms')); }catch(e){}
+  };
+  window.caroNeed=function(p,msg){ if(window.caroCan(p)) return true; toast(msg||'이 작업 권한이 없습니다 — 최고관리자에게 요청하세요'); return false; };
+  try{ new MutationObserver(function(){ window.caroApplyPerms(); }).observe(document.querySelector('.tabs'),{childList:true}); }catch(e){}
   // ── tabs ──
   document.querySelectorAll('.tab').forEach(function(t){
     t.addEventListener('click', function(){
+      if(t.style.display==='none') return;   /* ★[v108] 권한 없는 탭은 열리지 않는다 */
       document.querySelectorAll('.tab').forEach(function(x){x.classList.remove('active');});
       t.classList.add('active');
-      ['dash','price','resv','notice','chat','debt','members','set'].forEach(function(id){
+      ['dash','price','resv','notice','chat','debt','members','set','black','monthly','inbox'].forEach(function(id){
         var el=document.getElementById('tab-'+id); if(el) el.classList.toggle('hide', id!==t.dataset.tab);
       });
       if(t.dataset.tab==='dash'){ resizeChart(); setTimeout(function(){ caroMapResize(); },60); }
@@ -1570,7 +1584,9 @@
     });
   }
   var DEV_IDMAP={};   // 차량 fleetId → 기기 deviceId (차량마다 자기 기기 데이터만 읽도록)
+  var _lastDevSnap=null;   /* ★[v108] 기기가 차량보다 먼저 오면 매칭이 비었다가 다음 보고 때까지 '수신 0대'로 보이던 것 — 차량이 오면 다시 매칭 */
   function applyDevices(snap){
+    _lastDevSnap=snap;
     var next={}, idmap={};
     snap.forEach(function(doc){
       var d=doc.data()||{}, id=doc.id;
@@ -1659,9 +1675,11 @@
   function setConn(ok){ var el=document.querySelector('.conn'); if(!el) return;
     var c=ok?'#7bb89a':'#e0a86c';
     el.innerHTML='<span class="dot" style="background:'+c+';box-shadow:0 0 8px '+c+'"></span>'+(ok?'Firestore 실시간':'연결 대기'); }
+  var _devReplayed=false;
   function afterData(){
     if(!selectedId || !FLEET.find(function(x){return x.id===selectedId;}))
       selectedId = FLEET.length?FLEET[0].id:null;
+    if(_lastDevSnap && !_devReplayed && FLEET.length){ _devReplayed=true; try{ applyDevices(_lastDevSnap); }catch(e){} }
     devMergeTelemetry();   /* cars 갱신 후에도 기기 텔레메트리 유지 */
     renderKPIs(); renderFleet(); renderLive();
     if(typeof syncLogsToSelection==='function') syncLogsToSelection();
@@ -1669,14 +1687,17 @@
   function startFirestore(tries){
     tries=tries||0; var db=window.FB_DB, FN=window.FB_FN;
     if(!window.FB_READY || !db || !FN){
-      if(tries>60){ setConn(false); console.warn('[CARO 관제] Firebase 미연결 — firebase-config.js 확인 필요'); return; }
+      if(tries>300){ setConn(false); console.warn('[CARO 관제] Firebase 미연결 — firebase-config.js 확인 필요'); return; }
       return setTimeout(function(){ startFirestore(tries+1); }, 200);
     }
     try{
       FN.onSnapshot(FN.collection(db,'cars'),         function(s){ applyCars(s,'일반'); },     function(e){ console.warn('cars',e); });
       FN.onSnapshot(FN.collection(db,'bl_cars'),      function(s){ applyCars(s,'THE BLACK'); }, function(e){ console.warn('bl_cars',e); });
-      FN.onSnapshot(FN.collection(db,'reservations'), function(s){ applyResv(s); },             function(e){ console.warn('resv',e); });
-      FN.onSnapshot(FN.collection(db,'devices'),      function(s){ applyDevices(s); },          function(e){ console.warn('devices',e); });
+      /* ★[v108] 규칙상 읽을 수 있는 계정만 구독 (예약: 예약/관제 권한, 기기: 예약/차량/관제 권한) — 권한 없는 직원의 거부 오류 반복 방지 */
+      if(window.caroCan('resv')||window.caroCan('control'))
+        FN.onSnapshot(FN.collection(db,'reservations'), function(s){ applyResv(s); },             function(e){ console.warn('resv',e); });
+      if(window.caroCan('resv')||window.caroCan('cars')||window.caroCan('control'))
+        FN.onSnapshot(FN.collection(db,'devices'),      function(s){ applyDevices(s); },          function(e){ console.warn('devices',e); });
       setConn(true);
       console.log('[CARO 관제] ✅ Firestore 실시간 연결됨');
     }catch(e){ setConn(false); console.error('[CARO 관제] 연결 오류', e); }
@@ -1786,6 +1807,7 @@
     if(!dev){ if(window.toast)toast('이 차량은 IoT 기기 미연결'); return; }
     var db=window.FB_DB, FN=window.FB_FN;
     if(!db||!FN||!FN.setDoc){ if(window.toast)toast('Firebase 연결 대기'); return; }
+    if(!window.caroNeed('control','차량 원격 제어는 [실시간 관제] 권한이 있어야 합니다')) return;
     if(!window.confirm(v.name+' — 「'+label+'」 명령을 지금 보낼까요?')) return;
     var cmdId='cmd_'+Date.now()+'_'+Math.random().toString(36).slice(2,8);
     var _me=(window.FB_AUTH&&window.FB_AUTH.currentUser&&window.FB_AUTH.currentUser.email)||'admin';   /* ★[v106] 실제 보낸 직원 */
@@ -1793,13 +1815,10 @@
       issuedByEmail:_me,
       issuedAt:FN.serverTimestamp(), timestamp:Date.now() };
     if(extra) Object.keys(extra).forEach(function(k){ payload[k]=extra[k]; });
-    /* ★[14차] 서버 함수(staffCommand)가 권한·2단계 인증·값 형식을 확인한 뒤 만든다. 아직 배포 전(not-found)이면 예전처럼 직접 쓴다. */
-    var _direct=function(){ return FN.setDoc(FN.doc(db,'devices',dev,'commands',cmdId), payload).then(function(){ return cmdId; }); };
+    /* ★[v108] 명령은 서버 함수(staffCommand)만 만든다. 규칙이 브라우저 직접 쓰기를 막으므로 예전 '직접 쓰기' 폴백은 항상 실패했다 → 제거 */
     var _queued=(typeof window.FB_CALL==='function')
-      ? window.FB_CALL('staffCommand', Object.assign({}, extra||{}, {deviceId:dev, type:type})).then(function(r){ return r.cmdId; }, function(e){
-          if(/not-found|unimplemented/.test((e&&e.code)||'')) return _direct();
-          throw e; })
-      : _direct();
+      ? window.FB_CALL('staffCommand', Object.assign({}, extra||{}, {deviceId:dev, type:type})).then(function(r){ return r.cmdId; })
+      : Promise.reject({ code:'unavailable', message:'서버 함수 연결이 준비되지 않았습니다 (firebase-config.js)' });
     _queued.then(function(cmdId){
       if(window.toast)toast('📡 '+label+' 전송됨 · '+v.name);
       var ref=FN.doc(db,'devices',dev,'commands',cmdId), un=null;
@@ -1808,7 +1827,7 @@
          ② 실패 사유(d.error)를 안 보여 줘서 '주행 중이라 거부' 인지 '통신 두절' 인지 구분할 수 없었다. */
       var to=null;
       un=FN.onSnapshot(ref,function(s){ if(!s.exists())return; var d=s.data()||{};
-        if(d.status==='acked'){ if(window.toast)toast('📨 기기가 '+label+' 명령을 받았습니다'); return; }
+        if(d.status==='acked'){ if(window.toast)toast('📨 기기가 '+label+' 명령을 받았습니다'); clearTimeout(to); to=setTimeout(function(){ if(un)un(); if(window.toast)toast('⏱ '+label+' — 기기가 받았지만 60초 안에 완료 보고가 없습니다'); },60000); return; }
         if(d.status==='done'){ if(window.toast)toast('✅ '+label+' 완료'); if(un)un(); clearTimeout(to); return; }
         if(d.status==='failed'){
           var e=String(d.error||'');
@@ -1841,21 +1860,7 @@
   };
   // 펌웨어 원격 업데이트: Firebase Storage에 올린 .bin 주소를 기기에 보내 LTE로 자가 업데이트
   var _lastFwUrl='';
-  window.caroUpdateFw=function(){
-    /* ★[v106] 정책: 펌웨어는 USB 로만 넣는다(원격 갱신 없음, 관제 화면 안내와 동일). 서버(staffCommand)도 update 명령을 거부한다. */
-    if(window.toast) toast('원격 펌웨어 갱신은 정책상 막혀 있습니다 — 펌웨어는 USB 로만 넣습니다'); return;
-    var v=FLEET.find(function(x){return x.id===selectedId;});
-    if(!v){ if(window.toast)toast('차량을 먼저 선택하세요'); return; }
-    if(!DEV_IDMAP[v.id]){ if(window.toast)toast('이 차량은 IoT 기기 미연결'); return; }
-    var url=window.prompt('펌웨어 .bin 파일의 HTTPS 주소를 붙여넣으세요\n(Firebase Storage 다운로드 URL)', _lastFwUrl);
-    if(url==null) return;
-    url=(''+url).trim();
-    if(!/^https:\/\/.+\.bin(\?|$)/i.test(url) && !/firebasestorage\.googleapis\.com/i.test(url)){
-      if(!window.confirm('입력한 주소가 .bin 형식이 아닌 것 같습니다:\n'+url+'\n그래도 보낼까요?')) return;
-    }
-    _lastFwUrl=url;
-    sendDeviceCmd('update', {url:url}, '펌웨어 원격 업데이트\n'+v.name+'\n(기기가 다운로드 후 재부팅)');
-  };
+  window.caroUpdateFw=function(){ if(window.toast) toast('원격 펌웨어 갱신은 정책상 막혀 있습니다 — 펌웨어는 USB 로만 넣습니다'); };   /* ★[v106/108] */
   window.exportLogCsv=function(){
     var all=LOG_ROWS.slice().sort(function(a,z){return z._ms-a._ms;});
     if(!all.length){ if(window.toast)toast('내보낼 기록이 없습니다'); return; }
@@ -1954,12 +1959,13 @@
   function waitAuth(tries){
     tries=tries||0; var A=window.FB_AUTH, FN=window.FB_FN;
     if(!window.FB_READY || !A || !FN){
-      if(tries>60){ showGate('Firebase 미연결 — firebase-config.js 확인'); return; }
+      if(tries>300){ showGate('Firebase 미연결 — firebase-config.js 확인'); return; }
       return setTimeout(function(){ waitAuth(tries+1); }, 200);
     }
     FN.onAuthStateChanged(A, function(u){
       if(u && u.email === ADMIN_EMAIL){                    /* 최고관리자: 무조건 통과 */
-        hideGate(); document.getElementById('adminEmail').textContent=u.email; startOnce();
+        window.caroPerms={ super:true, ready:true, control:true, resv:true, cars:true, pricing:true, notices:true, ops:true };
+        hideGate(); document.getElementById('adminEmail').textContent=u.email; startOnce(); window.caroApplyPerms();
       } else if(u){
         /* ★ 운영팀 계정도 입장: 운영 관련 권한(요금/예약/공지/차량) 중 하나라도 있으면 허용.
            (탭별 세부 접근은 페이지 내부 caroCan 권한이 각각 제어) */
@@ -1967,7 +1973,8 @@
           var ex=s&&(typeof s.exists==='function'?s.exists():s.exists);
           var d=ex?(s.data()||{}):{}; var pm=(ex&&d.active!==false&&d.perms)?d.perms:{};
           if(pm.ops||pm.cars||pm.pricing||pm.notices||pm.resv){
-            hideGate(); document.getElementById('adminEmail').textContent=u.email+(d.name?(' · '+d.name):''); startOnce();
+            window.caroPerms=Object.assign({ super:false, ready:true }, pm);   /* ★[v108] 이 계정의 권한 → 탭·버튼 노출 */
+            hideGate(); document.getElementById('adminEmail').textContent=u.email+(d.name?(' · '+d.name):''); startOnce(); window.caroApplyPerms();
           } else {
             /* iframe(관제센터)에선 로그아웃 금지(공유 세션이라 부모까지 로그아웃됨). 부모가 이미 접근제어함. */
             if(!window.__CARO_INFRAME){ FN.signOut(A); showGate(pm.control===true
@@ -1982,7 +1989,7 @@
     /* ★[14차] 관리자 '로그아웃'(예전 이름 '나가기') — 고객앱으로 보내지 않고 진짜 로그아웃한다(관제 단독 운영).
        관제센터 안(iframe)에서 누르면 부모(관제)가 로그아웃을 처리한다. */
     document.getElementById('logoutBtn').addEventListener('click', function(){
-      try{ if(window.__CARO_INFRAME){ window.parent.postMessage('caro-admin-exit', location.origin); return; } }catch(e){}
+      try{ if(window.__CARO_INFRAME){ window.parent.postMessage('caro-admin-exit', (location.origin&&location.origin!=='null')?location.origin:'*'); return; } }catch(e){}
       var done=function(){ location.reload(); };
       try{ Promise.resolve(FN.signOut(A)).then(done, done); }catch(e){ done(); }
     });

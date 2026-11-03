@@ -24,11 +24,16 @@
   /* ★ 권한을 화면(탭) 두 개에 맞춰 딱 둘로 단순화: 실시간 관제 / 운영 관리.
      - control → 실시간 관제 탭(위치·원격제어·층보정·진단)
      - ops     → 운영 관리 탭(요금·예약·월렌트·공지·상담·차량 등록 전부) */
+  /* ★[v108] 권한을 화면 단위로 세분화: 실시간 관제 / 예약 관리 / 차량 관리 / 요금 관리 / 공지·이벤트.
+     전부 체크 = 두 프로그램(관제·운영관리) 모두. 하나만 체크 = 그 탭만 보인다(admin-ops.html caroApplyPerms). */
   var PERMS=[
-    {key:'control', label:'실시간 관제', sub:'실시간 위치·원격 제어·층 보정·기기 진단'},
-    {key:'ops',     label:'운영 관리',   sub:'요금·예약·월렌트·공지·상담·차량 등록 전체'}
+    {key:'control', label:'실시간 관제', sub:'실시간 위치·원격 제어(문열기·시동차단)·층 보정·기기 진단'},
+    {key:'resv',    label:'예약 관리',   sub:'예약·강제반납·취소·미납·정지·회원·사고/문의·상담통계'},
+    {key:'cars',    label:'차량 관리',   sub:'차량 등록·수정·점검 상태, 더블랙·월렌트 차량'},
+    {key:'pricing', label:'요금 관리',   sub:'시간당 요금·km 요금·성수기/주말 요금'},
+    {key:'notices', label:'공지·이벤트', sub:'공지·이벤트 등록·삭제'}
   ];
-  var PILL={control:'관제',ops:'운영'};
+  var PILL={control:'관제',resv:'예약',cars:'차량',pricing:'요금',notices:'공지'};
 
   /* ── 스타일 ── */
   var st=document.createElement('style');
@@ -152,7 +157,8 @@
     modal.querySelector('#acctName').value = acct ? (acct.name||'') : '';
     modal.querySelector('#acctRole').value = acct ? (acct.role||'') : '';
     var posSel=modal.querySelector('#acctPosition'); if(posSel) posSel.value = acct ? (acct.position||'') : '';
-    var perms=(acct&&acct.perms)||{};
+    var perms=Object.assign({},(acct&&acct.perms)||{});
+    if(perms.ops) perms=Object.assign({resv:true,cars:true,pricing:true,notices:true},perms);   /* ★[v108] 옛 '운영' 권한 = 네 권한 전부 */
     modal.querySelectorAll('.aperm input').forEach(function(c){ c.checked=!!perms[c.dataset.perm]; });
     modal.querySelector('#acctActive').checked = acct ? (acct.active!==false) : true;
     modal.classList.add('show');
@@ -174,6 +180,8 @@
     if(email===SUPER){ T('최고관리자 계정은 여기서 수정할 수 없습니다'); return; }
     var perms={};
     modal.querySelectorAll('.aperm input').forEach(function(c){ perms[c.dataset.perm]=!!c.checked; });
+    perms.ops=!!(perms.resv&&perms.cars&&perms.pricing&&perms.notices);   /* ★[v108] 네 권한 전부면 옛 표기 ops 도 켜 둔다(옛 규칙·화면 호환) */
+    if(!perms.control&&!perms.resv&&!perms.cars&&!perms.pricing&&!perms.notices){ T('권한을 하나 이상 선택하세요'); return; }
     var active=modal.querySelector('#acctActive').checked;
     var FN=window.FB_FN, db=window.FB_DB;
     var data={ email:email, name:name, role:role, position:position, perms:perms, active:active,
@@ -185,7 +193,8 @@
       ? window.FB_CALL('setAdminAccount',{ email:email, name:name, perms:perms, active:active, role:role, position:position })
       : Promise.reject(Object.assign(new Error('no FB_CALL'),{code:'functions/not-found'}));
     viaServer.catch(function(e){
-      if(e && /not-found|unavailable/.test(String(e.code||''))){ console.warn('[계정] 서버 함수 미배포 → 직접 쓰기 폴백'); return FN.setDoc(FN.doc(db,'admin_accounts',email), data, {merge:true}); }
+      /* ★[v108] '해당 이메일의 계정이 없습니다'(서버가 보낸 not-found)는 폴백하지 않는다 — 예전엔 가입 안 된 이메일에도 문서를 써서 '추가됨'으로 보였다 */
+      if(e && /not-found|unavailable/.test(String(e.code||'')) && !/계정/.test(String(e.message||''))){ console.warn('[계정] 서버 함수 미배포 → 직접 쓰기 폴백'); return FN.setDoc(FN.doc(db,'admin_accounts',email), data, {merge:true}); }
       throw e;
     }).then(function(){
       T(editingEmail?'권한이 수정되었습니다':'직원 계정이 추가되었습니다'); closeModal();
@@ -211,7 +220,7 @@
     if(!confirm('이 직원 계정의 권한을 삭제할까요?\n('+email+')')) return;
     var FN=window.FB_FN, db=window.FB_DB;
     var viaServer=(typeof window.FB_CALL==='function')?window.FB_CALL('setAdminAccount',{email:email, remove:true}):Promise.reject({code:'functions/not-found'});
-    viaServer.catch(function(e){ if(e && /not-found|unavailable/.test(String(e.code||''))) return FN.deleteDoc(FN.doc(db,'admin_accounts',email)); throw e; })
+    viaServer.catch(function(e){ if(e && /not-found|unavailable/.test(String(e.code||'')) && !/계정/.test(String(e.message||''))) return FN.deleteDoc(FN.doc(db,'admin_accounts',email)); throw e; })
       .then(function(){ T('삭제되었습니다'); })
       .catch(function(e){ console.error(e); T('삭제 실패 — '+((e&&e.message)||'')); });
   };
@@ -219,8 +228,8 @@
     if(!ready()) return;
     var FN=window.FB_FN, db=window.FB_DB;
     var a=(window.__caroAccts||[]).filter(function(x){return (x.id||x.email)===email;})[0]||{};
-    var viaServer=(typeof window.FB_CALL==='function')?window.FB_CALL('setAdminAccount',{email:email, name:a.name||'', perms:a.perms||{}, active:!!next}):Promise.reject({code:'functions/not-found'});
-    viaServer.catch(function(e){ if(e && /not-found|unavailable/.test(String(e.code||''))) return FN.setDoc(FN.doc(db,'admin_accounts',email),{active:!!next},{merge:true}); throw e; })
+    var viaServer=(typeof window.FB_CALL==='function')?window.FB_CALL('setAdminAccount',{email:email, name:a.name||'', role:a.role||'', position:a.position||'', perms:a.perms||{}, active:!!next}):Promise.reject({code:'functions/not-found'});   /* ★[v108] 직책·직급이 지워지던 것 */
+    viaServer.catch(function(e){ if(e && /not-found|unavailable/.test(String(e.code||'')) && !/계정/.test(String(e.message||''))) return FN.setDoc(FN.doc(db,'admin_accounts',email),{active:!!next},{merge:true}); throw e; })
       .then(function(){ T(next?'활성화되었습니다':'정지되었습니다'); })
       .catch(function(e){ console.error(e); T('변경 실패 — '+((e&&e.message)||'')); });
   };
@@ -231,11 +240,10 @@
 
   function badges(p){
     if(!p) return '<span class="apill none">권한 없음</span>';
-    var out='';
-    if(p.control) out+='<span class="apill control">관제</span>';
-    /* 예전 세부권한(cars/pricing/notices/resv) 계정도 '운영'으로 표시(하위호환) */
-    if(p.ops||p.cars||p.pricing||p.notices||p.resv) out+='<span class="apill ops">운영</span>';
-    return out || '<span class="apill none">권한 없음</span>';
+    var q=Object.assign({},p); if(q.ops) q=Object.assign({resv:true,cars:true,pricing:true,notices:true},q);
+    var keys=['control','resv','cars','pricing','notices'].filter(function(k){ return q[k]===true; });
+    if(keys.length===5) return '<span class="apill all">모든 권한 (관제+운영)</span>';
+    return keys.map(function(k){ return '<span class="apill '+k+'">'+PILL[k]+'</span>'; }).join('') || '<span class="apill none">권한 없음</span>';
   }
   function superEmail(){
     try{ if(window.FB_AUTH && FB_AUTH.currentUser && FB_AUTH.currentUser.email) return FB_AUTH.currentUser.email; }catch(e){}
@@ -243,11 +251,12 @@
   }
   function render(list){
     var box=document.getElementById('acctList'); if(!box) return;
-    var html=
-      '<div class="acct2"><span class="av">C</span>'
+    var isSuper=!!(window.caroPerms&&window.caroPerms.super);   /* ★[v108] 최고관리자 카드는 최고관리자에게만, 이메일은 본인 것만 */
+    var html= isSuper ?
+      ('<div class="acct2"><span class="av">C</span>'
       +'<div class="acct2-info"><div class="acct2-name">CAROMOBILITY<span class="stat on">최고관리자</span></div>'
       +'<div class="acct2-role">모든 권한 · 본인 ('+esc(superEmail())+')</div>'
-      +'<div class="acct2-perms"><span class="apill all">모든 권한</span></div></div></div>';
+      +'<div class="acct2-perms"><span class="apill all">모든 권한</span></div></div></div>') : '';
     (list||[]).forEach(function(a){
       var email=a.id||a.email||'';
       var on=a.active!==false;
@@ -273,6 +282,7 @@
     });
     render(window.__caroAccts||[]);
     if(!ready()) return false;
+    if(!(window.caroPerms&&window.caroPerms.super)){ return !!(window.caroPerms); }   /* ★[v108] 직원 계정 목록은 최고관리자만 (규칙상 직원은 읽기 거부 → 재시도 폭주 방지) */
     var FN=window.FB_FN, db=window.FB_DB;
     try{
       FN.onSnapshot(FN.collection(db,'admin_accounts'), function(snap){
@@ -283,6 +293,7 @@
     }catch(e){ console.warn('[계정] 리스너 오류', e); }
     return true;
   }
-  if(!wire()){ var t=setInterval(function(){ if(wire()) clearInterval(t); },400); setTimeout(function(){clearInterval(t);},15000); }
+  if(!wire()){ var t=setInterval(function(){ if(wire()) clearInterval(t); },400); setTimeout(function(){clearInterval(t);},60000); }
+  document.addEventListener('caro-perms', function(){ render(window.__caroAccts||[]); });
   console.log('[계정] ✅ 관리자 계정·권한 관리 v2 (이메일 연결 + 차량/요금/공지/예약)');
 })();

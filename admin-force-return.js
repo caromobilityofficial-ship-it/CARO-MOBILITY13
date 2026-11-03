@@ -80,11 +80,10 @@
       type:'lock', status:'pending', issuedBy:'admin', issuedByEmail:me(),
       issuedAt:(typeof f.serverTimestamp==='function'?f.serverTimestamp():new Date()), timestamp:Date.now()
     }); };
+    /* ★[v108] 잠금 명령은 서버 함수만 (규칙이 직접 쓰기를 막음). 관제 권한이 없는 직원은 서버가 거부 → 안내만 */
     var queued=(typeof window.FB_CALL==='function')
-      ? window.FB_CALL('staffCommand',{deviceId:dev,type:'lock'}).catch(function(e){
-          if(/not-found|unimplemented/.test((e&&e.code)||'')) return direct();
-          throw e; })
-      : direct();
+      ? window.FB_CALL('staffCommand',{deviceId:dev,type:'lock'})
+      : Promise.reject({code:'unavailable'});
     queued.then(function(){ notify('🔒 문 잠금 명령 전송 — 주차 절전 중이면 최대 80초 걸립니다'); })
       .catch(function(e){ notify('⚠ 잠금 명령 전송 실패: '+((e&&e.code)||e)); });
   }
@@ -119,7 +118,7 @@
     var p=hasFn()
       ? window.FB_CALL('staffReturn',{ bookNo:no, reason:reason, waiveFees:waive }).then(function(r){
           if(r&&r.already){ notify('이미 반납 처리된 예약입니다'); return; }
-          var amt=Number(r&&(waive?r.amountDue:r.amount))||0;   /* ★[v106] 면제 시 면제된 금액을 보여준다 */
+          var amt=Number(r&&(r.amountDue!=null?r.amountDue:r.amount))||0;   /* ★[v108] 서버가 amountDue 를 주면 면제액 표시, 아니면 청구액 */
           notify('✅ '+no+' 강제 반납 완료'+(amt>0?(waive?' · 추가요금 '+amt.toLocaleString()+'원 면제':' · 추가요금 '+amt.toLocaleString()+'원 미납 등록(고객 앱에서 결제)'):' · 추가요금 없음')+(r&&r.lockCmdId?' · 문 잠금 명령 전송':' · 단말 미연결(잠금 명령 없음)'));
           logAlert('force_return', no, { amount:amt, waived:waive, reason:reason });
         }).catch(function(e){ if(isNotFound(e)) return legacy(); throw e; })

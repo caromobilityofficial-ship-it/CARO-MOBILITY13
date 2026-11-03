@@ -92,7 +92,7 @@ button{font-family:inherit;cursor:pointer;}
   color:var(--txt);backdrop-filter:blur(4px);font-family:inherit;transition:.15s;}
 .followbtn.on{background:var(--gold);border-color:var(--gold);color:#15161a;}
 .followbtn:hover{border-color:var(--gold);}
-.livebar{display:grid;grid-template-columns:repeat(6,1fr);border-top:1px solid var(--border);}
+.livebar{display:grid;grid-template-columns:repeat(8,1fr);border-top:1px solid var(--border);}   /* ★[v108] 칸 8개에 맞춤(예전 6 → 두 번째 줄이 어긋남) */
 .lv{padding:12px 8px;text-align:center;border-right:1px solid var(--border);}
 .lv:last-child{border-right:none;}
 .lv .k{font-size:10px;letter-spacing:1.5px;color:var(--muted);}
@@ -230,7 +230,7 @@ html,body{max-width:100%;overflow-x:hidden;}
   .main{padding:10px 12px;gap:10px;}
   .bottom{padding:0 12px 16px;gap:10px;}
   .mapbox{height:52vh;min-height:300px;}
-  .livebar{grid-template-columns:repeat(3,1fr);}         /* 6칸 → 3칸 2줄 */
+  .livebar{grid-template-columns:repeat(4,1fr);}         /* 8칸 → 4칸 2줄 */
   .lv{padding:10px 6px;}
   .ctrl{grid-template-columns:1fr 1fr;}
   .logdate{gap:6px;flex-wrap:wrap;}
@@ -412,8 +412,9 @@ function toast(m){ var t=$('toast'); t.textContent=m; t.classList.add('show');
   clearTimeout(_tt); _tt=setTimeout(function(){t.classList.remove('show');},2600); }
 
 /* ── 경보음 (WebAudio 비프 — 파일 불필요) ── */
+var _ac=null;   /* ★[v108] AudioContext 는 하나만 만든다 — 경보마다 새로 만들면 6개 이후 브라우저가 막아 소리가 끊겼다 */
 function beep(){ if(!soundOn) return;
-  try{ var ac=new (window.AudioContext||window.webkitAudioContext)();
+  try{ var AC=window.AudioContext||window.webkitAudioContext; _ac=_ac||new AC(); var ac=_ac; if(ac.state==='suspended'){ try{ ac.resume(); }catch(e){} }
     var o=ac.createOscillator(), g=ac.createGain();
     o.connect(g); g.connect(ac.destination); o.frequency.value=880; g.gain.value=0.12;
     o.start(); o.frequency.setValueAtTime(660,ac.currentTime+0.15);
@@ -452,10 +453,7 @@ function matchCar(dev,devId){
 }
 
 /* ── 두 좌표 거리(m) ── */
-function distM(la1,lo1,la2,lo2){
-  var dLa=(la2-la1)*111320, dLo=(lo2-lo1)*111320*Math.cos(la1*Math.PI/180);
-  return Math.sqrt(dLa*dLa+dLo*dLo);
-}
+/* ★[v108] distM 은 아래(840행 부근) 하버사인 하나만 둔다 — 같은 이름이 두 번 정의돼 있었다 */
 /* ── 정차 평균화 (주차 시 GPS 배회만 제거) ──
    ★ 핵심 수정: 새 좌표가 평균에서 30m 넘게 벗어나면 = 실제 이동 → 평균 버리고 즉시 스냅.
      (예전엔 60샘플 평균이라 이동해도 마커가 옛 위치에 눌러붙어 못 따라왔음) */
@@ -746,23 +744,19 @@ function sendCmd(type,extra){
   var who=(window.FB_AUTH&&window.FB_AUTH.currentUser&&window.FB_AUTH.currentUser.email)||'admin';
   /* ★[14차] 명령은 서버 함수(staffCommand)가 권한·2단계 인증·값 형식을 확인한 뒤 만든다.
      서버 함수가 아직 배포 전이면(function not-found) 예전처럼 직접 쓴다 — 배포 순서 때문에 관제가 멈추지 않게. */
-  function direct(){
-    var id0='cmd-'+Date.now();
-    var pl=Object.assign({type:type,status:'pending',by:who,at:FN.serverTimestamp?FN.serverTimestamp():new Date(),timestamp:Date.now()},extra||{});
-    return FN.setDoc(FN.doc(db,'devices',dev,'commands',id0),pl).then(function(){ return id0; });
-  }
+  /* ★[v108] 명령은 서버 함수(staffCommand)만 만든다. 보안 규칙이 브라우저 직접 쓰기를 막으므로 예전 '직접 쓰기' 폴백은 항상 '권한 없음'으로 실패해 오해만 낳았다 → 제거 */
   var queued = (typeof window.FB_CALL==='function')
     ? window.FB_CALL('staffCommand',Object.assign({},extra||{},{deviceId:dev,type:type})).then(function(r){ return r.cmdId; },function(e){
         var c=(e&&e.code)||'';
-        if(/not-found|unimplemented/.test(c)) return direct();      /* 함수 미배포 → 예전 방식 */
+        if(/not-found|unimplemented/.test(c)) throw { code:c, message:'서버 함수(staffCommand)가 배포되어 있지 않습니다 — 최고관리자에게 문의' };
         throw e; })
-    : direct();
+    : Promise.reject({ code:'unavailable', message:'서버 함수 연결이 준비되지 않았습니다 (firebase-config.js)' });
   queued.then(function(id){
     toast('명령 전송: '+type+' — 기기 응답 대기…');
     var ref=FN.doc(db,'devices',dev,'commands',id), un=null, to=null;
     function done_(){ if(un)un(); clearTimeout(to); CMD_BUSY[dev+type]=false; }   /* ★어떤 이유로 끝나든 잠금을 반드시 푼다 */
     un=FN.onSnapshot(ref,function(s){ if(!s.exists())return; var d=s.data()||{};
-      if(d.status==='acked'){ toast('📨 기기가 명령을 받았습니다 — 실행 중…'); return; }
+      if(d.status==='acked'){ toast('📨 기기가 명령을 받았습니다 — 실행 중…'); clearTimeout(to); to=setTimeout(function(){ if(un)un(); CMD_BUSY[dev+type]=false; toast('⏱ 기기가 명령을 받았지만 60초 안에 완료 보고가 없습니다 — 상태를 확인하세요'); },60000); return; }
       if(d.status==='done'){ toast('✅ 기기 실행 완료: '+type); done_(); return; }
       if(d.status==='failed'){
         /* ★예전엔 '만료' 한 가지만 처리해서, 기기가 이유를 붙여 거부해도 화면엔 아무 말이 없다가
@@ -886,6 +880,7 @@ function startFS(){
 function num(x){ var n=Number(x); return isFinite(n)?n:null; }
 function remap(){
   IDMAP={};
+  FLEET.forEach(function(v){ v.online=false; });   /* ★[v108] 기기 문서가 사라지거나 다른 차에 다시 붙으면 '온라인' 표시가 남지 않게 */
   Object.keys(DEV).forEach(function(devId){
     var d=DEV[devId], fid=matchCar(d,devId); if(!fid) return;
     IDMAP[fid]=devId;
@@ -1056,7 +1051,7 @@ function csvExport(){
   EVTS.forEach(function(e){ var cls=e.event==='impact'?(impactMode(e)==='park'?'주차중':'주행중'):'';
     rows.push([fmtTs(e.ts),e.event||'',cls,floorStr(num(e.floor)),e.alt!=null?e.alt:'',e.heading!=null?Math.round(e.heading):'',e.speed!=null?e.speed:'',e.shock!=null?e.shock:'',e.lat!=null?e.lat:'',e.lng!=null?e.lng:'']); });
   TELE.forEach(function(t){ rows.push([fmtTs(t.ts),'주기','',floorStr(num(t.floor)),t.alt!=null?t.alt:'',t.heading!=null?Math.round(t.heading):'',t.speed!=null?t.speed:'',t.shock!=null?t.shock:'',t.lat!=null?t.lat:'',t.lng!=null?t.lng:'']); });
-  var csv='﻿'+rows.map(function(r){return r.join(',');}).join('\n');
+  var csv='﻿'+rows.map(function(r){return r.map(function(c){ var t=String(c==null?'':c); if(/^[=+\-@]/.test(t)) t="'"+t; return /[",\n]/.test(t)?('"'+t.replace(/"/g,'""')+'"'):t; }).join(',');}).join('\n');   /* ★[v108] 엑셀 수식 주입 방지·쉼표 처리 */
   var a=document.createElement('a');
   a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
   a.download=(devOf()||'CARO')+'_'+(selDate||todayStr()).replace(/-/g,'')+'.csv';
@@ -1066,6 +1061,7 @@ function csvExport(){
 /* ═══════════ 로그인 게이트 ═══════════ */
 function doLogin(){
   var A=window.FB_AUTH, FN=window.FB_FN;
+  try{ $('g-err').style.color=''; }catch(e){}   /* ★[v108] 재설정 성공(초록) 뒤 로그인 실패 문구가 초록으로 남던 것 */
   /* ★[12차 검수] 예전엔 여기서 Firebase 준비 여부를 보지 않았다.
      인터넷이 막혀 Firebase 가 안 올라오면 FN 이 없어서 그냥 오류로 죽고,
      버튼은 '로그인 중…' 에서 멈춘 채 **아무 일도 일어나지 않았다.**
@@ -1130,12 +1126,16 @@ function waitAuth(n){
         $('gate').style.display='flex';
       });
     }
-    else { $('gate').style.display='flex'; }
+    else { if(started){ location.reload(); return; } $('gate').style.display='flex'; }   /* ★[v108] 로그아웃·토큰 만료 뒤 죽은 화면이 남지 않게 새로 연다 */
   });
   function enter(label, pm, isSuper){
     $('gate').style.display='none'; $('adm').textContent=label;
     var canCtrl = isSuper || (pm&&pm.control===true);
     var canOps  = isSuper || !!(pm&&(pm.ops||pm.cars||pm.pricing||pm.notices||pm.resv));
+    window.caroPerms = isSuper ? {super:true,ready:true,control:true,resv:true,cars:true,pricing:true,notices:true,ops:true} : Object.assign({super:false,ready:true},pm||{});
+    /* ★[v108] 직원은 문열기·시동차단·해제·재부팅·입력극성 명령에 2단계 인증 로그인이 필요(서버 staffCommand). 미리 알려 준다 */
+    if(!isSuper && canCtrl){ try{ A.currentUser.getIdTokenResult().then(function(r){ var mfa=!!(r&&r.claims&&r.claims.firebase&&r.claims.firebase.sign_in_second_factor);
+      if(!mfa) toast('⚠ 문열기·시동차단·해제·재부팅은 2단계 인증으로 로그인해야 보낼 수 있습니다 (🔐 2단계 인증 등록 → 로그아웃 → 다시 로그인)'); }).catch(function(){}); }catch(e){} }
     /* 팀별 탭 노출 */
     $('nt-live').style.display = canCtrl?'':'none';
     $('nt-ops').style.display  = canOps?'':'none';
@@ -1145,7 +1145,9 @@ function waitAuth(n){
          여기서 오류가 나 **startFS() 가 아예 실행되지 않았다** — 차량 목록도, 실시간 갱신도 안 떴다.
          지도는 실패해도 나머지는 살아 있어야 한다. */
       try{ mapInit(); }catch(e){ console.warn('[지도] 초기화 실패 — 나머지 기능은 계속합니다:', e); }
-      try{ startFS(); }catch(e){ console.error('[관제] 실시간 구독 시작 실패:', e); } }
+      try{ startFS(); }catch(e){ console.error('[관제] 실시간 구독 시작 실패:', e); }
+      /* ★[v108] 단말 보고가 끊겨도 30초마다 온라인/오프라인·경보를 다시 계산 (예전엔 다른 단말이 보고해야만 갱신됐다) */
+      setInterval(function(){ try{ remap(); checkAlerts(); render(); }catch(e){} }, 30000); }
     /* 기본 탭: 관제 권한 있으면 실시간 관제, 없으면(운영팀) 운영 관리 */
     switchView(canCtrl?'live':'ops');
   }
@@ -1161,11 +1163,11 @@ function waitAuth(n){
     done();
   }
   $('lgout').addEventListener('click',function(){
-    try{ if(window.top!==window.self){ window.parent.postMessage('caro-admin-exit',location.origin); return; } }catch(e){}
+    try{ if(window.top!==window.self){ window.parent.postMessage('caro-admin-exit',(location.origin&&location.origin!=='null')?location.origin:'*'); return; } }catch(e){}
     adminExit();
   });
   /* 운영 관리 화면(iframe)의 로그아웃도 여기로 온다 */
-  window.addEventListener('message',function(ev){ if(ev.origin===location.origin && ev.data==='caro-admin-exit') adminExit(); });
+  window.addEventListener('message',function(ev){ if((ev.origin===location.origin||location.origin==='null') && ev.data==='caro-admin-exit') adminExit(); });
   /* 비밀번호 재설정: 아이디 칸의 계정(별명이면 최고관리자 이메일)으로 재설정 메일 발송 */
   $('g-reset').addEventListener('click',function(){
     var em=$('g-em').value.trim();
@@ -1174,7 +1176,7 @@ function waitAuth(n){
     if(em.indexOf('@')<0){ $('g-err').textContent='이메일 형식이 아닙니다'; return; }
     FN.sendPasswordResetEmail(A,em).then(function(){
       $('g-err').style.color='#4db183';
-      $('g-err').textContent='✅ '+em+' 으로 재설정 메일을 보냈습니다. 메일함(스팸함 포함)을 확인하세요.';
+      $('g-err').textContent='✅ 재설정 메일을 보냈습니다. 메일함(스팸함 포함)을 확인하세요.';   /* ★[v108] 이메일 주소는 화면에 표시하지 않는다 */
     }).catch(function(e){
       $('g-err').style.color='';
       $('g-err').textContent='메일 발송 실패: '+((e&&e.code)||'다시 시도하세요');

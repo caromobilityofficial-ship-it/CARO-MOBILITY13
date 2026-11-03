@@ -74,8 +74,10 @@
       var k=d.userId||d.idName; if(!k) return;
       if(!m[k]) m[k]={ key:k, userId:d.userId||k, count:0, unpaid:0,
                        name:d.userName||d.idName||'사용자', idName:d.idName||'', license:d.license||'' };
+      var st=String(d.status||'unpaid');
+      if(st==='void'||st==='waived') return;            /* ★[v108] 취소·면제된 청구는 횟수에서 제외 */
       m[k].count++;
-      if((d.status||'unpaid')==='unpaid') m[k].unpaid += (+d.amount||0);
+      if(st==='unpaid'||st==='due') m[k].unpaid += (+d.amount||0);   /* ★[v108] 서버 청구(due)도 미납 합계에 포함 */
       if(!m[k].license && d.license) m[k].license=d.license;
       if((!m[k].name||m[k].name==='사용자') && d.userName) m[k].name=d.userName;
     });

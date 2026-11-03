@@ -96,9 +96,9 @@
         for(var k in p){ if(Array.isArray(p[k])) imgs=imgs.concat(p[k]); else if(typeof p[k]==='string') imgs.push(p[k]); }
       }
     }
-    imgs=imgs.filter(function(s){ return typeof s==='string' && s.length>30; });
+    imgs=imgs.filter(function(s){ return typeof s==='string' && s.length>30 && /^(https:\/\/|data:image\/)/i.test(s); });   /* ★[v108] 고객이 쓴 값이라 http(s)·이미지 데이터만 허용 */
     if(imgs.length){
-      return '<div class="rm-photos">'+imgs.map(function(s){ return '<img src="'+esc(s)+'" onclick="window.open(this.src)">'; }).join('')+'</div>';
+      return '<div class="rm-photos">'+imgs.map(function(s){ return '<img src="'+esc(s)+'" onclick="window.caroViewPhoto&&caroViewPhoto(this.src)">'; }).join('')+'</div>';
     }
     return '<div class="rm-photo-empty">\uD83D\uDCF7 사용 전 사진이 아직 클라우드에 업로드되지 않았습니다.<br>(고객 앱에 사진 업로드 기능을 추가하면 여기에 표시됩니다)</div>';
   }
@@ -181,6 +181,8 @@
     };
   }
 
+  /* ★[v108] 사진 크게 보기 — 새 창에 DOM 으로만 넣는다(문자열 조립 금지, opener 차단) */
+  window.caroViewPhoto=function(src){ try{ if(!/^(https:\/\/|data:image\/)/i.test(String(src))) return; var w=window.open('','_blank','noopener'); if(!w) return; var im=w.document.createElement('img'); im.src=src; im.style.maxWidth='100%'; w.document.body.style.margin='0'; w.document.body.style.background='#111'; w.document.body.appendChild(im); }catch(e){} };
   window.openResManage=function(no){
     if(!no) return;
     var FN=window.FB_FN, db=window.FB_DB;

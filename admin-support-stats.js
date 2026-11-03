@@ -120,7 +120,10 @@
 
   var subscribed=false;
   function subscribe(){
-    if(subscribed) return; subscribed=true;
+    if(subscribed) return;
+    // ★[v108] 상담 기록은 '예약' 권한(또는 전체 권한)만 열람 — 권한 확정 전/권한 없음이면 구독하지 않음(규칙 거부 소음 방지)
+    if(window.caroPerms && window.caroPerms.ready && typeof window.caroCan==='function' && !window.caroCan('resv')) return;
+    subscribed=true;
     var db=window.FB_DB, FN=window.FB_FN;
     try{
       FN.onSnapshot(FN.collection(db,'support_chats'), function(snap){
@@ -140,6 +143,7 @@
     var A=window.FB_AUTH, FN=window.FB_FN;
     FN.onAuthStateChanged(A, function(u){ if(u) subscribe(); });
     if(A.currentUser) subscribe();
+    window.addEventListener('caro-perms', function(){ if(window.FB_AUTH && window.FB_AUTH.currentUser) subscribe(); });
   }
   start();
   // 탭 열릴 때 재렌더

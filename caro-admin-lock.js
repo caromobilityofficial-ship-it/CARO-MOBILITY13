@@ -19,6 +19,9 @@
   if(!isFinite(MIN) || MIN < 1) MIN = 10;
   var LIMIT = MIN * 60 * 1000;
   var last = Date.now(), locked = false, ov = null, tries = 0, lockedUntil = 0;
+  /* ★[v108] 앱 안 로컬 사본(file:/content:)은 origin 이 "null" 이라 postMessage 가 실패하던 것 */
+  var TGT = (location.origin && location.origin !== 'null') ? location.origin : '*';
+  function sameOrigin(e){ return e.origin === location.origin || location.origin === 'null' || !location.origin; }
 
   function now(){ return Date.now(); }
 
@@ -26,8 +29,8 @@
   if(inFrame){
     var sent = 0;
     var ping = function(){ var t = now(); if(t - sent < 5000) return; sent = t;
-      try{ window.parent.postMessage({caro:'admin-activity'}, location.origin); }catch(e){} };
-    ['pointerdown','keydown','touchstart','wheel'].forEach(function(ev){
+      try{ window.parent.postMessage({caro:'admin-activity'}, TGT); }catch(e){} };
+    ['pointerdown','keydown','touchstart','wheel','mousemove'].forEach(function(ev){   /* ★[v108] 마우스만 움직여도 활동으로 본다(5초마다 1번만 전송) */
       window.addEventListener(ev, ping, {passive:true, capture:true}); });
     return;
   }
@@ -36,7 +39,7 @@
   ['pointerdown','keydown','touchstart','wheel','mousemove'].forEach(function(ev){
     window.addEventListener(ev, touch, {passive:true, capture:true}); });
   window.addEventListener('message', function(e){
-    if(e.origin === location.origin && e.data && e.data.caro === 'admin-activity') touch(); });
+    if(sameOrigin(e) && e.data && e.data.caro === 'admin-activity') touch(); });
 
   function signedIn(){
     var a = window.FB_AUTH; return !!(a && a.currentUser && a.currentUser.email);
@@ -104,9 +107,10 @@
 
   function lock(){
     if(locked) return;
+    if(!signedIn()) return;   /* ★[v108] 로그아웃된 상태에서 잠그면 풀 방법이 없었다 */
     locked = true;
     ov = build(); document.body.appendChild(ov);
-    var a = ov.querySelector('#caroLockAcct'); a.textContent = (window.FB_AUTH.currentUser.email) || '';
+    var a = ov.querySelector('#caroLockAcct'); a.textContent = (window.FB_AUTH && window.FB_AUTH.currentUser && window.FB_AUTH.currentUser.email) || '';
     setInert(true);
     try{ if(document.activeElement && document.activeElement.blur) document.activeElement.blur(); }catch(e){}
     setTimeout(function(){ var i = ov && ov.querySelector('#caroLockPw'); if(i) i.focus(); }, 50);
@@ -121,6 +125,7 @@
   /* 오버레이가 개발자도구 등으로 지워지면 다시 세운다 */
   setInterval(function(){
     if(locked){
+      if(!signedIn()){ unlock(); try{ location.reload(); }catch(e){} return; }   /* ★[v108] 잠긴 동안 세션이 끝나면 로그인 화면으로 */
       if(!ov || !document.body.contains(ov)){ locked = false; ov = null; lock(); }
       return;
     }

@@ -73,8 +73,7 @@
   function showMonthly(){
     document.querySelectorAll('.tabs .tab').forEach(function(x){ x.classList.remove('active'); });
     var b=document.querySelector('.tabs [data-tab="monthly"]'); if(b) b.classList.add('active');
-    HIDE.forEach(function(id){ if(id!=='monthly'){ var el=document.getElementById('tab-'+id); if(el) el.classList.add('hide'); } });
-    var s=document.getElementById('tab-monthly'); if(s) s.classList.remove('hide');
+    document.querySelectorAll('section[id^="tab-"]').forEach(function(el){ el.classList.toggle('hide', el.id!=='tab-monthly'); });   /* ★[v108] */
   }
   function mount(){
     if(document.getElementById('tab-monthly')) return;

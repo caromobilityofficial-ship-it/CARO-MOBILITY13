@@ -190,7 +190,7 @@
     l.innerHTML=rows.map(card).join('');
     l.querySelectorAll('[data-act]').forEach(function(b){ b.addEventListener('click', function(){ act(b.dataset.act, b.dataset.col, b.dataset.id); }); });
     l.querySelectorAll('.ib-p').forEach(function(p){ p.addEventListener('click', function(){ p.classList.toggle('open'); }); });
-    l.querySelectorAll('.ib-ph img').forEach(function(im){ im.addEventListener('click', function(){ try{ var w=window.open(); w.document.write('<img src="'+im.src+'" style="max-width:100%">'); }catch(e){} }); });
+    l.querySelectorAll('.ib-ph img').forEach(function(im){ im.addEventListener('click', function(){ if(window.caroViewPhoto) caroViewPhoto(im.src); }); });   /* ★[v108] 안전한 사진 보기 */
   }
   var STL={new:'신규',in_progress:'처리중',done:'완료'};
   function STLv(v){ return STL[v]||v||'-'; }
@@ -215,7 +215,7 @@
     if(phone) meta.unshift('<a href="tel:'+phone+'">📞 '+esc(ph)+'</a>');
     if(d.name||d.userName) meta.push('👤 '+esc(d.name||d.userName)+(d.userEmail?' ('+esc(d.userEmail)+')':''));
     if(d.handledBy) meta.push('처리: '+esc(d.handledBy)+(d.handledAtMs?' · '+when({createdAtMs:d.handledAtMs}):''));
-    var photos=(d.photos||[]).map(function(p){ return '<img src="'+esc(p)+'" alt="첨부">'; }).join('');
+    var photos=(Array.isArray(d.photos)?d.photos:[]).filter(function(s){ return typeof s==='string' && /^(https:\/\/|data:image\/)/i.test(s); }).map(function(p){ return '<img src="'+esc(p)+'" alt="첨부">'; }).join('');   /* ★[v108] */
     var acts='';
     if(stv==='new') acts='<button class="pri" data-act="in_progress" data-col="'+esc(d._col)+'" data-id="'+esc(d._id)+'">처리 시작</button>';
     if(stv!=='done') acts+='<button data-act="done" data-col="'+esc(d._col)+'" data-id="'+esc(d._id)+'">완료 처리</button>';
