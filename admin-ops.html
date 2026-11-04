@@ -16,7 +16,9 @@
 <script src="//dapi.kakao.com/v2/maps/sdk.js?appkey=932e79971e43cfe8bab8710f6190897b&autoload=false&libraries=services"></script>
 <link rel="stylesheet" href="lib/leaflet/leaflet.css" />
 <script src="lib/leaflet/leaflet.js"></script>   <!-- ★13차: 외부 CDN 대신 자체 파일 -->
-<script src="caro-dialog.js"></script>   <!-- ★[v108] 앱 웹뷰용 확인/입력창 (native confirm 대체) -->
+<script src="caro-dialog.js"></script>
+<script src="caro-pii.js"></script>     <!-- ★[v108.5] 개인정보 가림·열람기록·워터마크 -->
+<script src="caro-kiosk.js"></script>   <!-- ★[v108.5] 로그인하면 전체화면 · 로그아웃으로만 종료 -->   <!-- ★[v108] 앱 웹뷰용 확인/입력창 (native confirm 대체) -->
 <style id="caro-admin-addons">
   /* ── 실시간 관제 패널: 세로 스크롤로만. (flex는 자식을 찌그러뜨려서 쓰지 않음) ── */
   .card.live .lv-body{max-height:calc(100vh - 150px);overflow-y:auto;overflow-x:hidden;padding-right:6px;}
@@ -425,7 +427,7 @@
         <span class="av">C</span>
         <span class="nm" id="adminNm">관리자<small id="adminEmail">—</small></span>
       </div>
-      <button class="logout-btn" id="logoutBtn">로그아웃</button>
+      <button class="logout-btn" id="logoutBtn" title="보안을 위해 프로그램은 로그아웃으로만 종료합니다">로그아웃 · 종료</button>
     </div>
   </div>
   <!-- TABS -->
@@ -937,14 +939,11 @@
     var badge = s==='반납지연'?'<span class="rbadge late">반납지연</span>'
               : s==='대여중'?'<span class="rbadge on">대여중</span>'
               : '<span class="rbadge soon">예약확정</span>';
-    var phone=(''+(cur.phone||'')).trim(), digits=phone.replace(/[^0-9]/g,'');
-    var telHtml = (phone && phone.indexOf('*')<0 && digits.length>=9)
-      ? '<a class="rtel" href="tel:'+digits+'">'+esc(phone)+'</a>'
-      : (phone ? '<span class="rv" style="color:var(--muted)">'+esc(phone)+' <small style="color:var(--muted2)">(가림)</small></span>'
-               : '<span style="color:var(--muted2)">미등록</span>');
+    var phone=(''+(cur.phone||'')).trim();
+    var telHtml = phone ? caroPii.span('phone', phone, {col:'reservations', id:cur.no}) : '<span style="color:var(--muted2)">미등록</span>';   /* ★[v108.5] 가림 + 사유 기록 후 열람 */
     el.innerHTML='<div class="rt">대여자 정보</div>'
       +'<div class="rrow"><span class="rk">상태</span><span class="rv">'+badge+'</span></div>'
-      +'<div class="rrow"><span class="rk">대여자</span><span class="rv">'+esc(cur.user||'-')+'</span></div>'
+      +'<div class="rrow"><span class="rk">대여자</span><span class="rv">'+esc(caroPii.name(cur.user||'-'))+'</span></div>'
       +'<div class="rrow"><span class="rk">연락처</span><span class="rv">'+telHtml+'</span></div>'
       +'<div class="rrow"><span class="rk">대여 기간</span><span class="rv" style="font-size:12px;font-weight:600">'+esc(cur.period||'-')+'</span></div>';
   }
@@ -1409,9 +1408,11 @@
   }
   window.exportResvCsv=function(){
     if(!window.caroNeed('resv','예약 내보내기는 [예약 관리] 권한이 필요합니다')) return;
-    var rows=[['예약번호','차량','차량번호','이용자','전화','이메일','기간','상태']].concat(filteredResv().map(function(r){ return [r.no,r.car,r.carNo,r.user,r.phone,r.email,r.period,liveStatus(r)]; }));
+    /* ★[v108.5] 개인정보 보호: 내보내는 목록의 이름·전화·이메일은 가린 값으로, 내보낸 기록은 서버에 남긴다 */
+    var rows=[['예약번호','차량','차량번호','이용자','전화','이메일','기간','상태']].concat(filteredResv().map(function(r){ return [r.no,r.car,r.carNo,caroPii.name(r.user),caroPii.phone(r.phone),caroPii.email(r.email),r.period,liveStatus(r)]; }));
     var csv='\uFEFF'+rows.map(function(a){ return a.map(function(v){ return '"'+String(v==null?'':v).replace(/"/g,'""')+'"'; }).join(','); }).join('\n');
     var a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'})); a.download='caro_reservations_'+new Date().toISOString().slice(0,10)+'.csv'; a.click();
+    try{ if(typeof window.FB_CALL==='function') window.FB_CALL('staffAudit',{kind:'export', detail:'예약 목록 CSV (가린 값)', count:rows.length-1}).catch(function(){}); }catch(e){}
   };
   function renderResv(){
     var list = filteredResv().sort(function(a,b){
@@ -1422,7 +1423,7 @@
       var sNow=liveStatus(r); var cls=stColor(sNow);
       var carCell = esc(r.car) + (r.carNo?(' <span style="color:var(--muted)">('+esc(r.carNo)+')</span>'):'');
       return '<tr><td style="font-family:Saira;color:var(--muted)">'+esc(r.no)+'</td><td>'+carCell+'</td>'+
-        '<td>'+esc(r.user)+(r.phone?'<div style="font-size:11px;color:var(--muted)">'+esc(r.phone)+'</div>':'')+'</td><td style="color:var(--muted)">'+esc(r.period)+'</td>'+
+        '<td>'+esc(caroPii.name(r.user))+(r.phone?'<div style="font-size:11px;color:var(--muted)">'+caroPii.span('phone',r.phone,{col:'reservations',id:r.no})+'</div>':'')+'</td><td style="color:var(--muted)">'+esc(r.period)+'</td>'+
         '<td><span class="st '+cls+'"><i></i>'+sNow+'</span></td>'+
         '<td><button class="btn sm" onclick="if(window.openResManage){openResManage(\''+jsq(r.no)+'\')}else{toast(\'예약 관리 모듈 로딩 중\')}">관리</button></td></tr>';
     }).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:20px">예약이 없습니다.</td></tr>';
@@ -1951,6 +1952,7 @@
     if(em.toUpperCase()==='CAROMOBILITY') em=ADMIN_EMAIL;   /* ★[14차] 실시간 관제·고객앱과 같은 최고관리자 별명 — 예전엔 운영 관리 로그인만 이걸 몰라 '로그인 실패' 였다 */
     if(!em||!pw){ document.getElementById('lg-err').textContent='아이디와 비밀번호를 입력하세요'; return; }
     document.getElementById('lg-btn').textContent='로그인 중…';
+    try{ if(window.caroKiosk) caroKiosk.goFull(); }catch(e){}   /* ★[v108.5] 로그인하면 전체화면 */
     FN.signInWithEmailAndPassword(A, em, pw)
       .then(function(){ })
       .catch(function(e){
@@ -2000,8 +2002,11 @@
        관제센터 안(iframe)에서 누르면 부모(관제)가 로그아웃을 처리한다. */
     document.getElementById('logoutBtn').addEventListener('click', function(){
       try{ if(window.__CARO_INFRAME){ window.parent.postMessage('caro-admin-exit', (location.origin&&location.origin!=='null')?location.origin:'*'); return; } }catch(e){}
-      var done=function(){ location.reload(); };
-      try{ Promise.resolve(FN.signOut(A)).then(done, done); }catch(e){ done(); }
+      caroConfirm('로그아웃하고 관제 프로그램을 종료할까요?',{ok:'로그아웃 · 종료'}).then(function(ok){ if(!ok) return;
+        if(window.caroKiosk){ caroKiosk.exit(); return; }   /* ★[v108.5] 로그아웃 = 프로그램 종료 */
+        var done=function(){ location.reload(); };
+        try{ Promise.resolve(FN.signOut(A)).then(done, done); }catch(e){ done(); }
+      });
     });
   }
   // ── init ──

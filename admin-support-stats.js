@@ -109,7 +109,7 @@
         +'<div class="ss-when">'+esc(fmt(c.createdAt||c.updatedAt))+'</div>'
         +'<div class="ss-main"><div class="ss-cl">'+esc(c.categoryLabel||c.category||'기타')+'</div>'
         +'<div class="ss-sn">'+esc(lastUser||'—')+'</div>'
-        +'<div class="ss-em">'+esc(c.email||'')+'</div></div>'
+        +'<div class="ss-em">'+esc(caroPii.email(c.email||''))+'</div></div>'
         +'<span class="ss-badge '+st.k+'">'+st.t+'</span></div>';
     });
     h+='</div></div>';

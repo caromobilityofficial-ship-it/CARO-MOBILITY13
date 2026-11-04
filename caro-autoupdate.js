@@ -109,6 +109,7 @@
     var go = function(){
       if(pending) lsSet(KEY, pending);
       try{ if(window.CaroAdminLock && window.CaroAdminLock.carry) window.CaroAdminLock.carry(); }catch(e){}
+      try{ if(window.caroKiosk) window.caroKiosk.leaving(); }catch(e){}
       location.reload();
     };
     var t = setTimeout(go, 10000);   /* 느린 회선이어도 10초 안에는 넘어간다 */

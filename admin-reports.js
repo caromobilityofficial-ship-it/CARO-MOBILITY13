@@ -139,7 +139,7 @@
              +   '</div>'
              +   '<div class="rp-h">'+head+'</div>'
              +   '<div class="rp-sub">'+sub+'</div>'
-             +   '<div class="rp-sub" style="margin-top:3px;">'+esc(r.userName || r.userEmail || '')+' · '+fmt(r.createdTs)+'</div>'
+             +   '<div class="rp-sub" style="margin-top:3px;">'+esc(caroPii.name(r.userName||'') || caroPii.email(r.userEmail||''))+' · '+fmt(r.createdTs)+'</div>'
              + '</div>';
       }).join('') + '</div>';
     }
@@ -177,8 +177,8 @@
     add('접수번호', r.id);
     add('상태', (STATUS[r.status]||STATUS.received).label);
     add('접수일시', fmt(r.createdTs));
-    add('고객', (r.userName||'') + (r.userEmail ? ' ('+r.userEmail+')' : ''));
-    add('연락처', r.userPhone);
+    add('고객', caroPii.nameEmail(r.userName||'', r.userEmail||''));
+    if(r.userPhone) rows.push('<div class="rp-row"><div class="rp-k">연락처</div><div class="rp-v">'+caroPii.span('phone', r.userPhone, {col:r._col, id:r._docId})+'</div></div>');
 
     if(view === 'acc'){
       add('사고일시', r.occurredAt);
@@ -274,7 +274,7 @@
         var arr = [];
         snap.forEach(function(d){
           var o = d.data() || {};
-          o.id = o.id || d.id;
+          o.id = o.id || d.id; o._docId = d.id; o._col = col;
           arr.push(o);
         });
         arr.sort(function(a,b){ return (b.createdTs||0) - (a.createdTs||0); });

@@ -125,7 +125,7 @@
           : '<button class="db-btn" onclick="window.caroDebtHold&&caroDebtHold(\''+jsa(u.userId)+'\')">정지 적용</button>';
         h+='<div class="db-row">'
           +'<div class="db-main">'
-            +'<div class="db-u">'+esc(u.name)+'<span class="sub">'+esc(u.idName||'')+(u.license?(' · 면허 '+esc(u.license)):'')+'</span></div>'
+            +'<div class="db-u">'+caroPii.span('contact',u.name,{uid:u.userId},{label:caroPii.name(u.name)})+'<span class="sub">'+esc(caroPii.email(u.idName||''))+(u.license?(' · 면허 '+esc(caroPii.lic(u.license))):'')+'</span></div>'
             +'<div class="db-meta">누적 미납 '+u.count+'회'+(u.unpaid>0?(' · 현재 미납 '+won(u.unpaid)+'원'):' · 현재 미납 없음')+'</div>'
           +'</div>'
           +'<span class="db-badge long">상습</span>'
@@ -152,9 +152,9 @@
         if(bd.penalty)  bdTxt.push('패널티 '+won(bd.penalty));
         h+='<div class="db-row">'
           +'<div class="db-main">'
-            +'<div class="db-u">'+esc(d.userName||d.idName||'사용자')
-              +'<span class="sub">'+esc(d.idName||'')+(d.license?(' · 면허 '+esc(d.license)):'')+'</span></div>'
-            +'<div class="db-meta">'+esc(d.title||d.carName||'차량')+(d.carNumber?(' · '+esc(d.carNumber)):'')+(d.phone?(' · <a href="tel:'+esc(d.phone)+'" style="color:inherit">'+esc(d.phone)+'</a>'):'')
+            +'<div class="db-u">'+esc(caroPii.name(d.userName||'')||caroPii.email(d.idName||'')||'사용자')
+              +'<span class="sub">'+esc(caroPii.email(d.idName||''))+(d.license?(' · 면허 '+esc(caroPii.lic(d.license))):'')+'</span></div>'
+            +'<div class="db-meta">'+esc(d.title||d.carName||'차량')+(d.carNumber?(' · '+esc(d.carNumber)):'')+(d.phone?(' · '+caroPii.span('phone',d.phone,{col:'unpaid_debts',id:d._id})):'')
               +' · 발생 '+fmtDay(tsOf(d))+' ('+days+'일 경과)'+(d.bookNo?(' · '+esc(d.bookNo)):'')+'</div>'
             +(bdTxt.length?'<div class="db-bd">'+esc(bdTxt.join(' / '))+'</div>':'')
           +'</div>'
@@ -181,8 +181,8 @@
                         : (esc(s.reason||'장기 미납')+' · 해제일 '+fmtDay(until)+' (잔여 '+left+'일)');
         h+='<div class="db-row">'
           +'<div class="db-main">'
-            +'<div class="db-u">'+esc(s.userName||s.idName||'사용자')
-              +'<span class="sub">'+esc(s.idName||'')+(s.license?(' · 면허 '+esc(s.license)):'')+'</span></div>'
+            +'<div class="db-u">'+esc(caroPii.name(s.userName||'')||caroPii.email(s.idName||'')||'사용자')
+              +'<span class="sub">'+esc(caroPii.email(s.idName||''))+(s.license?(' · 면허 '+esc(caroPii.lic(s.license))):'')+'</span></div>'
             +'<div class="db-meta">'+meta+'</div>'
           +'</div>'
           +(held?'<span class="db-badge hab">승인 대기</span>':'<span class="db-badge susp">정지중</span>')

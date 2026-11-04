@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════════════════════
    admin-members.js — ★[24차] 회원 관리 탭 (운영 화면)
-   · users 컬렉션(규칙: 예약·관제 직원 읽기 가능)을 읽어 이름·이메일·전화·면허·가입일·마지막 로그인 표시
+   · ★[v108.5] 회원 목록은 서버 함수(staffListCustomers)가 가린 값으로 준다(규칙 20차: 직원은 users 직접 읽기 불가)
    · 검색(이름·이메일·전화·면허), 미납·정지 상태 함께 표시
    · 회원 카드에서: 이용 정지/해제, 추가 청구 등록(admin-charges.js), 예약 이력 보기
    ※ 개인정보는 화면에서만 보고, 기록(CSV 등)은 남기지 않는다.
@@ -40,32 +40,35 @@
 
   function suspOf(uid){ var s=susps.find(function(x){ return x._id===uid; }); if(!s||s.active===false) return null; var t=Number(s.untilTs)||Date.parse(s.until)||0; return (s.requiresApproval===true||s.habitual===true||t>Date.now())?s:null; }
   function unpaidOf(uid){ return debts.filter(function(d){ var st=d.status||'unpaid'; return d.userId===uid && (st==='unpaid'||st==='due'); }); }   /* ★[v108.2] 미납·정지 탭과 같은 기준(status 없음 = 미납) */
-  function licOf(u){ var l=u.license; if(l&&typeof l==='object'&&l.number) return String(l.number); if(typeof l==='string'&&l) return l; return u.licenseText||''; }
-  function phoneOf(u){ return u.phoneFull||u.phone||u.phoneE164||''; }
-  function nameOf(u){ return u.name||u.id||(u.email?u.email.split('@')[0]:'회원'); }
+  /* ★[v108.5] 개인정보 보호: 회원 정보는 서버(staffListCustomers)가 가린 값으로만 준다 — 원래 값은 [보기] (사유 기록) */
+  function licOf(u){ return u.hasLic ? (u.lic||'등록') : ''; }
+  function phoneOf(u){ return u.hasPhone ? (u.phone||'') : ''; }
+  function nameOf(u){ return u.name||'회원'; }
 
   function render(){
     var root=document.getElementById('membersRoot'); if(!root) return;
     css();
     var ql=q.toLowerCase();
     var list=users.filter(function(u){
-      if(u.provider==='device' || /@device\.caromobility\.kr$|@caro\.local$/.test(u.email||'')) return false;
       if(onlyFlag==='susp' && !suspOf(u._id)) return false;
       if(onlyFlag==='unpaid' && !unpaidOf(u._id).length) return false;
       if(onlyFlag==='nolic' && licOf(u)) return false;
-      if(ql){ var hay=[nameOf(u),u.email,u.id,phoneOf(u),licOf(u)].join(' ').toLowerCase(); if(hay.indexOf(ql)<0) return false; }
       return true;
     }).sort(function(a,b){ return (ts(b.lastLoginAt)||ts(b.createdAt))-(ts(a.lastLoginAt)||ts(a.createdAt)); });
     var nS=users.filter(function(u){ return suspOf(u._id); }).length, nU=users.filter(function(u){ return unpaidOf(u._id).length; }).length, nL=users.filter(function(u){ return !licOf(u); }).length;
-    var h='<div class="mb-head"><input id="mbQ" placeholder="검색: 이름 · 이메일 · 전화 · 면허번호" value="'+esc(q)+'">'
+    var h='<div class="mb-head"><input id="mbQ" placeholder="검색: 이름 · 이메일 · 전화 뒤 4자리 이상 · 면허번호" value="'+esc(q)+'">'
       +'<select id="mbF"><option value="">전체</option><option value="susp"'+(onlyFlag==='susp'?' selected':'')+'>정지 중</option><option value="unpaid"'+(onlyFlag==='unpaid'?' selected':'')+'>미납 있음</option><option value="nolic"'+(onlyFlag==='nolic'?' selected':'')+'>면허 미등록</option></select>'
       +'<span class="sub">'+list.length+'명</span></div>'
       +'<div class="mb-kpis"><div class="mb-kpi"><div class="v">'+users.length+'</div><div class="l">전체 회원</div></div><div class="mb-kpi"><div class="v" style="color:#ff8f85">'+nS+'</div><div class="l">정지 중</div></div><div class="mb-kpi"><div class="v" style="color:var(--warn,#e0a86c)">'+nU+'</div><div class="l">미납 있음</div></div><div class="mb-kpi"><div class="v">'+nL+'</div><div class="l">면허 미등록</div></div></div>';
-    if(!list.length) h+='<div class="mb-empty">'+(users.length?'조건에 맞는 회원이 없습니다.':'회원 정보를 읽을 수 없거나 아직 없습니다. (예약·관제 권한 필요)')+'</div>';
+    h+='<div style="margin:-4px 0 10px;font-size:11.5px;color:var(--muted)">🔒 개인정보 보호를 위해 이름·연락처·이메일·면허번호는 가려서 보여 줍니다. 연락이 필요할 때만 [보기]를 누르세요 — 열람자·시각·사유가 기록됩니다.</div>';
+    if(loadErr) h+='<div class="mb-empty">'+esc(loadErr)+'</div>';
+    else if(!list.length) h+='<div class="mb-empty">'+(loading?'불러오는 중…':(users.length||q?'조건에 맞는 회원이 없습니다.':'회원이 없습니다.'))+'</div>';
     h+=list.slice(0,200).map(card).join('');
     if(list.length>200) h+='<div class="mb-empty">검색어를 더 넣어 주세요 (200명까지만 표시)</div>';
+    var ae=document.activeElement, typing=(ae&&ae.id==='mbQ'), pos=typing?ae.selectionStart:0;
     root.innerHTML=h;
-    var qi=document.getElementById('mbQ'); if(qi){ qi.addEventListener('input', function(){ q=qi.value; var pos=qi.selectionStart; render(); var n=document.getElementById('mbQ'); if(n){ n.focus(); try{ n.setSelectionRange(pos,pos); }catch(e){} } }); }
+    if(typing){ var nq=document.getElementById('mbQ'); if(nq){ nq.focus(); try{ nq.setSelectionRange(pos,pos); }catch(e){} } }
+    var qi=document.getElementById('mbQ'); if(qi){ qi.addEventListener('input', function(){ q=qi.value; clearTimeout(qT); qT=setTimeout(function(){ load(true); }, 500); }); }
     var fs=document.getElementById('mbF'); if(fs) fs.addEventListener('change', function(){ onlyFlag=fs.value; render(); });
     root.querySelectorAll('[data-act]').forEach(function(b){ b.addEventListener('click', function(){ act(b.dataset.act, b.dataset.uid, b); }); });
   }
@@ -76,13 +79,13 @@
     var tags='';
     if(sp) tags+='<span class="mb-tag red">정지 중'+(sp.untilTs?' · ~'+fmt(sp.untilTs):'')+'</span>';
     if(up.length) tags+='<span class="mb-tag red">미납 '+won(upSum)+'원 ('+up.length+'건)</span>';
-    tags+=lic?'<span class="mb-tag gray">면허 '+esc(lic.slice(0,2))+'-**-******-**'+(u.license&&u.license.verified?' ✓':' (미인증)')+'</span>':'<span class="mb-tag gold">면허 미등록</span>';
-    if(u.phoneVerified||u.certCI) tags+='<span class="mb-tag gray">본인인증 ✓</span>';
+    tags+=lic?'<span class="mb-tag gray">면허 '+esc(lic)+(u.licVerified?' ✓':' (미인증)')+'</span>':'<span class="mb-tag gold">면허 미등록</span>';
+    if(u.certified) tags+='<span class="mb-tag gray">본인인증 ✓</span>';
     if(u.withdrawalPending) tags+='<span class="mb-tag gray">탈퇴 대기</span>';
     var hist=rv.slice(0,8).map(function(r){ return '· '+esc(r.no)+' '+esc(r.car)+' '+esc(r.period)+' — '+esc(r.status); }).join('<br>')||'예약 이력 없음';
     return '<div class="mb-card'+(sp||up.length?' bad':'')+'" id="mb-'+esc(uid)+'">'
       +'<div><div class="mb-nm">'+esc(nameOf(u))+' <span style="font-weight:400;color:var(--muted);font-size:12px">'+esc(u.email||u.id||'')+'</span></div>'
-      +'<div class="mb-sub">'+(ph?'<a href="tel:'+esc(ph.replace(/[^\d+]/g,''))+'">📞 '+esc(ph)+'</a> · ':'📞 미등록 · ')+'가입 '+fmt(u.createdAt||u.signupAt)+' · 마지막 로그인 '+fmt(u.lastLoginAt)+(u.lastDevice?' ('+esc(u.lastDevice)+')':'')+' · 예약 '+rv.length+'건</div>'
+      +'<div class="mb-sub">'+(ph?'📞 '+caroPii.span('phone',ph,{uid:uid})+' · ':'📞 미등록 · ')+'가입 '+fmt(u.createdAt||u.signupAt)+' · 마지막 로그인 '+fmt(u.lastLoginAt)+' · 예약 '+rv.length+'건</div>'
       +'<div class="mb-sub">'+tags+'</div></div>'
       +'<div class="mb-act">'
       +(sp?'<button data-act="unsusp" data-uid="'+esc(uid)+'">정지 해제</button>':'<button class="warn" data-act="susp" data-uid="'+esc(uid)+'">이용 정지</button>')
@@ -113,11 +116,23 @@
     }
   }
 
-  var subscribed=false;
+  var subscribed=false, loading=false, loadErr='', qT=null, lastLoad=0;
+  /* 회원 목록 = 서버 함수(가린 값). 탭을 열 때·검색할 때·2분마다 새로 받는다 */
+  function load(force){
+    if(typeof window.FB_CALL!=='function') return;
+    if(!force && Date.now()-lastLoad<120000) return;
+    lastLoad=Date.now(); loading=true; loadErr=''; render();
+    window.FB_CALL('staffListCustomers',{ q:(q||'').trim() }).then(function(r){
+      loading=false;
+      users=((r&&r.list)||[]).map(function(x){ return { _id:x.uid, name:x.name, email:x.email, phone:x.phone, hasPhone:x.hasPhone, lic:x.lic, hasLic:x.hasLic, licVerified:x.licVerified, certified:x.certified, withdrawalPending:x.withdrawalPending, createdAt:x.createdAt, lastLoginAt:x.lastLoginAt }; });
+      render();
+    }).catch(function(e){ loading=false; var c=String((e&&e.code)||''); loadErr = /not-found/.test(c) ? '서버 업데이트(firebase deploy) 후 회원 목록이 보입니다' : (/permission/.test(c)?'회원 정보는 [예약 관리] 권한이 있어야 볼 수 있습니다':('회원 목록을 불러오지 못했습니다 — '+c)); render(); });
+  }
   function subscribe(){
+    load(false);
     if(subscribed||!ready()) return; subscribed=true;
     var FN=window.FB_FN, db=window.FB_DB;
-    try{ FN.onSnapshot(FN.collection(db,'users'), function(s){ users=[]; s.forEach(function(d){ users.push(Object.assign({}, d.data()||{}, {_id:d.id})); }); render(); }, function(e){ console.warn('[회원] users 구독 실패', e&&e.code); render(); }); }catch(e){}
+    setInterval(function(){ var t=document.getElementById('tab-members'); if(t && !t.classList.contains('hide')) load(false); }, 30000);
     try{ FN.onSnapshot(FN.collection(db,'unpaid_debts'), function(s){ debts=[]; s.forEach(function(d){ debts.push(Object.assign({}, d.data()||{}, {_id:d.id})); }); render(); }, function(){}); }catch(e){}
     try{ FN.onSnapshot(FN.collection(db,'suspensions'), function(s){ susps=[]; s.forEach(function(d){ susps.push(Object.assign({}, d.data()||{}, {_id:d.id})); }); render(); }, function(){}); }catch(e){}
     try{ FN.onSnapshot(FN.collection(db,'reservations'), function(s){ resvByUid={}; s.forEach(function(d){ var x=d.data()||{}; if(!x.userId) return; (resvByUid[x.userId]=resvByUid[x.userId]||[]).push({ no:d.id, car:(x.car&&x.car.name)||'', period:String(x.start||'').slice(0,16).replace('T',' '), status:x.cancelled?'취소':(x.returned?'반납완료':'진행'), ms:Date.parse(x.start)||0 }); }); Object.keys(resvByUid).forEach(function(k){ resvByUid[k].sort(function(a,b){ return b.ms-a.ms; }); }); render(); }, function(){}); }catch(e){}

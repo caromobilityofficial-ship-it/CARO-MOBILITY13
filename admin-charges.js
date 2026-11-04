@@ -36,7 +36,7 @@
   var target=null;
   window.caroOpenCharge=function(t){
     target=t||{}; build();
-    ov.querySelector('#chWho').textContent=(t.name?t.name+' ':'')+(t.email?'('+t.email+') ':'')+(t.bookNo?'· 예약 '+t.bookNo:'');
+    ov.querySelector('#chWho').textContent=(t.name?caroPii.name(t.name)+' ':'')+(t.email?'('+caroPii.email(t.email)+') ':'')+(t.bookNo?'· 예약 '+t.bookNo:'');
     ov.querySelector('#chAmt').value=''; ov.querySelector('#chMemo').value='';
     ov.classList.add('on');
     ov.querySelector('#chGo').onclick=submit;

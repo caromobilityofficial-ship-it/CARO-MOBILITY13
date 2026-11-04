@@ -111,9 +111,9 @@
                 + (car.id!=null&&car.id!==''?(' <span style="color:var(--muted)">('+esc(car.id)+')</span>'):'');
     elBody.innerHTML = ''
      + '<div class="rm-sec"><div class="rm-sec-t">대여 정보</div><div class="rm-grid">'
-     +   '<span class="k">대여자</span><span class="v">'+esc(d.userName||d.name||'-')+'</span>'
-     +   '<span class="k">이메일</span><span class="v">'+esc(d.userEmail||'-')+'</span>'
-     +   '<span class="k">전화</span><span class="v">'+(d.userPhone||d.phone?('<a href="tel:'+esc(d.userPhone||d.phone)+'" style="color:inherit">'+esc(d.userPhone||d.phone)+'</a>'):'<span style="color:var(--muted)">미등록 (10월 이후 예약부터 자동 기록)</span>')+'</span>'
+     +   '<span class="k">대여자</span><span class="v">'+caroPii.span('contact',d.userName||d.name||'-',{col:'reservations',id:curNo},{label:caroPii.name(d.userName||d.name||'-')})+'</span>'
+     +   '<span class="k">이메일</span><span class="v">'+esc(caroPii.email(d.userEmail||'-'))+'</span>'
+     +   '<span class="k">전화</span><span class="v">'+(d.userPhone||d.phone?caroPii.span('phone',d.userPhone||d.phone,{col:'reservations',id:curNo}):'<span style="color:var(--muted)">미등록</span>')+'</span>'
      +   '<span class="k">차량</span><span class="v">'+carLine+'</span>'
      +   '<span class="k">보험</span><span class="v">'+esc((d.ins&&d.ins.name)||'없음')+'</span>'
      + '</div></div>'

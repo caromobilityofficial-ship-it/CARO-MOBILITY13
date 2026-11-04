@@ -8,7 +8,9 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&family=Saira:wght@500;600;700&display=swap" rel="stylesheet">
 <script type="module" src="firebase-config.js?v=6"></script>
-<script src="caro-dialog.js"></script>   <!-- ★[v108] 앱 웹뷰용 확인/입력창 (native confirm 대체) -->
+<script src="caro-dialog.js"></script>
+<script src="caro-pii.js"></script>     <!-- ★[v108.5] 개인정보 가림·열람기록·워터마크 -->
+<script src="caro-kiosk.js"></script>   <!-- ★[v108.5] 로그인하면 전체화면 · 로그아웃으로만 종료 -->   <!-- ★[v108] 앱 웹뷰용 확인/입력창 (native confirm 대체) -->
 <style>
 /* ═══════════ CARO 관제센터 — 다크 럭셔리 테마 (v1.0 재설계) ═══════════ */
 :root{
@@ -269,7 +271,7 @@ body.ops .kpis, body.ops .main, body.ops .bottom{display:none!important;}
   <span class="clock" id="clock">--:--:--</span>
   <span class="adm" id="adm">—</span>
   <button class="lgout" id="mfabtn" onclick="if(window.CaroMFA)CaroMFA.openSetup()">🔐 2단계 인증</button>
-  <button class="lgout" id="lgout">로그아웃</button>
+  <button class="lgout" id="lgout" title="보안을 위해 프로그램은 로그아웃으로만 종료합니다">로그아웃 · 종료</button>
 </div>
 
 <!-- 운영 관리 (요금·예약·회원·공지·정산 — 기존 시스템 전체 내장) -->
@@ -726,7 +728,7 @@ function renderDiag(v){
       rows.push(['메모리 여유', '<span class="'+(v.heap<40000?'r':'gd')+'">'+Math.round(v.heap/1024)+' KB'+(v.heap<40000?' · ⚠ 부족':'')+'</span>']);
   }
   if(v.station) rows.push(['가까운 거점', '<span class="'+(v.station.d>v.station.s.radiusM?'y':'g')+'">'+esc(v.station.s.name)+' '+Math.round(v.station.d)+'m'+(v.station.d>v.station.s.radiusM?' (거점 밖)':' (거점 안)')+'</span>']);
-  var rv=resvOf(v); rows.push(['현재 예약', rv?('<span class="'+(rv.live==='반납지연'?'y':'g')+'">'+esc(rv.live)+' · '+esc(rv.user)+(rv.phone?' '+esc(rv.phone):'')+' · ~'+new Date(rv.eMs).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})+'</span>'):'<span class="gd">없음</span>']);
+  var rv=resvOf(v); rows.push(['현재 예약', rv?('<span class="'+(rv.live==='반납지연'?'y':'g')+'">'+esc(rv.live)+' · '+esc(caroPii.name(rv.user))+(rv.phone?' '+caroPii.span('phone',rv.phone,{col:'reservations',id:rv.no}):'')+' · ~'+new Date(rv.eMs).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})+'</span>'):'<span class="gd">없음</span>']);
   var ist=$('immobst');
   if(ist) ist.textContent='시동차단 상태: '+(v.immob?'⛔ 차단 중':'해제')
     + (!v.online ? ' · 오프라인 — 명령이 전달되지 않습니다'
@@ -949,9 +951,9 @@ function checkAlerts(){
     if(typeof v.lat==='number'&&v.gpsLive){ var ns=nearestStation(v.lat,v.lng); v.station=ns; var outside=ns&&ns.d>ns.s.radiusM;
       alertOnce('geo-'+v.id, !!(outside&&!r), '🚨 '+v.name+' 예약 없이 거점 밖 ('+(ns?ns.s.name+' '+Math.round(ns.d)+'m':'')+') — 도난·무단사용 의심');
       alertOnce('mv-'+v.id, !!(v.moving&&!r), '🚨 '+v.name+' 예약 없이 주행 중!'); }
-    alertOnce('late-'+v.id, !!(r&&r.live==='반납지연'&&v.moving), '⏰ '+v.name+' 반납시간 지났는데 주행 중 ('+(r?r.user:'')+')');
+    alertOnce('late-'+v.id, !!(r&&r.live==='반납지연'&&v.moving), '⏰ '+v.name+' 반납시간 지났는데 주행 중 ('+(r?caroPii.name(r.user):'')+')');
     /* ★[17차] 반납 지연(주행 여부와 무관) — 고객센터가 고객에게 바로 연락할 수 있게 이름·전화번호까지 띄운다 */
-    alertOnce('late2-'+v.id, !!(r&&r.live==='반납지연'), '⏰ 반납 지연 — '+v.name+' · '+(r?r.user:'')+(r&&r.phone?' '+r.phone:'')+' · 고객센터에서 연락해 주세요');
+    alertOnce('late2-'+v.id, !!(r&&r.live==='반납지연'), '⏰ 반납 지연 — '+v.name+' · '+(r?caroPii.name(r.user):'')+(r&&r.phone?' '+caroPii.phone(r.phone):'')+' · 차량을 눌러 [보기]로 연락처 확인');   /* ★[v108.5] 알림에는 가린 값만 */
     alertOnce('door-'+v.id, !!(v.doorOpen&&!v.acc&&!r), '🚪 '+v.name+' 예약 없이 문 열림 감지');
   });
 }
@@ -1090,6 +1092,7 @@ function doLogin(){
   if(em.toUpperCase()==='CAROMOBILITY') em=ADMIN_EMAIL;   /* 앱과 동일한 최고관리자 별명 지원 */
   if(!em||!pw){ $('g-err').textContent='이메일과 비밀번호를 입력하세요'; return; }
   $('g-btn').textContent='로그인 중…'; $('g-err').textContent='';
+  try{ if(window.caroKiosk) caroKiosk.goFull(); }catch(e){}   /* ★[v108.5] 로그인 버튼을 누르는 순간 전체화면 (브라우저는 클릭 안에서만 허용) */
   FN.signInWithEmailAndPassword(A,em,pw).catch(function(e){
     $('g-btn').textContent='로그인';
     var m=(e&&e.code)||'';
@@ -1128,7 +1131,8 @@ function waitAuth(n){
         /* ★[15차] 프로그램별 로그인 분리: 이 화면(실시간 관제)은 '관제' 권한이 있는 계정만 들어온다.
            운영 권한만 있는 계정은 여기서 로그인되지 않는다(운영 관리 화면에서 로그인). 두 화면을 모두 쓰려면
            최고관리자가 두 권한을 모두 부여해야 한다. 최고관리자는 위 분기에서 항상 통과. */
-        if(hasCtrl){ enter(u.email+(d.name?(' · '+d.name):''), pm, false); }
+        /* ★[v108.5] 한 프로그램으로 통합: 관제 권한이면 [실시간 관제], 운영 권한이면 [운영 관리] 탭이 보인다(둘 다면 둘 다) */
+        if(hasCtrl||hasOps){ enter(u.email+(d.name?(' · '+d.name):''), pm, false); }
         else {
           FN.signOut(A);
           $('g-err').textContent = hasOps
@@ -1141,7 +1145,7 @@ function waitAuth(n){
         $('gate').style.display='flex';
       });
     }
-    else { if(started){ location.reload(); return; } $('gate').style.display='flex'; $('g-btn').textContent='로그인'; }   /* ★[v108] 로그아웃·토큰 만료 뒤 죽은 화면이 남지 않게 새로 연다 */
+    else { if(started){ try{ caroKiosk.leaving(); }catch(e){} location.reload(); return; } $('gate').style.display='flex'; $('g-btn').textContent='로그인'; }   /* ★[v108] 로그아웃·토큰 만료 뒤 죽은 화면이 남지 않게 새로 연다 */
   });
   function enter(label, pm, isSuper){
     $('gate').style.display='none'; $('adm').textContent=label;
@@ -1172,14 +1176,16 @@ function waitAuth(n){
      예전: 로그아웃하지 않고 고객앱(index.html)으로 이동 → ① 단독 운영이 안 되고 ② 세션이 살아 있어 누구나 다시 열 수 있었다.
      지금: 진짜 로그아웃 → 이 화면의 로그인 창으로 돌아온다. (고객앱으로 가지 않는다)
      ※ 이 브라우저에서 같은 계정으로 고객앱을 함께 쓰고 있었다면 그쪽도 로그아웃된다 — 관제 전용 태블릿이면 무관. */
+  /* ★[v108.5] 로그아웃 = 프로그램 종료. 로그아웃한 뒤 창을 닫는다(창 닫기가 막힌 일반 브라우저 탭이면 로그인 화면으로) */
   function adminExit(){
+    if(window.caroKiosk){ caroKiosk.exit(); return; }
     var done=function(){ location.reload(); };
     try{ if(A && FN && typeof FN.signOut==='function'){ Promise.resolve(FN.signOut(A)).then(done,done); return; } }catch(e){}
     done();
   }
   $('lgout').addEventListener('click',function(){
     try{ if(window.top!==window.self){ window.parent.postMessage('caro-admin-exit',(location.origin&&location.origin!=='null')?location.origin:'*'); return; } }catch(e){}
-    adminExit();
+    caroConfirm('로그아웃하고 관제 프로그램을 종료할까요?',{ok:'로그아웃 · 종료'}).then(function(ok){ if(ok) adminExit(); });
   });
   /* 운영 관리 화면(iframe)의 로그아웃도 여기로 온다 */
   window.addEventListener('message',function(ev){ if((ev.origin===location.origin||location.origin==='null') && ev.data==='caro-admin-exit') adminExit(); });

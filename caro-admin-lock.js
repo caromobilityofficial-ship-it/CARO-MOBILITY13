@@ -132,7 +132,7 @@
   /* 오버레이가 개발자도구 등으로 지워지면 다시 세운다 */
   setInterval(function(){
     if(locked){
-      if(!signedIn()){ unlock(); lsSet(KEY, null); try{ location.reload(); }catch(e){} return; }   /* ★[v108] 잠긴 동안 세션이 끝나면 로그인 화면으로 */
+      if(!signedIn()){ unlock(); lsSet(KEY, null); try{ if(window.caroKiosk) caroKiosk.leaving(); location.reload(); }catch(e){} return; }   /* ★[v108] 잠긴 동안 세션이 끝나면 로그인 화면으로 */
       if(!ov || !document.body.contains(ov)){ locked = false; ov = null; lock(); }
       return;
     }

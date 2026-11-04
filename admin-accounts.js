@@ -110,15 +110,16 @@
       +'<div class="hint">회사 메일(@caromobility.kr)을 입력하면 로그인 계정이 자동으로 만들어지고, 그 메일로 <b>비밀번호 설정 메일</b>이 갑니다. 직원은 메일에서 비밀번호를 정한 뒤 관제 프로그램에 로그인하면 됩니다.</div>'
       +'<label class="fld">직원 이름 *</label>'
       +'<input class="txt" id="acctName" placeholder="예: 이현장" maxlength="30" />'
-      +'<label class="fld">역할 / 직책 (선택)</label>'
+      +'<label class="fld">담당 업무 / 직급 (선택)</label>'
       +'<div class="role-row">'
         +'<input class="txt" id="acctRole" placeholder="예: 송도점 운영 담당" maxlength="40" />'
         +'<select class="sel" id="acctPosition">'
-          +'<option value="">직책 ▼</option>'
+          +'<option value="">직급 ▼</option>'
+          +'<option>총괄파트장</option>'
+          +'<option>파트장</option>'
           +'<option>매니저</option>'
-          +'<option>슈퍼바이저</option>'
-          +'<option>어드바이저</option>'
           +'<option>사원</option>'
+          +'<option>프리랜서</option>'
           +'<option>계약직</option>'
         +'</select>'
       +'</div>'
@@ -156,7 +157,12 @@
     em.disabled = !!acct;   /* 수정 시 이메일(키) 고정 */
     modal.querySelector('#acctName').value = acct ? (acct.name||'') : '';
     modal.querySelector('#acctRole').value = acct ? (acct.role||'') : '';
-    var posSel=modal.querySelector('#acctPosition'); if(posSel) posSel.value = acct ? (acct.position||'') : '';
+    var posSel=modal.querySelector('#acctPosition');
+    if(posSel){ var pv=acct?(acct.position||''):'';
+      /* 예전 직급(슈퍼바이저·어드바이저 등)으로 저장된 직원은 그 값을 목록에 잠시 넣어 보여 준다 — 새 직급으로 골라 저장하면 바뀜 */
+      Array.prototype.slice.call(posSel.querySelectorAll('option[data-old]')).forEach(function(o){ o.remove(); });
+      if(pv && !Array.prototype.some.call(posSel.options,function(o){ return o.value===pv||o.text===pv; })){ var o=document.createElement('option'); o.text=pv+' (예전 직급)'; o.value=pv; o.setAttribute('data-old','1'); posSel.appendChild(o); }
+      posSel.value=pv; }
     var perms=Object.assign({},(acct&&acct.perms)||{});
     if(perms.ops) perms=Object.assign({resv:true,cars:true,pricing:true,notices:true},perms);   /* ★[v108] 옛 '운영' 권한 = 네 권한 전부 */
     modal.querySelectorAll('.aperm input').forEach(function(c){ c.checked=!!perms[c.dataset.perm]; });

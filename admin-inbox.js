@@ -124,9 +124,9 @@
     box.innerHTML='<div class="ib-al-head"><span>🔔 처리 대기 알림 '+open.length+'건 (서버 자동 감지 포함)</span><button class="ib-f" id="ib-al-all">모두 읽음</button></div>'
       + open.slice(0,30).map(function(a){
         var k=AL[a.kind||a.type]||['•',a.kind||a.type||'알림'];
-        var ph=(a.phone||'').replace(/[^\d]/g,'');
+        var ph=(a.phone||'');
         return '<div class="ib-al k-'+esc(a.kind||a.type||'')+'"><span>'+k[0]+'</span><div class="t"><b>'+esc(k[1])+'</b> · '+esc(a.summary||a.bookNo||a.refId||'')
-          +(ph?' · <a href="tel:'+ph+'">📞 '+esc(a.phone)+'</a>':'')+'<div class="w">'+(alTs(a)?new Date(alTs(a)).toLocaleString('ko-KR'):'')+(a.refId?' · '+esc(a.refId):'')+'</div></div>'
+          +(ph?' · 📞 '+caroPii.span('phone',ph,{col:'admin_alerts',id:a._id}):'')+'<div class="w">'+(alTs(a)?new Date(alTs(a)).toLocaleString('ko-KR'):'')+(a.refId?' · '+esc(a.refId):'')+'</div></div>'
           +(a.refId&&/^(CR|EX)/.test(a.refId)&&window.openResManage?'<button data-open="'+esc(a.refId)+'">예약 열기</button>':'')
           +'<button data-read="'+esc(a._id)+'">읽음</button></div>';
       }).join('');
@@ -202,18 +202,18 @@
       body=esc(d.description||'');
       if(d.location) meta.push('📍 '+esc(d.location));
       if(d.datetime||d.occurredAt) meta.push('🕒 '+esc(d.datetime||d.occurredAt));
-      if(d.otherVehicle) meta.push('상대 '+esc(d.otherVehicle)+(d.otherPhone?' '+esc(d.otherPhone):''));
+      if(d.otherVehicle) meta.push('상대 '+esc(d.otherVehicle)+(d.otherPhone?' '+caroPii.span('other',d.otherPhone,{col:d._col,id:d._id}):''));
       if(d.police) meta.push('경찰 '+esc(d.police));
       if(d.bookNo) meta.push('예약 '+esc(d.bookNo));
     } else {
       head=(d.category?'['+esc(d.category)+'] ':'')+esc(d.title||'(제목 없음)');
       body=esc(d.content||'');
       if(d.replyMethod) meta.push('회신: '+esc(d.replyMethod));
-      if(d.email) meta.push('✉ '+esc(d.email));
+      if(d.email) meta.push('✉ '+esc(caroPii.email(d.email)));
     }
-    var ph=d.phone||d.userPhone||''; var phone=ph.replace(/[^\d]/g,'');
-    if(phone) meta.unshift('<a href="tel:'+phone+'">📞 '+esc(ph)+'</a>');
-    if(d.name||d.userName) meta.push('👤 '+esc(d.name||d.userName)+(d.userEmail?' ('+esc(d.userEmail)+')':''));
+    var ph=d.phone||d.userPhone||'';   /* ★[v108.5] 가림 + [보기](사유 기록) */
+    if(ph) meta.unshift('📞 '+caroPii.span('phone',ph,{col:d._col,id:d._id}));
+    if(d.name||d.userName) meta.push('👤 '+esc(caroPii.nameEmail(d.name||d.userName, d.userEmail)));
     if(d.handledBy) meta.push('처리: '+esc(d.handledBy)+(d.handledAtMs?' · '+when({createdAtMs:d.handledAtMs}):''));
     var photos=(Array.isArray(d.photos)?d.photos:[]).filter(function(s){ return typeof s==='string' && /^(https:\/\/|data:image\/)/i.test(s); }).map(function(p){ return '<img src="'+esc(p)+'" alt="첨부">'; }).join('');   /* ★[v108] */
     var acts='';
