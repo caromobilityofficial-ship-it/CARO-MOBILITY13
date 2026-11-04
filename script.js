@@ -1178,6 +1178,13 @@ function caroNormLicense(v, ctx){
   var o=null;
   /* ★[v106] 번호는 하이픈·공백을 뺀 숫자만 보관 → "12-34-567890-12" 와 "123456789012" 를 같은 번호로 본다 (형식이 달라 '미등록'으로 보이던 것 방지) */
   function _n(x){ x=String(x==null?'':x).trim(); if(!x||x.indexOf('*')!==-1) return ''; var d=x.replace(/[^0-9]/g,''); return d.length>=10?d:x; }
+  /* ★[v109] 서버가 암호화해 둔 면허(enc/masked/secure): 기기에는 가린 번호만 둔다 — 원래 번호는 서버(암호문)에만 */
+  if(v&&typeof v==='object'&&(v.secure||v.enc||(v.masked&&String(v.masked).indexOf('*')!==-1))){
+    var mk=String(v.masked||v.number||'');
+    o={number:mk, masked:mk, name:v.name||'', birth:v.birth||'', type:v.type||'', expiry:v.expiry||'', verified:!!v.verified, secure:true};
+    if(!o.name&&ctx.name) o.name=ctx.name; if(!o.birth&&ctx.birth) o.birth=ctx.birth;
+    return mk?o:null;
+  }
   if(v&&typeof v==='object'){
     o={number:_n(v.number), name:v.name||'', birth:v.birth||'', type:v.type||'', expiry:v.expiry||'', verified:!!v.verified};
   }else if(typeof v==='string'){
@@ -1189,6 +1196,10 @@ function caroNormLicense(v, ctx){
 }
 function caroApplyLicenseLocal(lic){
   try{
+    if(lic&&lic.number&&!lic.secure){   /* ★[v109] 원래 번호는 기기에 남기지 않는다 — 가린 값으로 바꿔 보관 */
+      var _d=String(lic.number).replace(/[^0-9]/g,'');
+      if(_d.length>=4){ var _m=_d.slice(0,2)+'-**-******-'+_d.slice(-2); lic=Object.assign({},lic,{number:_m, masked:_m, secure:true}); }
+    }
     if(lic&&lic.number){
       userInfo.license=lic.number;
       localStorage.setItem('caro_license', JSON.stringify(lic));
@@ -1208,21 +1219,20 @@ function caroSaveLicense(lic){
   if(!lic) return Promise.resolve(false);
   var uid=userInfo.uid||(window.FB_AUTH&&window.FB_AUTH.currentUser&&window.FB_AUTH.currentUser.uid)||'';
   if(!fbReady()||!uid) return Promise.resolve(false);
-  var fn=window.FB_FN, ref=fn.doc(window.FB_DB,'users',uid);
   window.__caroLicErr='';
-  return fn.setDoc(ref,
-      {license:lic, licenseText:lic.number, licenseRegisteredAt:new Date().toISOString()},{merge:true})
-    .then(function(){
-      /* 서버에 실제로 들어갔는지 다시 읽어 확인 — 확인되면 로컬 반영 */
-      return fn.getDoc(ref).then(function(s){
-        var d=(s&&s.exists&&s.exists())?s.data():null;
-        var got=d&&((d.license&&d.license.number)||d.licenseText)||'';
-        if(String(got)!==String(lic.number)){ window.__caroLicErr='서버 확인 실패(값 없음)'; console.error('🔴 면허 저장 확인 실패: 서버에 값이 없음', uid); return false; }
-        console.log('✅ 면허 서버 저장 확인 uid='+uid);
-        caroApplyLicenseLocal(lic); return true;
-      });
+  if(lic.secure) return Promise.resolve(true);   /* 이미 서버에 암호화돼 있는 면허(가린 값) — 다시 보낼 것 없음 */
+  /* ★[v109] 면허번호는 서버(saveLicense)로만 보낸다 — 서버가 암호화(AES-256)해 저장하고 가린 값만 돌려준다.
+     다른 면허로 바꾸는 경우 서버가 '재인증 필요' 를 돌려주면 비밀번호를 다시 묻고 한 번 더 보낸다 */
+  var call=window.caroCallSecure||window.FB_CALL;
+  if(typeof call!=='function'){ window.__caroLicErr='서버 연결 대기'; return Promise.resolve(false); }
+  return call('saveLicense',{number:lic.number, name:lic.name||'', birth:lic.birth||'', type:lic.type||'', expiry:lic.expiry||''}, '운전면허를 바꾸려면 비밀번호를 한 번 더 입력해 주세요.')
+    .then(function(r){
+      var got=r&&r.license?caroNormLicense(r.license,{name:userInfo.name,birth:userInfo.birth}):null;
+      if(!got){ window.__caroLicErr='서버 확인 실패'; return false; }
+      console.log('✅ 면허 서버 암호화 저장 uid='+uid);
+      caroApplyLicenseLocal(got); return true;
     })
-    .catch(function(e){ window.__caroLicErr=(e&&e.code)||String(e); console.error('🔴 면허 저장 실패:',e&&e.code||e); return false; });
+    .catch(function(e){ var m=(e&&e.message)||''; window.__caroLicErr=(/already-exists/.test((e&&e.code)||'')?'이미 다른 계정에 등록된 면허입니다':(m||(e&&e.code)||String(e))); console.error('🔴 면허 저장 실패:',e&&e.code||e); return false; });
 }
 window.caroNormLicense=caroNormLicense; window.caroApplyLicenseLocal=caroApplyLicenseLocal; window.caroSaveLicense=caroSaveLicense;
 
@@ -1589,11 +1599,12 @@ function handleSignup(){
 
   var btn=document.querySelector('#signup-step3 .submit-btn');
   if(btn){ btn.disabled=true; btn.textContent='가입 처리 중...'; }
+  var signupLic=null;
 
   function signupDone(){
     userInfo.id=id; userInfo.email=email; userInfo.name=name; userInfo.phone=phone||''; userInfo.birth=birth||'';
     /* ★ [v101] 가입 때 입력한 면허를 즉시 로컬에도 표준형으로 반영 (서버에는 아래 setDoc 으로 저장됨) */
-    try{ caroApplyLicenseLocal(license?{number:license,name:name,birth:birth,type:'',expiry:'',verified:false}:null); }catch(e){}
+    try{ caroApplyLicenseLocal(signupLic); }catch(e){}   /* ★[v109] 서버가 암호화 저장 후 돌려준 가린 값 */
     if(btn){ btn.disabled=false; btn.textContent='가입 완료'; }
     goSignupStep(4);
   }
@@ -1622,14 +1633,21 @@ function handleSignup(){
           id:id, name:name, email:email,
           phone: phone || '',
           birth: birth || '',
-          license: license ? {number:license, name:name, birth:birth||'', type:'', expiry:'', verified:false} : '',
-          licenseText: license || '',
+          /* ★[v109] 면허번호는 여기에 쓰지 않는다 — 아래 saveLicense(서버 암호화)로만 저장 */
           /* ★ [v101] phoneVerified·certCI 는 서버(verifyCertification 함수)만 기록 — 규칙이 클라이언트 쓰기를 막는다.
              전화 인증 여부는 Firebase 계정에 연결된 번호(phoneE164)로 알 수 있다. */
           phoneE164: (cred.user && cred.user.phoneNumber) || '',
           consents: consents, birthFull: birth || '',
           createdAt: fn.serverTimestamp(), uid:uid
-        }, {merge:true});
+        }, {merge:true}).then(function(){
+          if(!license||typeof window.FB_CALL!=='function') return;
+          return window.FB_CALL('saveLicense',{number:license, name:name, birth:birth||''}).then(function(r){
+            signupLic=(r&&r.license)?caroNormLicense(r.license,{name:name,birth:birth}):null;
+          }).catch(function(e){
+            signupLic=null; console.warn('면허 저장 실패', e&&e.code);
+            setTimeout(function(){ showToast(/already-exists/.test((e&&e.code)||'')?'이 운전면허는 이미 다른 계정에 등록돼 있어요. 고객센터로 문의해 주세요.':'면허 저장에 실패했어요. 내 정보 → 운전면허에서 다시 등록해 주세요.'); },1500);
+          });
+        });
       })
       .then(signupDone)
       .catch(function(e){
@@ -5512,6 +5530,7 @@ function deletePICard(idx){
 function saveLicenseFromPI(){
   var inp=document.getElementById('pi-license');
   if(!inp||!inp.value.trim()){showToast('운전면허 번호를 입력해 주세요.');return;}
+  if(inp.value.indexOf('*')!==-1){ showToast('등록된 면허는 보안을 위해 가려져 있어요. 바꾸려면 새 면허번호 12자리를 입력해 주세요.'); return; }   /* ★[v109] */
   /* ★ [v101] 서버(users.license 표준형)에 먼저 저장하고, 성공했을 때만 '저장됨' 안내.
      예전엔 메모리에만 넣고 성공 토스트 → 앱을 다시 켜면 사라졌다. */
   var lic={number:inp.value.trim(), name:userInfo.name||'', birth:userInfo.birth||'', type:'', expiry:'', verified:false};
@@ -5784,6 +5803,11 @@ function onWithdrawAgreeChange(){
 }
 
 function confirmWithdrawal(){
+  /* ★[v109] 탈퇴는 비밀번호를 한 번 더 확인한 뒤에만 */
+  if(!window.__caroWdOk && window.caroReauth && window.FB_AUTH && window.FB_AUTH.currentUser){
+    window.caroReauth('회원 탈퇴를 진행하려면 비밀번호를 한 번 더 입력해 주세요.').then(function(ok){ if(ok){ window.__caroWdOk=true; try{ confirmWithdrawal(); } finally { window.__caroWdOk=false; } } });
+    return;
+  }
   var chk=document.getElementById('withdraw-agree-chk');
   if(!chk||!chk.checked){showToast('동의 체크를 해주세요.');return;}
   /* 탈퇴 정보 백업 */
@@ -9526,7 +9550,7 @@ window.devUploadAllCars=function(){
     h+='<div class="apd-section-title"><span class="apd-section-title-icon">🪪</span>등록된 운전면허증</div>';
     /* ★[v106] '등록 완료'는 면허번호가 실제로(가려지지 않은 값으로) 있을 때만. 예전 버전이 남긴 번호 없는 기록(이름만 있음)은
        홈 '이용 준비' 카드와 서버 예약 자격 검사가 '미등록'으로 보므로, 여기서도 같은 기준으로 '번호 재등록 필요' 를 보여 준다. */
-    var _licOk=!!(lic&&lic.number&&String(lic.number).trim()&&String(lic.number).indexOf('*')===-1);
+    var _licOk=!!(lic&&lic.number&&String(lic.number).trim()&&(lic.secure||String(lic.number).indexOf('*')===-1));   /* ★[v109] 서버 암호화(가린 값)도 등록 완료 */
     if(lic&&lic.name&&!_licOk){
       h+='<div class="apd-row"><span class="apd-row-label">상태</span><span class="apd-row-value" style="color:#b23a3a;font-weight:700;">면허번호 재등록 필요</span></div>';
       h+='<div style="padding:10px 4px 4px;color:var(--text-m);font-size:.84rem;line-height:1.6;">예전 버전에서 저장된 기록에 면허번호가 없습니다. 아래 버튼을 눌러 면허번호를 다시 입력하면 바로 예약할 수 있어요.</div>';
@@ -10407,6 +10431,7 @@ window.devUploadAllCars=function(){
     /* ★ [v101] 표준형만 저장 (번호 없는 객체는 저장하지 않음) */
     licenseData = window.caroNormLicense ? caroNormLicense(licenseData, {name: window.userInfo && userInfo.name, birth: window.userInfo && userInfo.birth}) : licenseData;
     if(!licenseData || !licenseData.number) return false;
+    if(window.caroSaveLicense) return window.caroSaveLicense(licenseData);   /* ★[v109] 서버 암호화 저장으로 일원화 (아래 직접 쓰기는 규칙 21차가 막는다) */
 
     try{
       if(window.FB_FN && window.FB_FN.setDoc && window.FB_FN.doc){
@@ -11417,7 +11442,7 @@ window.devUploadAllCars=function(){
     return [];
   }
   function syncCards(){ try{ var c=curCards(); fsSet({ savedCards:c }); }catch(e){} }
-  function syncLicense(){ try{ var lic=(window.userInfo&&window.userInfo.license)||''; if(lic) fsSet({ licenseText:lic }); }catch(e){} }
+  function syncLicense(){ /* ★[v109] 면허는 서버(saveLicense)만 저장 — licenseText 사본은 더 이상 쓰지 않는다 */ }
 
   /* 저장 함수 후킹 (다른 모듈이 나중에 덮어써도 잡도록 재시도) */
   function installHooks(){

@@ -198,16 +198,14 @@ window.caroOpenExtraDriver=function(){
     /* ★ 면허 진위확인 프레임 사용 (연동 전엔 형식 검증, 승인 후 자동 실검증) */
     window.caroVerifyLicense({name:name,birth:birth,license:lic}).then(function(vr){
       if(!vr.ok){ toast(vr.msg||'면허 정보를 확인해 주세요.'); return; }
-      var data={name:name,birth:birth,license:lic,verified:!!vr.verified,pendingVerify:!!vr.pending,at:Date.now()};
-      try{ localStorage.setItem('caro_extra_driver',JSON.stringify(data)); }catch(e){}
-      try{
-        var u=uid();
-        if(u&&fbOK()){
-          window.FB_FN.setDoc(window.FB_FN.doc(window.FB_DB,'users',u),{extraDriver:data},{merge:true});
-        }
-      }catch(e){}
-      ov.remove();
-      toast(vr.verified?'✅ 추가운전자 등록 완료 — 진위확인 완료':'✅ 추가운전자 등록 완료 — '+(vr.msg||'형식 확인됨'));
+      /* ★[v109] 추가운전자 면허번호도 서버가 암호화해 저장 — 기기·서버 문서에는 가린 값만 */
+      if(typeof window.FB_CALL!=='function'||!uid()){ toast('로그인 상태를 확인할 수 없어 저장하지 못했어요.'); return; }
+      window.FB_CALL('saveLicense',{kind:'extra', number:lic, name:name, birth:birth}).then(function(r){
+        var data=(r&&r.extraDriver)||{name:name,birth:birth,license:'',verified:false,pendingVerify:true,at:Date.now(),secure:true};
+        try{ localStorage.setItem('caro_extra_driver',JSON.stringify(data)); }catch(e){}
+        ov.remove();
+        toast('✅ 추가운전자 등록 완료 — '+(vr.msg||'형식 확인됨'));
+      }).catch(function(e){ toast('추가운전자 저장 실패 — '+((e&&e.message)||'잠시 후 다시 시도해 주세요')); });
     });
   };
 };

@@ -30,6 +30,8 @@ import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/
 import * as __FSNS from "https://www.gstatic.com/firebasejs/12.12.1/firebase-firestore.js";
 /* ★[24차] 사진 저장소(Storage) — 예약 문서(1MB) 대신 파일로 저장 */
 import * as __STNS from "https://www.gstatic.com/firebasejs/12.12.1/firebase-storage.js";
+/* ★[v109] App Check — 진짜 카로 앱·사이트에서 온 요청에만 서버가 응답하게 한다(가짜 앱·스크립트 차단) */
+import * as __ACNS from "https://www.gstatic.com/firebasejs/12.12.1/firebase-app-check.js";
 import {
   getFirestore,
   doc,
@@ -73,6 +75,28 @@ const firebaseConfig = {
 const __isAdminPage = /\/admin[^\/]*\.html$/i.test(location.pathname);
 
 const app = initializeApp(firebaseConfig);
+
+/* ★[v109] App Check 사이트 키 (reCAPTCHA v3 '사이트 키' — 공개값). 비어 있으면 App Check 를 켜지 않는다.
+   콘솔에서 등록한 뒤 이 값을 채우고, 한동안 지표를 확인한 다음 서버 APP_CHECK_ENFORCE=true 로 바꾼다 */
+const APPCHECK_SITE_KEY = '6LfDPBAuAAAAAB8EG01g18v4S5VJjzuUEcL7yJPa';   // 2026-11-05 등록 (caro-mobility-prod, app.caromobility.kr)
+if (APPCHECK_SITE_KEY && __ACNS && typeof __ACNS.initializeAppCheck === 'function' && /^https:$/.test(location.protocol)) {
+  try { __ACNS.initializeAppCheck(app, { provider: new __ACNS.ReCaptchaV3Provider(APPCHECK_SITE_KEY), isTokenAutoRefreshEnabled: true }); }
+  catch (e) { console.warn('App Check 시작 실패', e); }
+  /* reCAPTCHA 떠 있는 배지는 화면(하단 메뉴·관제 버튼)을 가리므로 숨기고, 대신 로그인 화면에 구글 약관 안내 문구를 넣는다(구글 허용 방식) */
+  try {
+    const st = document.createElement('style'); st.textContent = '.grecaptcha-badge{visibility:hidden!important}'; document.head.appendChild(st);
+    const note = function () {
+      ['login-screen', 'gate', 'loginGate'].forEach(function (id) {
+        const el = document.getElementById(id); if (!el || el.querySelector('.caro-rc-note')) return;
+        const d = document.createElement('div'); d.className = 'caro-rc-note';
+        d.style.cssText = 'font-size:10.5px;line-height:1.5;opacity:.55;text-align:center;padding:10px 16px 14px;';
+        d.innerHTML = '이 서비스는 reCAPTCHA 로 보호되며 Google <a href="https://policies.google.com/privacy" target="_blank" rel="noopener" style="color:inherit">개인정보처리방침</a>과 <a href="https://policies.google.com/terms" target="_blank" rel="noopener" style="color:inherit">서비스 약관</a>이 적용됩니다.';
+        (el.firstElementChild && el.id !== 'login-screen' ? el.firstElementChild : el).appendChild(d);
+      });
+    };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', note); else note();
+  } catch (e) {}
+}
 
 let auth;
 if (__isAdminPage && typeof __AUTHNS.initializeAuth === 'function') {

@@ -321,6 +321,7 @@
   function secHd(title,key,noAll){ return '<div class="nh-sec-hd"><h2>'+esc(title)+'</h2>'+(noAll?'':'<a data-all="'+key+'">전체보기 ›</a>')+'</div>'; }
   /* ── 결제·면허 — 전체화면(보안 마스킹) ── */
   function maskLicense(l){
+    if(String(l||'').indexOf('*')!==-1) return String(l).replace(/\*/g,'•');   /* ★[v109] 이미 가린 값(서버 암호화 면허) */
     l=String(l||'').replace(/[^0-9A-Za-z]/g,'');
     if(!l) return '—';
     if(l.length<=4) return l.slice(0,1)+'•••';
@@ -7496,7 +7497,7 @@
   function readyState(){
     var logged=!!window._caroLoggedIn;
     var lic=!!(window.userInfo&&window.userInfo.license&&String(window.userInfo.license).trim());
-    var oldRec=false; try{ var _O=JSON.parse(localStorage.getItem('caro_license')||'null'); oldRec=!!(_O&&_O.name&&!(_O.number&&String(_O.number).indexOf('*')===-1)); }catch(e){}   /* ★[v106] 번호 없는 옛 기록 */
+    var oldRec=false; try{ var _O=JSON.parse(localStorage.getItem('caro_license')||'null'); oldRec=!!(_O&&_O.name&&!_O.secure&&!(_O.number&&String(_O.number).indexOf('*')===-1));   /* ★[v109] 서버 암호화 면허(secure)는 정상 등록 */ }catch(e){}   /* ★[v106] 번호 없는 옛 기록 */
     /* ★ [v102] 서버 복원이 늦거나 한 박자 어긋나도, 기기에 복원된 면허(caro_license)가 있으면 '등록 완료'로 본다
        (계정관리 화면은 이 값을 보는데 홈 카드만 userInfo.license 를 봐서 서로 다르게 나오던 문제). 로그아웃·계정전환 시 이 값은 지워진다. */
     if(!lic){ try{ var _L=JSON.parse(localStorage.getItem('caro_license')||'null'); if(_L&&_L.number&&String(_L.number).trim()){ lic=true; if(window.userInfo&&!window.userInfo.license) window.userInfo.license=String(_L.number); } }catch(e){} }
