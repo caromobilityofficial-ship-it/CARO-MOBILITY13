@@ -80,7 +80,8 @@ const app = initializeApp(firebaseConfig);
    콘솔에서 등록한 뒤 이 값을 채우고, 한동안 지표를 확인한 다음 서버 APP_CHECK_ENFORCE=true 로 바꾼다 */
 const APPCHECK_SITE_KEY = '6LfDPBAuAAAAAB8EG01g18v4S5VJjzuUEcL7yJPa';   // 2026-11-05 등록 (caro-mobility-prod, app.caromobility.kr)
 if (APPCHECK_SITE_KEY && __ACNS && typeof __ACNS.initializeAppCheck === 'function' && /^https:$/.test(location.protocol)) {
-  try { __ACNS.initializeAppCheck(app, { provider: new __ACNS.ReCaptchaV3Provider(APPCHECK_SITE_KEY), isTokenAutoRefreshEnabled: true }); }
+  /* reCAPTCHA 클래식은 지원 종료 → Fraud Defense(reCAPTCHA Enterprise) 방식. 키는 같은 키를 쓴다(점수 기준 웹 키) */
+  try { __ACNS.initializeAppCheck(app, { provider: new __ACNS.ReCaptchaEnterpriseProvider(APPCHECK_SITE_KEY), isTokenAutoRefreshEnabled: true }); }
   catch (e) { console.warn('App Check 시작 실패', e); }
   /* reCAPTCHA 떠 있는 배지는 화면(하단 메뉴·관제 버튼)을 가리므로 숨기고, 대신 로그인 화면에 구글 약관 안내 문구를 넣는다(구글 허용 방식) */
   try {
