@@ -24,6 +24,10 @@
   function sameOrigin(e){ return e.origin === location.origin || location.origin === 'null' || !location.origin; }
 
   function now(){ return Date.now(); }
+  /* ★[v108.3] 잠금 상태를 저장한다 — 예전엔 잠긴 화면에서 F5(새로고침)만 누르면 비밀번호 없이 풀렸다. 자동 업데이트 새로고침 뒤에도 잠금 유지 */
+  var KEY = 'caro_admin_locked', CARRY = 'caro_lock_carry';
+  function lsGet(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
+  function lsSet(k, v){ try{ if(v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); }catch(e){} }
 
   /* ── iframe(운영관리) 안에서는 잠그지 않고, 조작이 있었다고 부모에게만 알린다 ── */
   if(inFrame){
@@ -35,6 +39,9 @@
     return;
   }
 
+  /* 자동 업데이트(caro-autoupdate.js)로 새로고침된 경우: 직전의 마지막 조작 시각을 이어받아 잠금 타이머가 0으로 돌아가지 않게 */
+  (function(){ var c = lsGet(CARRY); lsSet(CARRY, null); if(!c) return;
+    try{ var o = JSON.parse(c); if(o && now() - o.at < 120000 && o.last > 0 && o.last <= now()) last = o.last; }catch(e){} })();
   function touch(){ if(!locked) last = now(); }
   ['pointerdown','keydown','touchstart','wheel','mousemove'].forEach(function(ev){
     window.addEventListener(ev, touch, {passive:true, capture:true}); });
@@ -108,7 +115,7 @@
   function lock(){
     if(locked) return;
     if(!signedIn()) return;   /* ★[v108] 로그아웃된 상태에서 잠그면 풀 방법이 없었다 */
-    locked = true;
+    locked = true; lsSet(KEY, '1');
     ov = build(); document.body.appendChild(ov);
     var a = ov.querySelector('#caroLockAcct'); a.textContent = (window.FB_AUTH && window.FB_AUTH.currentUser && window.FB_AUTH.currentUser.email) || '';
     setInert(true);
@@ -119,18 +126,27 @@
     if(!locked) return;
     setInert(false);
     if(ov && ov.parentNode) ov.parentNode.removeChild(ov);
-    ov = null; locked = false; last = now();
+    ov = null; locked = false; last = now(); lsSet(KEY, null);
   }
 
   /* 오버레이가 개발자도구 등으로 지워지면 다시 세운다 */
   setInterval(function(){
     if(locked){
-      if(!signedIn()){ unlock(); try{ location.reload(); }catch(e){} return; }   /* ★[v108] 잠긴 동안 세션이 끝나면 로그인 화면으로 */
+      if(!signedIn()){ unlock(); lsSet(KEY, null); try{ location.reload(); }catch(e){} return; }   /* ★[v108] 잠긴 동안 세션이 끝나면 로그인 화면으로 */
       if(!ov || !document.body.contains(ov)){ locked = false; ov = null; lock(); }
       return;
     }
     if(signedIn() && now() - last > LIMIT) lock();
   }, 5000);
 
-  window.CaroAdminLock = { lockNow: function(){ if(signedIn()) lock(); }, isLocked: function(){ return locked; } };
+  /* 새로고침 직후: 잠겨 있던 화면이면 로그인 복원되는 즉시 다시 잠근다 (0.2초마다 확인) */
+  if(lsGet(KEY) === '1'){ var _t0 = now(), _iv = setInterval(function(){
+      if(locked){ clearInterval(_iv); return; }
+      if(signedIn()){ clearInterval(_iv); lock(); return; }
+      if(now() - _t0 > 8000){ clearInterval(_iv); lsSet(KEY, null); }   /* 8초 안에 로그인이 복원되지 않으면(=로그아웃 상태) 표시만 지운다 — 비밀번호로 새로 로그인하는 사람을 다시 잠그지 않게 */
+    }, 200); }
+
+  window.CaroAdminLock = { lockNow: function(){ if(signedIn()) lock(); }, isLocked: function(){ return locked; },
+    lastActivity: function(){ return last; },
+    carry: function(){ lsSet(CARRY, JSON.stringify({ at: now(), last: last })); } };
 })();

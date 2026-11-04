@@ -15,7 +15,7 @@
   }
   function build(){
     if(ov) return;
-    ov=document.createElement('div');
+    ov=document.createElement('div'); ov.setAttribute('data-caro-dialog','1');   /* 자동 업데이트가 '확인창 열림' 을 알아보는 표시 */
     ov.setAttribute('style','position:fixed;inset:0;top:0;left:0;right:0;bottom:0;z-index:2147483000;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;');
     box=document.createElement('div');
     box.setAttribute('role','dialog'); box.setAttribute('aria-modal','true');
