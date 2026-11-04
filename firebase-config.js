@@ -65,11 +65,22 @@ const firebaseConfig = {
    재로그인 없이 '같은 계정·권한'이 그대로 넘어가야 한다(2중 로그인 제거 + 권한대로 탭 분리).
    그래서 관리자 페이지도 고객 앱과 '동일한 기본 세션'을 쓴다(예전엔 caroAdmin으로 분리해서
    앱에서 열 때마다 다시 로그인 → 최고관리자로 들어가 두 탭 다 뜨던 문제의 근본 원인). */
-const __isAdminPage = false;   // 세션 분리 해제 → 앱↔관제센터 동일 세션
+/* ★[v108.4] 관제 화면(admin-control.html · admin-ops.html)은 다시 '창을 닫으면 로그아웃' 으로.
+   예전(false)엔 고객 앱과 같은 '영구 로그인' 을 써서, 관제 창을 닫았다 열어도 비밀번호·2단계 인증 없이 그대로 들어가졌다.
+   ─ 관제 화면은 저장된 로그인(IndexedDB)을 아예 읽지 않는다 → 창을 새로 열 때마다 비밀번호 + 6자리
+   ─ 같은 창 안의 새로고침·자동 업데이트·운영관리(iframe) 는 로그인 유지(sessionStorage)
+   ─ 고객 앱(index.html)은 그대로 영구 로그인 */
+const __isAdminPage = /\/admin[^\/]*\.html$/i.test(location.pathname);
 
 const app = initializeApp(firebaseConfig);
 
-const auth = getAuth(app);
+let auth;
+if (__isAdminPage && typeof __AUTHNS.initializeAuth === 'function') {
+  try { auth = __AUTHNS.initializeAuth(app, { persistence: [browserSessionPersistence] }); }
+  catch (e) { auth = getAuth(app); }
+} else {
+  auth = getAuth(app);
+}
 const db = getFirestore(app);
 
 /* ★ 보안: 관리자 페이지는 '세션 지속성(SESSION)' 사용
@@ -77,7 +88,7 @@ const db = getFirestore(app);
    ─ 브라우저/앱을 완전히 닫으면 로그아웃 → 다시 켜면 로그인 필요(자동 로그인 방지)
    ─ 고객 앱(index.html)은 손대지 않음 = 기존처럼 로그인 유지 */
 if (__isAdminPage) {
-  setPersistence(auth, browserSessionPersistence)
+  setPersistence(auth, browserSessionPersistence)   /* initializeAuth 가 없는 옛 SDK 대비 — 이미 SESSION 이면 아무 일 없음 */
     .then(function () {
       console.log('🔒 관리자 세션 지속성: SESSION — 닫으면 로그아웃(자동 로그인 방지)');
     })

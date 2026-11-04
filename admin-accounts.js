@@ -106,8 +106,8 @@
     +'<div class="ahd"><h3 id="acctTtl">직원 계정 권한 부여</h3><button class="aclose" id="acctClose">✕</button></div>'
     +'<div class="abody">'
       +'<label class="fld">직원 이메일 (아이디) *</label>'
-      +'<input class="txt" id="acctEmail" placeholder="예: staff@caro.app" maxlength="80" autocomplete="off" />'
-      +'<div class="hint">직원이 입사 시 만든 로그인 아이디(이메일)와 똑같이 입력하세요. 이 계정으로 태블릿에 로그인하면 아래 권한이 적용됩니다.</div>'
+      +'<input class="txt" id="acctEmail" placeholder="예: hong@caromobility.kr" maxlength="80" autocomplete="off" />'
+      +'<div class="hint">회사 메일(@caromobility.kr)을 입력하면 로그인 계정이 자동으로 만들어지고, 그 메일로 <b>비밀번호 설정 메일</b>이 갑니다. 직원은 메일에서 비밀번호를 정한 뒤 관제 프로그램에 로그인하면 됩니다.</div>'
       +'<label class="fld">직원 이름 *</label>'
       +'<input class="txt" id="acctName" placeholder="예: 이현장" maxlength="30" />'
       +'<label class="fld">역할 / 직책 (선택)</label>'
@@ -190,14 +190,16 @@
     /* ★ v100: 권한 부여는 서버(setAdminAccount → Custom Claims)가 정식 경로.
        함수가 아직 배포되지 않았으면(not-found) 예전 방식(문서 직접 쓰기)으로 폴백 */
     var viaServer = (typeof window.FB_CALL==='function')
-      ? window.FB_CALL('setAdminAccount',{ email:email, name:name, perms:perms, active:active, role:role, position:position })
+      ? window.FB_CALL('setAdminAccount',{ email:email, name:name, perms:perms, active:active, role:role, position:position, create:!editingEmail })   /* ★[v108.4] 새 직원 + 회사 메일이면 서버가 로그인 계정 생성 */
       : Promise.reject(Object.assign(new Error('no FB_CALL'),{code:'functions/not-found'}));
     viaServer.catch(function(e){
       /* ★[v108] '해당 이메일의 계정이 없습니다'(서버가 보낸 not-found)는 폴백하지 않는다 — 예전엔 가입 안 된 이메일에도 문서를 써서 '추가됨'으로 보였다 */
       if(e && /not-found|unavailable/.test(String(e.code||'')) && !/계정/.test(String(e.message||''))){ console.warn('[계정] 서버 함수 미배포 → 직접 쓰기 폴백'); return FN.setDoc(FN.doc(db,'admin_accounts',email), data, {merge:true}); }
       throw e;
-    }).then(function(){
-      T(editingEmail?'권한이 수정되었습니다':'직원 계정이 추가되었습니다'); closeModal();
+    }).then(function(r){
+      if(r && r.created){ sendPwMail(email, true); }
+      else T(editingEmail?'권한이 수정되었습니다':'직원 계정이 추가되었습니다');
+      closeModal();
       /* 즉시 반영 (onSnapshot 기다리지 않고 바로 목록 갱신) */
       try{
         var obj={id:email, email:email, name:name, role:role, position:position, perms:perms, active:active};
@@ -211,6 +213,29 @@
       console.error('[계정] 저장 실패', e);
       var m=(e&&e.message)||'';
       T(/not-found/.test(String(e&&e.code||'')) && /계정이 없습니다/.test(m) ? m : ('저장 실패 — '+(m||'권한을 확인하세요')));
+    });
+  };
+
+  /* ★[v108.4] 비밀번호 설정 메일 — 새 직원(자동 생성) 또는 비밀번호를 잊은 직원에게 */
+  function sendPwMail(email, isNew){
+    var A=window.FB_AUTH, FN=window.FB_FN;
+    if(!A || !FN || typeof FN.sendPasswordResetEmail!=='function'){ T('메일을 보낼 수 없습니다 — 새로고침 후 다시 시도'); return; }
+    try{ A.languageCode='ko'; }catch(e){}
+    FN.sendPasswordResetEmail(A, email).then(function(){
+      caroAlert((isNew?'직원 계정을 만들었습니다.\n\n':'')+email+' 로 비밀번호 설정 메일을 보냈습니다.\n직원이 메일의 링크에서 비밀번호를 정한 뒤 관제 프로그램에 로그인하면 됩니다.\n(메일이 안 보이면 스팸함 확인 · 링크는 1시간 동안 유효)');
+    }).catch(function(e){ console.error(e); T('메일 발송 실패 — '+((e&&e.code)||'')+' · 잠시 후 [비밀번호 메일] 버튼으로 다시 보내세요'); });
+  }
+  window.acctSendPw=function(email){
+    caroConfirm(email+' 로 비밀번호 설정 메일을 보낼까요?\n(직원이 새 비밀번호를 정하면 예전 비밀번호는 쓸 수 없습니다)').then(function(ok){ if(ok) sendPwMail(email,false); });
+  };
+  /* ★[v108.4] 2단계 인증 초기화 — 휴대폰 분실·교체 */
+  window.acctResetMfa=function(email){
+    caroConfirm(email+' 의 2단계 인증(휴대폰 인증 앱 등록)을 초기화할까요?\n\n휴대폰을 잃어버렸거나 바꾼 경우에만 하세요. 그 직원은 지금 로그아웃되고,\n비밀번호로 다시 로그인해 새 휴대폰으로 다시 등록해야 합니다.',{danger:true, ok:'초기화'}).then(function(ok){
+      if(!ok) return;
+      if(typeof window.FB_CALL!=='function'){ T('서버에 연결할 수 없습니다'); return; }
+      window.FB_CALL('resetStaffMfa',{email:email}).then(function(r){
+        T(r && r.had ? '2단계 인증을 초기화했습니다 — 직원에게 다시 등록하라고 알려 주세요' : '이 직원은 등록된 2단계 인증이 없었습니다');
+      }).catch(function(e){ console.error(e); var c=String((e&&e.code)||''); T(/not-found/.test(c)&&!/계정|목록/.test((e&&e.message)||'') ? '서버 업데이트(firebase deploy) 후 사용할 수 있습니다' : ('초기화 실패 — '+((e&&e.message)||c))); });
     });
   };
 
@@ -270,6 +295,8 @@
         +'<div class="acct2-btns">'
         +'<button class="acct2-btn edit" onclick="editAcct(\''+jsa(email)+'\')">수정</button>'
         +'<button class="acct2-btn" onclick="toggleAcctActive(\''+jsa(email)+'\','+(on?'false':'true')+')">'+(on?'정지':'활성')+'</button>'
+        +'<button class="acct2-btn" onclick="acctSendPw(\''+jsa(email)+'\')" title="비밀번호 설정 메일 보내기">비밀번호 메일</button>'
+        +'<button class="acct2-btn" onclick="acctResetMfa(\''+jsa(email)+'\')" title="휴대폰 분실·교체 시">2단계 초기화</button>'
         +'<button class="acct2-btn del" onclick="delAcct(\''+jsa(email)+'\')">삭제</button>'
         +'</div></div>';
     });

@@ -166,7 +166,7 @@
           Promise.resolve(mf.enroll(f.TotpMultiFactorGenerator.assertionForEnrollment(secret, inp.value), '인증앱')).then(function(){
             clear(); head('✅ 등록되었습니다');
             line('★지금 "로그아웃" 후 다시 로그인하세요. 다음 로그인부터 6자리 코드를 묻습니다.', '#e6c34b');
-            line('★휴대폰을 잃어버리면 로그인이 안 됩니다. 복구 방법은 읽어보세요.txt 를 확인해 두세요.', '#e6c34b');
+            line('★휴대폰을 잃어버리거나 바꾸면 최고관리자에게 "2단계 초기화" 를 요청하세요 (설정 → 직원 계정).', '#e6c34b');
             btn('확인', GOLD, ov.close);
           }).catch(function(e){ go.disabled = false; inp.value = ''; status(msgOf(e)); });
         });
