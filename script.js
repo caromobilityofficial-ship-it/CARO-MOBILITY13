@@ -9571,20 +9571,44 @@ window.devUploadAllCars=function(){
     /* 추가운전자 */
     h+='<div class="apd-section" style="margin-top:14px;">';
     h+='<div class="apd-section-title"><span class="apd-section-title-icon">👤</span>추가운전자 <span style="font-size:.7rem;color:var(--text-m);font-weight:400;">대여자 외 1명</span></div>';
+    /* ★[v109.2] 대여자 본인 면허가 추가운전자로 저장돼 있으면(예전 버전·기기 백업에서 되살아난 경우) 추가운전자로 보지 않는다 */
+    try{
+      var _own=(lic&&(lic.masked||lic.number))||'', _xl=(extra&&extra.license)||'';
+      var _d=function(x){ return String(x||'').replace(/[^0-9]/g,''); };
+      var _do=_d(_own), _dx=_d(_xl), _ownName=String((lic&&lic.name)||(window.userInfo&&userInfo.name)||'').trim(), _xName=String((extra&&extra.name)||'').trim();
+      /* 번호가 둘 다 원래 값이면 그대로 비교, 한쪽이라도 가린 값이면 앞 2자리·뒤 2자리 + 이름이 같을 때 본인으로 본다 */
+      var _numSame = !!(_do && _dx && (_do===_dx || ((String(_own).indexOf('*')!==-1||String(_xl).indexOf('*')!==-1) && _do.slice(0,2)===_dx.slice(0,2) && _do.slice(-2)===_dx.slice(-2))));
+      var _same = !!(extra && _numSame && (_do===_dx || (_xName && _ownName && _xName===_ownName)));
+      if(_same){ localStorage.removeItem('caro_extra_driver'); extra=null; if(typeof window.FB_CALL==='function') window.FB_CALL('saveLicense',{kind:'extra-remove'}).catch(function(){}); }
+    }catch(e){}
+    var _e=function(x){ return String(x==null?'':x).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); };
     if(extra&&extra.name){
-      h+='<div class="apd-row"><span class="apd-row-label">이름</span><span class="apd-row-value">'+extra.name+'</span></div>';
-      h+='<div class="apd-row"><span class="apd-row-label">면허번호</span><span class="apd-row-value">'+_licMask(extra.license)+'</span></div>';
+      h+='<div class="apd-row"><span class="apd-row-label">이름</span><span class="apd-row-value">'+_e(extra.name)+'</span></div>';
+      h+='<div class="apd-row"><span class="apd-row-label">면허번호</span><span class="apd-row-value">'+_e(_licMask(extra.license))+'</span></div>';
       h+='<div class="apd-row"><span class="apd-row-label">확인 상태</span><span class="apd-row-value">'+(extra.verified?'진위확인 완료':'형식 확인 완료')+'</span></div>';
     }else{
       h+='<div style="padding:14px 4px;color:var(--text-m);font-size:.84rem;">등록된 추가운전자가 없습니다.</div>';
     }
     h+='<button class="apd-btn" id="apd-extra-driver-btn" style="margin-top:10px;">'+(extra&&extra.name?'추가운전자 변경':'추가운전자 등록')+'</button>';
+    if(extra&&extra.name) h+='<button class="apd-btn" id="apd-extra-driver-del" style="margin-top:8px;background:#fff;color:#b23a3a;border:1px solid rgba(178,58,58,.35);">추가운전자 삭제</button>';
     h+='</div>';
     return h;
   }
   function bindLicense(){
     var b=document.getElementById('apd-extra-driver-btn');
     if(b) b.onclick=function(){ if(window.caroOpenExtraDriver) caroOpenExtraDriver(); else toast('등록 기능을 불러오지 못했습니다', false); };
+    var del=document.getElementById('apd-extra-driver-del');
+    if(del) del.onclick=function(){
+      /* 앱 웹뷰에서는 confirm() 이 자동 승인될 수 있어 '한 번 더 누르기' 로 확인 */
+      if(!del.__armed){ del.__armed=true; del.textContent='한 번 더 누르면 삭제됩니다'; setTimeout(function(){ if(document.body.contains(del)){ del.__armed=false; del.textContent='추가운전자 삭제'; } },4000); return; }
+      if(typeof window.FB_CALL!=='function'){ toast('서버에 연결할 수 없습니다', false); return; }
+      del.disabled=true;
+      window.FB_CALL('saveLicense',{kind:'extra-remove'}).then(function(){
+        try{ localStorage.removeItem('caro_extra_driver'); }catch(e){}
+        toast('추가운전자를 삭제했습니다', true);
+        try{ var content=document.querySelector('#account-detail-screen .mpd-content'); if(content){ content.innerHTML=renderLicense(); bindLicense(); } }catch(e){}
+      }).catch(function(e){ del.disabled=false; toast('삭제 실패 — '+((e&&e.message)||'잠시 후 다시 시도해 주세요'), false); });
+    };
   }
 
   const RENDERERS = {

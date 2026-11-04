@@ -171,7 +171,7 @@ window.caroOpenExtraDriver=function(){
     +'<label style="font-size:.75rem;color:#555;">생년월일 (6자리)</label>'
     +'<input id="xdrv-birth" inputmode="numeric" maxlength="6" style="width:100%;padding:11px;border:1px solid #ddd;border-radius:9px;margin:4px 0 10px;font-size:.9rem;" placeholder="900101" value="'+(saved&&saved.birth?saved.birth:'')+'">'
     +'<label style="font-size:.75rem;color:#555;">운전면허번호</label>'
-    +'<input id="xdrv-lic" inputmode="numeric" maxlength="15" style="width:100%;padding:11px;border:1px solid #ddd;border-radius:9px;margin:4px 0 4px;font-size:.9rem;" placeholder="12-34-567890-12" value="'+(saved&&saved.license?saved.license:'')+'">'
+    +'<input id="xdrv-lic" inputmode="numeric" maxlength="15" style="width:100%;padding:11px;border:1px solid #ddd;border-radius:9px;margin:4px 0 4px;font-size:.9rem;" placeholder="12-34-567890-12" value="">'
     +'<div style="font-size:.72rem;color:#999;margin-bottom:14px;line-height:1.5;word-break:keep-all;">형식: 2-2-6-2 자리 (지역코드-연도-일련번호-체크)</div>'
     +'<div style="display:flex;gap:9px;">'
     +'<button id="xdrv-cancel" style="flex:1;padding:13px;border:1px solid #ddd;background:#fff;border-radius:10px;font-size:.9rem;">닫기</button>'
