@@ -1,6 +1,7 @@
 /* ═══════════════════════════════════════════════════════════════
    caro-kiosk.js — 관제 프로그램 전체화면 · 로그아웃으로만 종료 (v108.5, 2026-11-04)
-   ─ 로그인하면 전체화면으로 바뀐다(Esc 한 번으로 빠져나가지 못하게 Esc 는 길게 눌러야 해제)
+   ─ 설치 프로그램 v1.2 부터는 Edge 키오스크 모드(해제 버튼·닫기 버튼 없는 전체화면)로 실행된다.
+     키오스크가 아닌 창(일반 브라우저)에서는 로그인할 때 화면 전체화면으로 바꾼다(브라우저 기본 해제 버튼은 남음)
    ─ 로그인한 상태에서 창을 닫으려 하면(Alt+F4·작업표시줄 닫기) 브라우저가 "나가시겠습니까?" 를 묻는다
    ─ [로그아웃] 을 누르면 로그아웃한 뒤 프로그램 창이 닫힌다
    ─ 혹시 강제로 꺼져도 관제 창은 '창 닫으면 로그아웃' 이라(firebase-config.js) 다시 열면 비밀번호+6자리를 묻는다
@@ -61,6 +62,21 @@
     try{ if(A && FN && typeof FN.signOut === 'function'){ Promise.resolve(FN.signOut(A)).then(close, close); return; } }catch(e){}
     close();
   }
+
+  /* ★[v108.6] 로그인 화면에서만 보이는 [프로그램 종료] 버튼 — 키오스크(전체화면) 창에는 닫기 버튼이 없으므로.
+     로그인하면 사라지고, 그때부터는 [로그아웃 · 종료] 로만 끈다 */
+  var quitBtn = null;
+  function paintQuit(){
+    var show = !signedIn() && isFull();
+    if(show && !quitBtn){
+      quitBtn = document.createElement('button'); quitBtn.type = 'button'; quitBtn.textContent = '✕ 프로그램 종료';
+      quitBtn.setAttribute('style', 'position:fixed;top:14px;right:16px;z-index:2147482500;padding:8px 14px;border-radius:9px;border:1px solid #555;'
+        + 'background:#1e2026;color:#ddd;font:13px -apple-system,"Noto Sans KR","Malgun Gothic",sans-serif;cursor:pointer;');
+      quitBtn.onclick = function(){ leaving = true; try{ window.close(); }catch(e){} };
+      document.body.appendChild(quitBtn);
+    } else if(!show && quitBtn){ quitBtn.remove(); quitBtn = null; }
+  }
+  setInterval(paintQuit, 700);
 
   window.addEventListener('message', function(e){
     if(!(e.origin === location.origin || location.origin === 'null')) return;
