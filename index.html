@@ -92,6 +92,20 @@
     <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png"/>
 
     <link rel="stylesheet" href="style.css?v=18"/>
+    <!-- ★[v110.1] 옛(초기 버전) 디자인이 잠깐 보였다가 새 디자인으로 바뀌는 문제 제거
+         1) 옛 홈 화면 내용은 처음부터 영구히 숨김 (새 홈만 표시)
+         2) 앱 스크립트가 모두 준비될 때까지는 스플래시만 보여 준다 (느린 망에서도 옛 화면이 안 비침) -->
+    <style id="caro-boot-css">
+      #home-screen > *:not(.nh-root){ display:none !important; }
+      #home-screen{ background:var(--silver-base,#eff1f4); }
+      html:not(.caro-ready) body > *:not(#splash-screen){ visibility:hidden !important; }
+      html:not(.caro-ready) #splash-screen{ opacity:1 !important; transform:none !important; display:flex !important; visibility:visible !important; z-index:2147483000 !important; }
+    </style>
+    <!-- ★[v110.1] 글꼴(Pretendard)을 처음부터 불러온다 — 나중에 글꼴이 바뀌며 화면이 '옛 모양 → 새 모양'으로 바뀌어 보이던 현상 제거 -->
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+    <link id="caro-pretendard" rel="stylesheet" media="print" onload="this.media='all';window.__caroFontCss=1" onerror="window.__caroFontCss=2" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+    <style id="caro-pretendard-var">:root{--font:'Pretendard Variable','Pretendard',-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Noto Sans KR','Malgun Gothic',sans-serif;}</style>
+    <script>setTimeout(function(){ document.documentElement.classList.add('caro-ready'); }, 15000);   /* 안전장치: 스크립트가 멈춰도 15초 뒤엔 화면 표시 */</script>
     <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700&family=Oswald:wght@400;500;600&display=swap" rel="stylesheet"/>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -2791,5 +2805,15 @@
         </div>
     </div>
 </div>
+<script>
+/* ★[v110.1] 모든 앱 스크립트(새 디자인 포함)가 실행된 뒤에만 화면을 연다 → 옛 디자인 깜빡임 없음 */
+(function(){ var h=document.documentElement, done=false;
+  function ok(){ if(done) return; done=true; var f=function(){ h.classList.add('caro-ready'); };
+    if(window.requestAnimationFrame) requestAnimationFrame(function(){ requestAnimationFrame(f); }); else f(); }
+  /* 글꼴까지 받아진 뒤 화면을 연다 (최대 2.5초만 기다림 — 느린 망에서도 멈추지 않게) */
+  function fontsThenOk(){ try{ if(document.fonts&&document.fonts.load){ document.fonts.load('700 16px "Pretendard Variable"','가나다').then(ok,ok); } else ok(); }catch(e){ ok(); } }
+  (function waitCss(n){ if(window.__caroFontCss===1) return fontsThenOk(); if(window.__caroFontCss===2||n>50) return ok(); setTimeout(function(){ waitCss(n+1); },50); })(0);
+  setTimeout(ok, 2500); })();
+</script>
 </body>
 </html>
