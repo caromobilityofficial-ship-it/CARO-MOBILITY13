@@ -120,7 +120,28 @@
           d:['무의도와 인도교로 이어진 작은 섬으로, 차는 들어갈 수 없고 걸어서 건넙니다.','섬 둘레를 잇는 무의바다누리길은 천천히 걸어도 한 시간 남짓이면 한 바퀴를 돌 수 있어, 반나절 코스의 마무리로 알맞습니다.'],
           t:['오르막과 계단이 있어요. 편한 신발을 신으세요.','섬 안에는 가게가 많지 않으니 물을 챙겨 가세요.'] }
       ]},
-    { id:'ganghwa', no:'05', art:'dusk_temple', title:'강화 남서부 해안도로', area:'강화군', tags:['장거리','낙조'], theme:['long','night'],
+    { id:'airport', no:'05', art:'airport_dawn', title:'인천공항 픽업 · 배웅', area:'연수구 · 영종구', tags:['공항','가족'], theme:['sea'],
+      dist:'약 90km', dur:'반나절', when:'항공편 시간', car:'대형 SUV',
+      toll:'인천대교 또는 영종대교 통행료가 별도로 발생합니다',
+      must:{k:'주의', t:'가족·지인을 태워 주는 용도로만 이용하세요. 돈을 받고 손님을 공항에 태워 주는 등 영업 목적으로 쓰는 것은 법으로 금지되어 있으며 적발 시 처벌받을 수 있습니다.'},
+      note:{k:'참고', t:'공항 도착층 앞 도로는 오래 정차할 수 없어요. 마중 나갈 때는 단기주차장(요금 별도)에 세우고 입국장에서 만나세요.'},
+      sum:'인천으로 여행 온 가족을 공항에서 맞이하고, 여행이 끝나면 다시 공항까지 편하게 배웅해 주세요. 짐이 많은 가족 여행도 넉넉한 SUV면 한 번에 실을 수 있습니다.',
+      tips:['항공편 도착 시간과 터미널(제1·제2)을 미리 확인하고, 도착 30분 뒤쯤 공항에 닿도록 출발하세요.','캐리어가 많다면 넉넉한 SUV를 고르세요.','픽업과 배웅 사이 인천 여행은 위 드라이브 코스를 함께 둘러보세요.'],
+      stops:[
+        { n:'인천대교', q:'인천대교', cat:'bridge', lm:'cable', cl:'다리', stay:'지나가는 길', hl:['바다 위 드라이브','통행료'],
+          one:'송도에서 영종도까지 바다 위를 달리는 다리',
+          d:['송도국제도시와 영종도를 잇는 긴 바다 위 다리로, 송도·구월동 거점에서 공항으로 가는 가장 빠른 길입니다.','부평·동인천 거점에서 출발한다면 영종대교로 가는 길이 더 가까울 수 있어요.'],
+          t:['통행료는 별도로 내야 합니다.','다리 위에서는 정차할 수 없어요.'] },
+        { n:'인천공항 제1여객터미널', q:'인천국제공항 제1여객터미널', cat:'airport', cl:'공항', stay:'30분~1시간', hl:['T1','입국장','단기주차장'],
+          one:'가족을 맞이하고 배웅하는 공항 제1터미널',
+          d:['인천국제공항의 제1여객터미널입니다. 마중을 나갈 때는 단기주차장에 차를 세우고 입국장에서 만나는 것이 편합니다.','배웅할 때는 출국장 앞에 잠시 세워 짐을 내리고, 오래 머물러야 한다면 주차장을 이용하세요.'],
+          t:['항공사에 따라 제1·제2터미널이 다릅니다. 항공권에 적힌 터미널을 꼭 확인하세요.','두 터미널은 서로 떨어져 있어요. 내비게이션 목적지를 정확한 터미널로 설정하세요.'] },
+        { n:'인천공항 제2여객터미널', q:'인천국제공항 제2여객터미널', cat:'airport', cl:'공항', stay:'30분~1시간', hl:['T2','입국장','단기주차장'],
+          one:'가족을 맞이하고 배웅하는 공항 제2터미널',
+          d:['인천국제공항의 제2여객터미널입니다. 제1터미널과 떨어져 있으니 가족이 이용하는 항공사의 터미널을 먼저 확인하세요.','도착층 앞은 오래 정차할 수 없어, 단기주차장에 세운 뒤 마중 나가는 것이 좋습니다.'],
+          t:['주차 요금은 이용 시간에 따라 따로 발생해요.','반납 시간에 늦지 않도록 공항에서 거점까지 걸리는 시간을 넉넉히 잡으세요.'] }
+      ]},
+    { id:'ganghwa', no:'06', art:'dusk_temple', title:'강화 남서부 해안도로', area:'강화군', tags:['장거리','낙조'], theme:['long','night'],
       dist:'약 120km', dur:'하루', when:'오후 출발 · 일몰', car:'쏘나타',
       sum:'초지대교로 들어가 갯벌을 끼고 서쪽으로 돌아 나오는 길. 장화리 일몰조망지는 강화에서 손꼽히는 낙조 자리입니다.',
       tips:['장거리 코스예요. 출발 전 연료 상태를 확인하세요.','주말에는 초지대교·강화대교 방면 정체가 잦습니다.','해넘이를 놓치기 싫다면 보문사를 먼저 들른 뒤 장화리에서 마무리하는 순서도 좋아요.'],
@@ -150,7 +171,7 @@
           d:['석모대교를 건너 석모도 낙가산 자락에 자리한 절로, 가파른 계단을 올라 만나는 눈썹바위 아래 마애석불좌상이 유명합니다.','계단 위에서 내려다보는 서해 풍경이 좋아, 오르는 수고가 아깝지 않은 곳입니다.'],
           t:['계단이 길고 가팔라요. 편한 신발을 신으세요.','주차장 이용 요금이 있을 수 있어요.'] }
       ]},
-    { id:'gyodong', no:'06', art:'misty_river', title:'교동도 · 강화 북부', area:'강화군 교동면', tags:['장거리','한적함'], theme:['long'],
+    { id:'gyodong', no:'07', art:'misty_river', title:'교동도 · 강화 북부', area:'강화군 교동면', tags:['장거리','한적함'], theme:['long'],
       dist:'약 145km', dur:'하루', when:'오전 출발', car:'아반떼',
       must:{k:'필수', t:'교동대교는 민통선 구간이라 다리 앞 해병대 검문소에서 신분증을 확인하고 출입증을 받아 차량 앞유리에 둡니다. 탑승자 전원 신분증을 챙기세요.'},
       note:{k:'참고', t:'군사 지역이라 해가 진 뒤에는 출입이 제한될 수 있어요. 해 지기 전에 섬을 나오도록 일정을 잡으세요.'},
@@ -312,6 +333,21 @@
         +ridge(r,140,34,5,'#9fd3a6',1)+ridge(r,168,26,6,'#73b884',1)+'<ellipse cx="250" cy="196" rx="120" ry="20" fill="url(#'+u+'w)"/>'+shimmer(r,184,206,'#ffffff',14)
         +'<path d="M-10 260 Q120 210 230 236 Q320 256 410 226 L410 260Z" fill="#4f9b66"/><path d="M60 260 Q140 226 210 222" stroke="#f3ead6" stroke-width="7" fill="none" stroke-linecap="round"/>';
       [[40,186,14,'#3f8656'],[74,176,11,'#f3b6c8'],[102,190,13,'#3f8656'],[352,170,15,'#3f8656'],[380,186,11,'#f3b6c8'],[150,172,9,'#5aa06e']].forEach(function(t){ s+=tree(t[0],t[1],t[2],t[3]); });
+    } else if(kind==='airport_dawn'){
+      d=G(u+'s',[[0,'#26365f'],[.5,'#9a5d84'],[.8,'#ef916a'],[1,'#ffd6a2']])+G(u+'w',[[0,'#3a2c4a'],[1,'#1b1626']])+RG(u+'g','#ffe2b0',.9);
+      s='<rect width="400" height="260" fill="url(#'+u+'s)"/>'+stars(r,14,60)+'<circle cx="96" cy="150" r="80" fill="url(#'+u+'g)"/><circle cx="96" cy="152" r="20" fill="#fff0d2"/>'
+        +ridge(r,150,14,6,'#6c4a6e',.55)
+        +'<path d="M150 70 Q210 92 300 74" fill="none" stroke="#ffffff" stroke-width="1.6" opacity=".55" stroke-linecap="round"/>'+plane(312,66,1.15,'#2a1f3c')
+        +'<rect y="158" width="400" height="102" fill="url(#'+u+'w)"/>'
+        /* 여객터미널: 물결 지붕 + 유리벽 */
+        +'<path d="M24 160 L24 132 Q80 116 140 128 Q200 140 260 124 Q300 114 330 122 L330 160 Z" fill="#2b2140"/>'
+        +'<path d="M24 132 Q80 116 140 128 Q200 140 260 124 Q300 114 330 122" fill="none" stroke="#ffd9a6" stroke-width="1.4" opacity=".7"/>';
+      for(var gx=34;gx<322;gx+=9){ s+='<rect x="'+gx+'" y="'+(140+Math.sin(gx/22)*3).toFixed(1)+'" width="5" height="'+(18-Math.sin(gx/22)*3).toFixed(1)+'" fill="#ffd98a" opacity="'+(.28+r()*.4).toFixed(2)+'"/>'; }
+      /* 관제탑 */
+      s+='<path d="M356 160 L358 84 L362 84 L364 160 Z" fill="#241b36"/><path d="M346 84 L374 84 L370 70 L350 70 Z" fill="#241b36"/><rect x="349" y="74" width="22" height="5" fill="#ffd98a" opacity=".75"/><rect x="359" y="58" width="2" height="12" fill="#241b36"/>'
+        +'<rect y="164" width="400" height="3" fill="#120e1a" opacity=".7"/>';
+      for(var lx=6;lx<400;lx+=16){ s+='<circle cx="'+lx+'" cy="'+(190+((lx/16)%2))+'" r="1.6" fill="#ffd27a" opacity=".9"/><circle cx="'+(lx+8)+'" cy="214" r="1.3" fill="#9fd6ff" opacity=".8"/>'; }
+      s+='<path d="M0 236 L400 226 L400 260 L0 260 Z" fill="#120e1a" opacity=".55"/>'+birds(r,3,200,92,'#3a2a4a');
     } else { /* night_lake */
       d=G(u+'s',[[0,'#0b1a2c'],[.6,'#1d2c4d'],[1,'#3d4f76']])+G(u+'w',[[0,'#1a2846'],[1,'#070e1c']])+RG(u+'f','#8fe6ff',.8);
       s='<rect width="400" height="260" fill="url(#'+u+'s)"/>'+stars(r,60,110)+skyline(r,150,-4,404,'#121d36','#9fd6ff',70)+'<rect y="150" width="400" height="110" fill="url(#'+u+'w)"/>'
@@ -332,6 +368,7 @@
     misty_river:{sky:[[0,'#d6e0dd'],[1,'#f3eee4']],wat:[[0,'#e6e3d8'],[1,'#a9b8b1']],sun:[300,70,15,'#fbf4e4'],glow:'#fffaf0',far:'#a7b8b0',sil:'#556b60',lit:'#ffffff',day:1},
     retro_port:{sky:[[0,'#1d3a5b'],[.55,'#c96a66'],[1,'#f1c48a']],wat:[[0,'#d9806b'],[1,'#1d2c45']],sun:[196,152,17,'#ffeac4'],glow:'#ffe0a8',far:'#7a4c62',sil:'#2a2338',lit:'#ffe3b0'},
     green_park:{sky:[[0,'#bfe2fb'],[1,'#f1f9ff']],wat:[[0,'#8fd0e6'],[1,'#5aaec9']],sun:[330,46,14,'#fffef6'],glow:'#fffbe0',far:'#9fd3a6',sil:'#3f8656',lit:'#ffffff',day:1},
+    airport_dawn:{sky:[[0,'#26365f'],[.5,'#9a5d84'],[.8,'#ef916a'],[1,'#ffd6a2']],wat:[[0,'#3a2c4a'],[1,'#1b1626']],sun:[96,150,20,'#fff0d2'],glow:'#ffe2b0',far:'#6c4a6e',sil:'#2b2140',lit:'#ffd98a'},
     night_lake:{sky:[[0,'#0b1a2c'],[.6,'#1d2c4d'],[1,'#3d4f76']],wat:[[0,'#1a2846'],[1,'#070e1c']],sun:[318,48,11,'#eef6ff'],glow:'#cfe6ff',far:'#24385a',sil:'#121d36',lit:'#9fd6ff',night:1}
   };
   var LAND={park:1,garden:1,temple:1,pavilion:1,oldmarket:1,street:1,modern:1,arboretum:1};
@@ -369,6 +406,10 @@
           s+='<rect x="'+x+'" y="'+top.toFixed(1)+'" width="'+w+'" height="'+(H+40-top).toFixed(1)+'" fill="'+c+'"/><path d="M'+(x-4)+' '+top.toFixed(1)+' L'+(x+w/2)+' '+(top-16).toFixed(1)+' L'+(x+w+4)+' '+top.toFixed(1)+'Z" fill="'+c+'"/>';
           for(var cx2=x+8;cx2<x+w-6;cx2+=12) s+='<rect x="'+cx2+'" y="'+(top+12).toFixed(1)+'" width="5" height="'+(H+30-top-12).toFixed(1)+'" fill="'+L+'" opacity=".28"/>'; }); s+=people(160,H+40,3,c); break;
       case 'arboretum': s+=ridge(r,H+14,26,6,c,.8); [[40,H+44,16],[90,H+36,12],[150,H+46,14],[260,H+40,15],[320,H+48,17],[370,H+40,12]].forEach(function(tt){ s+=tree(tt[0],tt[1],tt[2],c); }); s+=flowers(r,H+52,260,['#ff9ec4','#ffffff','#ffd36b','#f5c7e0']); break;
+      case 'airport': var s0=s; s='';
+        s+='<path d="M20 '+(H+2)+' L20 '+(H-26)+' Q90 '+(H-44)+' 170 '+(H-30)+' Q250 '+(H-16)+' 320 '+(H-34)+' L320 '+(H+2)+' Z" fill="'+c+'"/>'; for(var ax=30;ax<312;ax+=9) s+='<rect x="'+ax+'" y="'+(H-18)+'" width="5" height="16" fill="'+L+'" opacity="'+(.3+r()*.4).toFixed(2)+'"/>';
+        s+='<path d="M350 '+(H+2)+' L352 '+(H-74)+' L356 '+(H-74)+' L358 '+(H+2)+'Z" fill="'+c+'"/><path d="M341 '+(H-74)+' L367 '+(H-74)+' L363 '+(H-88)+' L345 '+(H-88)+'Z" fill="'+c+'"/>'+plane(250,60,1.1,c)+'<path d="M90 76 Q160 90 236 64" fill="none" stroke="#fff" stroke-width="1.4" opacity=".5"/>'; for(var bx=6;bx<400;bx+=16) s+='<circle cx="'+bx+'" cy="'+(H+36)+'" r="1.5" fill="'+L+'" opacity=".9"/>';
+        s=s0+((seed&1)?'<g transform="translate(400 0) scale(-1 1)">'+s+'</g>':s); break;
       case 'tower': s+=skyline(r,H+2,180,404,c,P.night?L:null,70)+containers(110,H+30,c,L)+'<rect x="40" y="'+(H+26)+'" width="140" height="6" fill="'+c+'"/>'+people(88,H+26,3,c); break;
       case 'wetland': s+=windmill(290,H+8,.95,c)+'<path d="M-10 '+(H+30)+' Q200 '+(H+16)+' 410 '+(H+34)+' L410 260 L-10 260Z" fill="'+c+'" opacity=".92"/>'+reeds(r,H+40,90,c); break;
       case 'market': s+=shops(-6,170,H+4,c,L,r)+boat(250,H+26,1,c,L)+boat(330,H+40,1.25,c,L)+boat(196,H+52,.8,c,L); break;
@@ -382,6 +423,7 @@
       case 'marina': s+='<rect x="-10" y="'+(H+38)+'" width="250" height="5" fill="'+c+'"/>'; for(var m=0;m<5;m++) s+=yacht(30+m*44,H+36,.9+r()*.2,c); s+=yacht(310,H+56,1.4,c); break;
       case 'island': s+='<path d="M60 '+(H+2)+' Q130 '+(H-58)+' 210 '+(H-20)+' Q250 '+(H-36)+' 290 '+(H+2)+'Z" fill="'+c+'"/><path d="M290 '+(H+2)+' Q330 '+(H-30)+' 380 '+(H+2)+'Z" fill="'+c+'" opacity=".8"/><path d="M262 '+(H-2)+' Q300 '+(H-18)+' 336 '+(H-2)+'" fill="none" stroke="'+L+'" stroke-width="1.6"/><line x1="262" y1="'+(H-2)+'" x2="336" y2="'+(H-2)+'" stroke="'+L+'" stroke-width="2"/>'; break;
       case 'bridge': s+=girder(H+18,c); break;
+      case 'cable': s+=cableBridge(H-4,c,[130,250]); break;
       case 'temple': s+='<path d="M-10 '+(H+10)+' Q120 '+(H-62)+' 260 '+(H-30)+' Q330 '+(H-14)+' 410 '+(H+10)+'Z" fill="'+c+'"/>'+templeRoof(170,H-46,.72,c)+tree(70,H-14,14,c)+tree(300,H-8,12,c)+tree(330,H-2,10,c)+birds(r,4,260,60,c); break;
       case 'pavilion': s+=rampart(H+36,c)+pavilion(200,H+2,1,c)+birds(r,5,60,50,c); break;
       case 'oldmarket': s+=shops(-6,406,H+44,c,L,r)+'<rect y="'+(H+44)+'" width="400" height="60" fill="'+c+'" opacity=".55"/>'; break;
@@ -421,6 +463,7 @@
     bridge:'<path d="M2 15h20"/><path d="M6 15V7M18 15V7"/><path d="M6 7c3 4 9 4 12 0"/><path d="M10 15v-3M14 15v-3M2 19h20"/>',
     temple:'<path d="M3 10c4 0 6-2.6 9-5 3 2.4 5 5 9 5"/><path d="M5 10v10h14V10"/><path d="M10 20v-5h4v5"/>', pavilion:'<path d="M3 9c4 0 6-2 9-4.5C15 7 17 9 21 9"/><path d="M6 9v11M18 9v11M4 14h16"/>',
     oldmarket:'<path d="M4 20V9l4-4 4 4 4-4 4 4v11"/><path d="M4 13h16"/><path d="M9 20v-4h6v4"/>', street:'<path d="M4 20V8l5-3v15M9 20V10h6v10M15 20V6l5 2v12"/><path d="M2 20h20"/>',
+    airport:'<path d="M2.5 19h19"/><path d="M3.5 13.5 8 15l8-4.6c1.4-.8 3-.9 3.7 0 .5.7 0 1.6-.8 2L9.6 17.6 4.6 16Z"/><path d="M10.5 9.6 7 6.4l1.8-.8 5.2 2.4"/>',
     promenade:'<path d="M3 15c2-1.4 4-1.4 6 0s4 1.4 6 0 4-1.4 6 0"/><path d="M3 19c2-1.4 4-1.4 6 0s4 1.4 6 0 4-1.4 6 0"/><circle cx="16" cy="6" r="2.4"/>'
   };
   function ic(k,cls){ return '<svg class="'+(cls||'tv-i')+'" viewBox="0 0 24 24">'+(I[k]||I.pin)+'</svg>'; }
@@ -683,7 +726,7 @@
       +'</div>'
       +'<div class="tv-card2"><h3>코스 경로 <small>'+c.stops.length+'곳 · 눌러서 자세히</small></h3><ol class="tv-tl">'
         +c.stops.map(function(s,i){ return '<li class="tv-st" data-s="'+i+'" style="animation-delay:'+(120+i*70)+'ms"><span class="tv-dot">'+(i+1)+'</span>'
-          +'<div class="tv-stb"><div class="tv-stn"><b>'+esc(s.n)+'</b><span class="tv-cl">'+esc(s.cl)+'</span></div><p>'+esc(s.one)+'</p><small>'+ic('clock')+'머무는 시간 약 '+esc(s.stay)+'</small></div>'
+          +'<div class="tv-stb"><div class="tv-stn"><b>'+esc(s.n)+'</b><span class="tv-cl">'+esc(s.cl)+'</span></div><p>'+esc(s.one)+'</p><small>'+ic('clock')+(/^\d/.test(s.stay)?'머무는 시간 약 '+esc(s.stay):esc(s.stay))+'</small></div>'
           +'<div class="tv-thumb tv-art">'+visual(s,c.art)+'<span class="tv-ti">'+ic(s.cat)+'</span></div></li>'; }).join('')
       +'</ol></div>'
       +'<div class="tv-card2"><h3>이렇게 다녀오세요</h3><ul class="tv-tips">'+c.tips.map(function(t){ return '<li><span class="ck">'+ic('check')+'</span><span>'+esc(t)+'</span></li>'; }).join('')+'</ul></div>'
@@ -718,7 +761,7 @@
       +'<div class="tv-card2" style="margin-top:16px"><h3>이런 곳이에요</h3>'+s.d.map(function(p){ return '<p class="tv-p">'+esc(p)+'</p>'; }).join('')+'</div>'
       +'<div class="tv-card2"><h3>알아두면 좋아요</h3><ul class="tv-tips">'+s.t.map(function(t){ return '<li><span class="ck">'+ic('check')+'</span><span>'+esc(t)+'</span></li>'; }).join('')+'</ul></div>'
       +'<div class="tv-card2"><h3>방문 정보</h3><div class="tv-rows">'
-        +'<div class="tv-row">'+ic('clock')+'<span>머무는 시간</span><b>약 '+esc(s.stay)+'</b></div>'
+        +'<div class="tv-row">'+ic('clock')+'<span>머무는 시간</span><b>'+(/^\d/.test(s.stay)?'약 '+esc(s.stay):esc(s.stay))+'</b></div>'
         +'<div class="tv-row">'+ic('sun')+'<span>코스 추천 시간</span><b>'+esc(c.when)+'</b></div>'
         +'<div class="tv-row">'+ic('car')+'<span>추천 차종</span><b>'+esc(c.car)+'</b></div>'
       +'</div><div class="tv-maps"><button class="tv-mapbtn" data-map="kakao"><i class="k">K</i>카카오맵</button><button class="tv-mapbtn" data-map="naver"><i class="n">N</i>네이버지도</button></div></div>'
@@ -746,7 +789,7 @@
     return '<div class="nh-sec tv-home"><div class="nh-sec-hd"><h2>인천, 한 바퀴 돌아볼까요</h2><a data-tvall>전체보기 ›</a></div><div class="tv-hs">'
       +COURSES.map(function(c){ return '<div class="tv-hc" data-tvc="'+c.id+'"><div class="tv-art">'+visual(c,c.art)+'</div><div class="tv-tags"><span class="tv-tag">'+esc(c.tags[0])+'</span></div>'
         +'<div class="tv-hct"><small>COURSE '+c.no+'</small><b>'+esc(c.title)+'</b><span>왕복 '+esc(c.dist)+' · '+esc(c.car)+' 추천</span></div></div>'; }).join('')
-      +'<div class="tv-hc more" data-tvall><span class="ar">'+ic('chev')+'</span><b>짧은 코스까지<br>9곳 모두 보기</b><span>월미도 · 인천대공원 · 청라</span></div>'
+      +'<div class="tv-hc more" data-tvall><span class="ar">'+ic('chev')+'</span><b>짧은 코스까지<br>10곳 모두 보기</b><span>월미도 · 인천대공원 · 청라</span></div>'
       +'</div></div>';
   }
   var _homeBusy=false;
