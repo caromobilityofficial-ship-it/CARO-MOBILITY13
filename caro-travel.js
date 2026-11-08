@@ -26,6 +26,14 @@
 
   /* ═════════ 1. 데이터 ═════════ */
   var NOTE_DIST='거리는 CARO 거점(송도 · 구월동 · 부평 · 동인천) 출발 기준의 대략적인 참고 값이며, 출발 거점 · 실제 경로 · 교통 상황에 따라 달라집니다.';
+  var NOTE_BIZ='※ 대여 차량은 개인 이동 목적으로만 이용할 수 있습니다. 돈을 받고 사람이나 물건을 실어 나르거나 다른 사람에게 다시 빌려주는 등 <b>영업 목적으로 사용하다 적발되면 「여객자동차 운수사업법」에 따라 법적 처벌</b>을 받을 수 있으며, 이용이 정지될 수 있습니다. <b>(영업용 사용 절대 불가)</b>';
+  var NOTE_LAW=[
+    ['「여객자동차 운수사업법」 제34조제1항','자동차대여사업자의 사업용 자동차를 임차한 자는 그 자동차를 유상(有償)으로 운송에 사용하거나 다시 남에게 대여하여서는 아니 되며, 누구든지 이를 알선(斡旋)하여서는 아니 된다.'],
+    ['같은 법 제90조제6호의2','제34조제1항을 위반하여 임차한 자동차를 유상 운송에 사용하거나 다시 남에게 대여한 자 또는 이를 알선한 자는 2년 이하의 징역 또는 2천만원 이하의 벌금에 처한다.']
+  ];
+  var CAR_IMG={'모닝':'morning','아반떼':'avante','쏘나타':'sonata','셀토스':'seltos','코나':'kona'};
+  function carImg(name){ var n=String(name||''); for(var k in CAR_IMG){ if(n.indexOf(k)>=0) return 'tv-car-'+CAR_IMG[k]+'.png?v=1'; } return ''; }
+  function lawHtml(){ return '<div class="tv-law"><p class="tv-biz">'+NOTE_BIZ+'</p>'+NOTE_LAW.map(function(l){ return '<p><b>'+l[0]+'</b>'+l[1]+'</p>'; }).join('')+'</div>'; }
   var NOTE_INFO='운영 시간 · 요금 · 개방 여부는 계절과 현장 사정에 따라 바뀔 수 있어요. 방문 전에 한 번 확인해 주세요.';
 
   var COURSES=[
@@ -123,7 +131,6 @@
     { id:'airport', no:'05', art:'airport_dawn', title:'인천공항 픽업 · 배웅', area:'연수구 · 영종구', tags:['공항','가족'], theme:['sea'],
       dist:'약 90km', dur:'반나절', when:'항공편 시간', car:'대형 SUV',
       toll:'인천대교 또는 영종대교 통행료가 별도로 발생합니다',
-      must:{k:'주의', t:'가족·지인을 태워 주는 용도로만 이용하세요. 돈을 받고 손님을 공항에 태워 주는 등 영업 목적으로 쓰는 것은 법으로 금지되어 있으며 적발 시 처벌받을 수 있습니다.'},
       note:{k:'참고', t:'공항 도착층 앞 도로는 오래 정차할 수 없어요. 마중 나갈 때는 단기주차장(요금 별도)에 세우고 입국장에서 만나세요.'},
       sum:'인천으로 여행 온 가족을 공항에서 맞이하고, 여행이 끝나면 다시 공항까지 편하게 배웅해 주세요. 짐이 많은 가족 여행도 넉넉한 SUV면 한 번에 실을 수 있습니다.',
       tips:['항공편 도착 시간과 터미널(제1·제2)을 미리 확인하고, 도착 30분 뒤쯤 공항에 닿도록 출발하세요.','캐리어가 많다면 넉넉한 SUV를 고르세요.','픽업과 배웅 사이 인천 여행은 위 드라이브 코스를 함께 둘러보세요.'],
@@ -542,6 +549,10 @@
     '.tv-stat .bx{width:38px;height:38px;border-radius:12px;background:#f3f4f6;display:flex;align-items:center;justify-content:center;color:#4b525c;flex:0 0 auto;}',
     '.tv-stat .bx .tv-i{width:19px;height:19px;} .tv-stat small{display:block;font-size:11px;font-weight:700;color:#8a919b;} .tv-stat b{display:block;font-size:14px;font-weight:780;margin-top:2px;letter-spacing:-.2px;}',
     '.tv-stat.car .bx{background:#16181c;color:#c8a96e;}',
+    '.tv-carcard{margin-top:8px;background:linear-gradient(135deg,#1b1e23,#2a2f37);border-radius:18px;padding:16px 14px 16px 18px;display:flex;align-items:center;gap:8px;color:#fff;overflow:hidden;}',
+    '.tv-carcard .tv-cc-t{flex:1 1 auto;min-width:0;} .tv-carcard small{display:block;font-size:11px;font-weight:700;color:#c8a96e;letter-spacing:.2px;} .tv-carcard b{display:block;font-size:19px;font-weight:800;margin-top:3px;letter-spacing:-.3px;} .tv-carcard p{margin:6px 0 0;font-size:11.5px;line-height:1.5;color:#aab1bb;}',
+    '.tv-cc-img{flex:0 0 auto;width:150px;height:auto;margin:-6px -18px -10px 0;filter:drop-shadow(0 10px 12px rgba(0,0,0,.45));}',
+    '.tv-carcard.noimg .bx{width:46px;height:46px;border-radius:14px;background:#16181c;color:#c8a96e;display:flex;align-items:center;justify-content:center;flex:0 0 auto;} .tv-carcard.noimg .bx .tv-i{width:22px;height:22px;}',
     '.tv-card2{background:#fff;border-radius:20px;padding:18px;margin-top:12px;}',
     '.tv-card2 h3{margin:0 0 12px;font-size:15.5px;font-weight:800;letter-spacing:-.3px;display:flex;align-items:center;gap:8px;} .tv-card2 h3 small{font-size:12px;color:#8a919b;font-weight:700;}',
     '.tv-p{margin:0;font-size:14.5px;line-height:1.75;color:#3a4048;} .tv-p+.tv-p{margin-top:10px;}',
@@ -562,6 +573,8 @@
     '.tv-tips{list-style:none;margin:0;padding:0;display:grid;gap:10px;}',
     '.tv-tips li{display:flex;gap:10px;font-size:13.5px;line-height:1.6;color:#3a4048;} .tv-tips .ck{width:22px;height:22px;border-radius:50%;background:#16181c;color:#fff;display:flex;align-items:center;justify-content:center;flex:0 0 auto;margin-top:1px;} .tv-tips .ck .tv-i{width:13px;height:13px;stroke-width:2.6;}',
     '.tv-small{margin:14px 4px 0;font-size:11.5px;line-height:1.6;color:#8a919b;}',
+    '.tv-rec{display:inline-block;margin-left:6px;padding:1px 6px;border-radius:5px;background:#18191c;color:#fff;font-size:10px;font-weight:700;vertical-align:2px;}',
+    '.tv-law{margin:14px 4px 0;font-size:11px;line-height:1.7;color:#8a919b;} .tv-law p{margin:0 0 6px;} .tv-law b{font-weight:700;color:#5b636e;margin-right:4px;} .tv-law .tv-biz{margin-bottom:10px;} .tv-law-l{margin:16px 22px 0;}',
     /* 하단 고정 버튼 */
     '.tv-cta{position:fixed;left:0;right:0;bottom:0;z-index:20;padding:12px 16px calc(12px + var(--sab,0px));background:linear-gradient(180deg,rgba(243,244,246,0) 0%,#f3f4f6 30%);pointer-events:none;}',
     '.tv-cta-in{max-width:608px;margin:0 auto;display:flex;gap:8px;pointer-events:auto;}',
@@ -649,10 +662,62 @@
     var full=text+'\n'+url;
     try{ navigator.clipboard.writeText(full).then(function(){ toast('코스 내용을 복사했어요. 원하는 곳에 붙여 넣어 공유하세요.'); },function(){ toast(full); }); }catch(e){ toast(full); }
   }
+  /* 이 코스로 예약하기 → 예약 화면 + 내 위치에서 가장 가까운 거점 차량 시트 */
+  function kmBetween(a,b,c,d){ var R=6371,r=Math.PI/180,x=(c-a)*r,y=(d-b)*r,h=Math.sin(x/2)*Math.sin(x/2)+Math.cos(a*r)*Math.cos(c*r)*Math.sin(y/2)*Math.sin(y/2); return 2*R*Math.asin(Math.min(1,Math.sqrt(h))); }
+  function nearestZoneTo(lat,lng){
+    var Z=window.CARO_ZONES||{}, best=null, bd=Infinity;
+    Object.keys(Z).forEach(function(k){ var z=Z[k]; if(!z||typeof z.lat!=='number') return; var d=kmBetween(lat,lng,z.lat,z.lng); if(d<bd){ bd=d; best=k; } });
+    return best ? {zone:best, km:bd} : null;
+  }
+  function carKey(t){ return String(t||'').replace(/더\s*뉴|디\s*올\s*뉴|올\s*뉴|\s+/g,'').toLowerCase(); }
+  function markRecommended(car){
+    var box=document.getElementById('czList'); if(!box||!car) return;
+    var key=carKey(car); if(!key) return;
+    var rows=[].slice.call(box.querySelectorAll('.ccs-car')), hit=[];
+    rows.forEach(function(r){ var n=r.querySelector('.ccs-name'); var k=carKey(n&&n.textContent); if(k && (k.indexOf(key)>=0||key.indexOf(k)>=0)) hit.push(r); });
+    hit.slice().reverse().forEach(function(r){
+      box.insertBefore(r, box.firstChild);
+      var n=r.querySelector('.ccs-name'); if(n && !n.querySelector('.tv-rec')){ var t=document.createElement('span'); t.className='tv-rec'; t.textContent='코스 추천'; n.appendChild(t); }
+    });
+  }
+  var REC=null;
+  /* 거점 시트가 다시 그려져도(시간 변경·실시간 갱신) 코스 추천 차종을 맨 위에 유지 */
+  function hookZoneSheet(){
+    var f=window.caroOpenZoneSheet; if(!f || f.__tvRec) return;
+    var w=function(zone){ var r=f.apply(this,arguments); try{ if(REC && REC.zone===zone && Date.now()-REC.t<3600000) markRecommended(REC.car); }catch(e){} return r; };
+    w.__tvRec=true; window.caroOpenZoneSheet=w;
+  }
+  function focusZone(zone, c){
+    var tries=0;
+    (function go(){
+      var map=window.caroMap;
+      if(map && map.__kakao && window.kakao && window.kakao.maps && window.CARO_ZONES && window.CARO_ZONES[zone]){
+        try{ var Z=window.CARO_ZONES[zone]; map.setLevel(5); map.setCenter(new window.kakao.maps.LatLng(Z.lat-0.004, Z.lng)); }catch(e){}
+      } else if(++tries<20){ return setTimeout(go,300); }
+      REC={car:c.car, zone:zone, t:Date.now()}; hookZoneSheet();
+      try{ if(window.caroOpenZoneSheet){ window.caroOpenZoneSheet(zone); } }catch(e){}
+    })();
+  }
   function book(c){
     closeAll();
-    setTimeout(function(){ try{ if(window.goTo) goTo('rental-screen'); }catch(e){}
-      setTimeout(function(){ toast('추천 차종: '+c.car+' — 가까운 거점에서 골라 예약하세요.'); }, 500); }, 260);
+    setTimeout(function(){
+      try{ if(window.goTo) goTo('rental-screen'); }catch(e){}
+      var done=false;
+      function fallback(msg){ if(done) return; done=true; try{ if(window.caroFitZones) window.caroFitZones(); }catch(e){} toast(msg); }
+      if(!navigator.geolocation || !window.CARO_ZONES){ return setTimeout(function(){ fallback('지도에서 가까운 거점을 골라 주세요. 추천 차종: '+c.car); },500); }
+      setTimeout(function(){ if(!done) toast('가까운 거점을 찾고 있어요…'); },400);
+      var guard=setTimeout(function(){ fallback('위치를 확인하지 못했어요. 지도에서 가까운 거점을 골라 주세요.'); },10000);
+      navigator.geolocation.getCurrentPosition(function(p){
+        if(done) return; done=true; clearTimeout(guard);
+        var n=nearestZoneTo(p.coords.latitude, p.coords.longitude);
+        if(!n){ done=false; return fallback('지도에서 가까운 거점을 골라 주세요. 추천 차종: '+c.car); }
+        setTimeout(function(){ focusZone(n.zone, c); }, 450);
+        var km = n.km<1 ? Math.round(n.km*1000)+'m' : (Math.round(n.km*10)/10)+'km';
+        toast('가장 가까운 '+n.zone+' 거점이에요 (약 '+km+'). 다른 거점은 지도에서 고를 수 있어요.');
+      }, function(){
+        clearTimeout(guard); fallback('위치 권한이 없어 전체 거점을 보여드려요. 지도에서 가까운 거점을 골라 주세요.');
+      }, {enableHighAccuracy:false, timeout:9000, maximumAge:300000});
+    }, 260);
   }
 
   /* ═════════ 8. 화면: 목록 ═════════ */
@@ -680,7 +745,7 @@
       +'<p class="tv-lead">영종부터 강화까지 인천에서 많이 찾는 드라이브 코스를 모았어요. 거점에서 가까운 순서로 정리했습니다. 코스를 누르면 들를 곳과 팁이 자세히 나와요.</p></div>'
       +'<div class="tv-chips">'+FILTERS.map(function(f){ return '<button class="tv-chip'+(f.k===(filter||'all')?' on':'')+'" data-f="'+f.k+'">'+(f.i?ic(f.i):'')+f.l+'</button>'; }).join('')+'</div>'
       +'<div class="tv-list"></div><div class="tv-shorts"></div>'
-      +'<div class="tv-foot">'+esc(NOTE_DIST)+' <b>서두르지 마시고 여유 있게 다녀오세요.</b> 대여 시간이 부족하면 앱에서 연장할 수 있어요.</div><div style="height:calc(40px + var(--sab,0px))"></div></div>';
+      +'<div class="tv-foot">'+esc(NOTE_DIST)+' <b>서두르지 마시고 여유 있게 다녀오세요.</b> 대여 시간이 부족하면 앱에서 연장할 수 있어요.</div>'+lawHtml().replace('tv-law','tv-law tv-law-l')+'<div style="height:calc(40px + var(--sab,0px))"></div></div>';
     var listEl=el.querySelector('.tv-list'), shortEl=el.querySelector('.tv-shorts');
     function draw(f){
       var main=COURSES.filter(function(c){ return f==='all'||(f==='fav'?isFav(c.id):c.theme.indexOf(f)>=0); });
@@ -717,8 +782,10 @@
         +'<div class="tv-stat"><span class="bx">'+ic('route')+'</span><div><small>왕복 거리</small><b>'+esc(c.dist)+'</b></div></div>'
         +'<div class="tv-stat"><span class="bx">'+ic('clock')+'</span><div><small>예상 소요</small><b>'+esc(c.dur)+'</b></div></div>'
         +'<div class="tv-stat"><span class="bx">'+ic('sun')+'</span><div><small>추천 시간</small><b>'+esc(c.when)+'</b></div></div>'
-        +'<div class="tv-stat car"><span class="bx">'+ic('car')+'</span><div><small>추천 차종</small><b>'+esc(c.car)+'</b></div></div>'
+        +'<div class="tv-stat"><span class="bx">'+ic('pin')+'</span><div><small>들르는 곳</small><b>'+c.stops.length+'곳</b></div></div>'
       +'</div>'
+      +(function(){ var im=carImg(c.car); return '<div class="tv-carcard'+(im?'':' noimg')+'"><div class="tv-cc-t"><small>추천 차종</small><b>'+esc(c.car)+'</b><p>이 코스로 예약하면 가까운 거점에서 이 차종을 맨 위에 보여드려요.</p></div>'
+        +(im?'<img class="tv-cc-img" src="'+im+'" alt="'+esc(c.car)+'" loading="lazy">':'<span class="bx">'+ic('car')+'</span>')+'</div>'; })()
       +'<div class="tv-card2"><h3>코스 소개</h3><p class="tv-p">'+esc(c.sum)+'</p>'
         +(c.toll?'<div class="tv-call toll">'+ic('toll')+'<div>'+esc(c.toll)+'</div></div>':'')
         +(c.must?'<div class="tv-call must">'+ic('alert')+'<div><b>'+esc(c.must.k)+'</b>'+esc(c.must.t)+'</div></div>':'')
@@ -731,6 +798,7 @@
       +'</ol></div>'
       +'<div class="tv-card2"><h3>이렇게 다녀오세요</h3><ul class="tv-tips">'+c.tips.map(function(t){ return '<li><span class="ck">'+ic('check')+'</span><span>'+esc(t)+'</span></li>'; }).join('')+'</ul></div>'
       +'<p class="tv-small">'+esc(NOTE_DIST)+' '+esc(NOTE_INFO)+'</p>'
+      +lawHtml()
       +'</div></div>'
       +'<div class="tv-cta"><div class="tv-cta-in"><button class="tv-btn sec'+(fav?' on':'')+'" data-fav2 aria-label="코스 저장">'+ic('heart')+'</button>'
       +'<button class="tv-btn pri" data-book>'+ic('car')+'이 코스로 예약하기 <small>'+esc(c.car)+' 추천</small></button></div></div>';
