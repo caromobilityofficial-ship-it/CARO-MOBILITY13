@@ -2569,7 +2569,8 @@
     var logout=document.querySelector('.hmenu-logout');
     var existing=document.getElementById('caro-admin-entry');
     var divider=document.getElementById('caro-admin-entry-div');
-    if(!window.caroIsAdmin()){ if(existing) existing.remove(); if(divider) divider.remove(); return; }
+    /* ★[v110.6] 어플 안 관리자 화면 삭제 — 메뉴 항목도 항상 제거 (관리는 관제프로그램에서) */
+    if(existing) existing.remove(); if(divider) divider.remove(); return;
     if(existing) return;
     if(!logout || !logout.parentNode) return;
     var dv=document.createElement('div'); dv.className='hmenu-divider'; dv.id='caro-admin-entry-div';
@@ -7679,4 +7680,12 @@
     }catch(e){ return false; }
   };
   console.log('[CARO v4] ✅ caroBack (하드웨어 뒤로가기 핸들러) 준비');
+})();
+
+/* ★[v110.6] 어플 안 관리자 화면(DEV CONSOLE) 삭제 — 관리자 계정으로 어플에 로그인해도 홈으로 */
+(function(){ 'use strict';
+  window.showDevLoginTransition=function(){
+    try{ if(window.goTo) goTo('home-screen', true); }catch(e){}
+    try{ if(window.showToast) showToast('관리 기능은 관제프로그램에서 이용해 주세요'); }catch(e){}
+  };
 })();

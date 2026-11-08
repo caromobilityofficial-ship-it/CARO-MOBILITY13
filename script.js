@@ -11186,9 +11186,11 @@ window.devUploadAllCars=function(){
     };
   }
 
-  /* DOM 변경 감지로 자동 교체 (백업) */
+  /* DOM 변경 감지로 자동 교체 (백업) — ★[v110.5] 0.4초에 한 번으로 묶음 */
+  let _rtT = null;
   const observer = new MutationObserver(() => {
-    replaceTermsLabel();
+    if(_rtT) return;
+    _rtT = setTimeout(() => { _rtT = null; replaceTermsLabel(); }, 400);
   });
 
   if(document.body){
@@ -11229,8 +11231,11 @@ window.devUploadAllCars=function(){
   /* ───── 2. 10분 전 차량 사용 가능 ───── */
   function activate10minRentals(){
     // 모든 예약 카드에서 "대여 임박" → "대여 중"으로 표시 + 버튼 활성화
-    var allEls = document.querySelectorAll('*');
-    allEls.forEach(function(el){
+    /* ★[v110.5] 성능: 화면 전체(4천여 개 요소)를 매번 훑던 방식 → 글자 노드만 빠르게 찾기 */
+    if(!document.body || (document.body.textContent||'').indexOf('대여 임박') < 0) return;
+    var hits = [], tw = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null), tn;
+    while((tn = tw.nextNode())){ if(tn.nodeValue && tn.nodeValue.indexOf('대여 임박') >= 0 && tn.parentNode && tn.parentNode.children.length === 0) hits.push(tn.parentNode); }
+    hits.forEach(function(el){
       if(el.children.length === 0 && el.textContent && el.textContent.trim() === '대여 임박'){
         el.textContent = '대여 중';
         el.style.color = '#b23a3a';
@@ -11254,9 +11259,11 @@ window.devUploadAllCars=function(){
     });
   }
 
-  // DOM 변경 감지로 자동 적용
+  // DOM 변경 감지로 자동 적용 — ★[v110.5] 화면이 바뀔 때마다 즉시 돌던 것을 0.6초에 한 번으로 묶음(렉 감소)
+  var _a10t = null;
   var observer = new MutationObserver(function(){
-    activate10minRentals();
+    if(_a10t) return;
+    _a10t = setTimeout(function(){ _a10t = null; activate10minRentals(); }, 600);
   });
 
   if(document.body){
