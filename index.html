@@ -675,37 +675,21 @@
             <h1 class="ev-main-title" data-i18n="menu_event">이벤트</h1>
             <p class="ev-sub" data-i18n="ev_sub">CARO의 특별한 혜택을 확인하세요</p>
         </div>
+        <!-- ★[v110.8] 실제 진행 중인 혜택만 (예전 30% 할인·친구 추천 5,000P·주말 30% 는 실제 요금에 없는 예시라 삭제) -->
         <div class="ev-card e1" onclick="openEventDetail(0)">
             <div class="ev-card-left">
                 <div class="ev-card-badge">HOT</div>
-                <div class="ev-card-title" data-i18n="ev1_title">신규 가입 첫 대여 30% 할인</div>
-                <div class="ev-card-period">2026.03.01 ~ 2026.12.31</div>
+                <div class="ev-card-title">신규 가입 첫 1시간 무료</div>
+                <div class="ev-card-period">상시 · 첫 예약 때 자동 적용 (보험료 별도)</div>
             </div>
             <div class="ev-card-arrow">›</div>
         </div>
-        <div class="ev-card e2" onclick="openEventDetail(1)">
+        <div class="ev-card e2" style="cursor:default;opacity:.92;">   <!-- ★[v110.9] COMING SOON — 누를 수 없음 -->
             <div class="ev-card-left">
-                <div class="ev-card-badge new-b">NEW</div>
-                <div class="ev-card-title" data-i18n="ev2_title">CARO THE BLACK 출시</div>
-                <div class="ev-card-period">2026.03.01 ~ 2026.06.30</div>
+                <div class="ev-card-badge new-b">SOON</div>
+                <div class="ev-card-title">CARO THE BLACK</div>
+                <div class="ev-card-period">COMING SOON</div>
             </div>
-            <div class="ev-card-arrow">›</div>
-        </div>
-        <div class="ev-card e3" onclick="openEventDetail(2)">
-            <div class="ev-card-left">
-                <div class="ev-card-badge gift-b">GIFT</div>
-                <div class="ev-card-title" data-i18n="ev3_title">친구 추천 5,000P 적립</div>
-                <div class="ev-card-period" data-i18n="always">상시</div>
-            </div>
-            <div class="ev-card-arrow">›</div>
-        </div>
-        <div class="ev-card e4" onclick="openEventDetail(3)">
-            <div class="ev-card-left">
-                <div class="ev-card-badge">EVENT</div>
-                <div class="ev-card-title" data-i18n="ev4_title">주말 특별 할인 최대 30%</div>
-                <div class="ev-card-period" data-i18n="weekend_period">매주 토~일</div>
-            </div>
-            <div class="ev-card-arrow">›</div>
         </div>
     </div>
 </div>
@@ -1739,11 +1723,11 @@
 <script src="caro-config.js?v=3"></script>
 <script type="module" src="firebase-config.js?v=9"></script>
 <script src="caro-mfa.js?v=1"></script>   <!-- 2단계 인증 코드 창 (관리자 계정이 이 화면에서 로그인할 때만 뜸) -->
-<script src="script.js?v=35"></script>
+<script src="script.js?v=37"></script>
 <script type="module" src="caro-auth.js?v=2"></script>
 <script src="script-photo-upload.js?v=6"></script>
 <script src="customer-notices.js?v=10"></script>
-<script src="customer-redesign.js?v=186"></script>
+<script src="customer-redesign.js?v=187"></script>
 <script src="caro-sync-fix.js?v=15"></script>
 <script src="caro-icons.js?v=1"></script>
 <script src="caro-ux.js?v=1"></script>

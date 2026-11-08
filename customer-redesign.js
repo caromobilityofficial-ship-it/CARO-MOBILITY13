@@ -197,6 +197,10 @@
     .nh-black-l{ flex:1 1 auto; min-width:0; }
     .nh-black-t{ font-family:var(--font-brand,'Oswald',sans-serif); font-size:16px; font-weight:700; letter-spacing:.12em; color:#f3d38a; }
     .nh-black-s{ font-size:11.5px; font-weight:600; color:#9a958c; margin-top:6px; }
+    .nh-black{ cursor:default !important; }
+    .nh-black .nh-black-t{ white-space:nowrap; font-size:15px; letter-spacing:.08em; }
+    @media (max-width:360px){ .nh-black .nh-black-t{ font-size:13.5px; letter-spacing:.05em; } .nh-black-cs{ padding:5px 9px; font-size:9.5px; } }
+    .nh-black-cs{ flex:0 0 auto; font-family:var(--font-brand,'Oswald',sans-serif); font-size:10.5px; font-weight:700; letter-spacing:.16em; color:#f3d38a; border:1px solid rgba(243,211,138,.55); border-radius:999px; padding:6px 11px; }
 
     .nh-sec{ margin-top:22px; }
     .nh-sec-hd{ display:flex; align-items:center; justify-content:space-between; margin:0 2px 8px; }
@@ -505,6 +509,7 @@
       +'<div class="nh-black" data-black="1"><div class="nh-black-l">'
       +'<div class="nh-black-t">◆ CARO THE BLACK</div>'
       +'<div class="nh-black-s">프리미엄 차량 · 전담 컨시어지</div></div>'
+      +'<span class="nh-black-cs">COMING SOON</span>'
       +'</div></div>';
     var menu='<div class="nh-menu">'+MENU.map(function(m,i){
       return '<div class="nh-mi'+(m.prem?' prem':'')+'" data-mi="'+i+'"><div class="nh-box">'+(m.boxHtml||ic(m.i))+'</div><span>'+(m.html||esc(m.l))+'</span></div>';
@@ -529,10 +534,11 @@
 
     root.querySelector('[data-orb]').onclick=function(){ go(getActive()?'my-reservation-screen':'rental-screen'); };
     var recEl=root.querySelector('[data-recent]'); if(recEl) recEl.onclick=function(){ go(recEl.classList.contains('nh-free')?'rental-screen':'usage-history-screen'); };
-    var blkEl=root.querySelector('[data-black]'); if(blkEl) blkEl.onclick=function(){ if(has('goBlackLabel')) call('goBlackLabel'); else go('black-label-screen'); };
+    /* ★[v110.9] CARO THE BLACK 은 준비 중(COMING SOON) — 눌러도 들어가지 않음 */
+    var blkEl=root.querySelector('[data-black]'); if(blkEl) blkEl.onclick=null;
     root.querySelectorAll('[data-all]').forEach(function(a){ a.onclick=function(e){ e.stopPropagation();
       var k=a.getAttribute('data-all');
-      if(k==='black'){ if(has('goBlackLabel')) call('goBlackLabel'); else go('black-label-screen'); }
+      if(k==='black'){ /* ★[v110.9] COMING SOON — 이동 없음 */ }
       else if(k==='event'){ go('event-screen'); }
       else if(k==='plan'){ go('membership-screen'); }
     }; });

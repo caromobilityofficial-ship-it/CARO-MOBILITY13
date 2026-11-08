@@ -1995,6 +1995,7 @@ function handleLogout(){
    13-1. 카로 더 블랙 전환 모션 (4초 천천히)
 ───────────────────────────────────────────── */
 function goBlackLabel(){
+  return;   /* ★[v110.9] CARO THE BLACK 준비 중(COMING SOON) — 화면 이동 없음 */
   var overlay=document.getElementById('bl-transition-overlay');
   if(!overlay){ goTo('black-label-screen'); return; }
 
@@ -4768,10 +4769,10 @@ function openBLDetail(car){
 ───────────────────────────────────────────── */
 var EVENT_DETAILS = [
   {
-    title:'신규 가입 첫 대여 30% 할인',
-    titleen:'30% Off First Ride for New Members',
-    body:'<h4 style="text-align:center">이벤트 내용</h4><p>CARO 모빌리티에 신규 가입하신 후 <strong>7일 이내</strong>에 첫 차량 대여를 하시면 대여 요금의 <strong>30%를 자동 할인</strong>해 드립니다.</p><h4 style="text-align:center">적용 조건</h4><ul><li>가입일로부터 7일 이내 첫 대여 시 자동 적용</li><li>쿠폰 코드 입력 불필요 (자동 처리)</li><li>모든 차량 등급 적용 가능</li><li>포인트와 중복 할인 가능</li></ul><h4 style="text-align:center">이벤트 기간</h4><p style="text-align:center">2026년 3월 1일 ~ 2026년 12월 31일</p>',
-    period:'2026.03.01 ~ 2026.12.31'
+    title:'신규 가입 첫 1시간 무료',
+    titleen:'First Hour Free for New Members',
+    body:'<h4 style="text-align:center">이벤트 내용</h4><p>CARO에 새로 가입하신 분의 <strong>첫 예약 차량 요금 1시간</strong>을 무료로 드립니다.</p><h4 style="text-align:center">이용 방법</h4><ul><li>쿠폰 코드 입력 없이 첫 예약 결제 금액에 <strong>자동으로 반영</strong>돼요.</li><li><strong>보험료(면책 상품)는 별도</strong>로 결제돼요.</li><li>예약을 취소하면 혜택이 되살아나 다음 예약에 다시 적용돼요.</li><li>대여·반납까지 마친 뒤에는 다시 적용되지 않아요 (1인 1회).</li></ul>',
+    period:'상시'
   },
   {
     title:'CARO 카로 더 블랙 출시 기념',
