@@ -65,6 +65,9 @@
         #splash-screen .csp-tag{font-family:'Oswald',sans-serif;font-weight:300;font-size:.7rem;letter-spacing:.34em;
           color:#8a8f99;margin-top:16px;opacity:0;animation:csrFade 1.2s ease 1.3s forwards;}
         #splash-screen .splash-footer{color:#a3a8b1!important;}
+        /* ★[v110.4] 앱을 누르면 로딩 화면이 바로 보이게 — 페이드 지연·로딩 줄 제거 */
+        #splash-screen .nh-splash-mk,#splash-screen .csp-brand,#splash-screen .csp-tag{opacity:1!important;animation:none!important;}
+        #splash-screen .csp-line,#splash-screen .logo-line{display:none!important;}
         @keyframes csrFade{to{opacity:1;}}
         @keyframes csrFlow{0%{left:-45%;}100%{left:100%;}}
     </style>
@@ -164,7 +167,6 @@
     <div class="splash-center">
         <div class="nh-splash-mk"><svg viewBox="132 92 248 350" xmlns="http://www.w3.org/2000/svg"><path d="M256 396C256 396 360 292 360 208A104 104 0 0 0 152 208C152 292 256 396 256 396Z" fill="currentColor"/><path d="M293 171A52 52 0 1 0 293 245" fill="none" stroke="#fff" stroke-width="30" stroke-linecap="round"/></svg></div>
         <div class="csp-brand">CARO MOBILITY</div>
-        <div class="csp-line"></div>
         <div class="csp-tag">PREMIUM CAR SHARING</div>
     </div>
     <div class="splash-footer">EST. 2026</div>
@@ -1994,11 +1996,11 @@
 <script src="caro-config.js?v=3"></script>
 <script type="module" src="firebase-config.js?v=9"></script>
 <script src="caro-mfa.js?v=1"></script>   <!-- 2단계 인증 코드 창 (관리자 계정이 이 화면에서 로그인할 때만 뜸) -->
-<script src="script.js?v=32"></script>
+<script src="script.js?v=33"></script>
 <script type="module" src="caro-auth.js?v=2"></script>
 <script src="script-photo-upload.js?v=6"></script>
 <script src="customer-notices.js?v=10"></script>
-<script src="customer-redesign.js?v=183"></script>
+<script src="customer-redesign.js?v=184"></script>
 <script src="caro-sync-fix.js?v=15"></script>
 <script src="caro-icons.js?v=1"></script>
 <script src="caro-ux.js?v=1"></script>

@@ -7404,6 +7404,7 @@
      +'padding:calc(env(safe-area-inset-top,0px) + 9px) 16px 9px;background:var(--accent,#18191c);color:#fff;'
      +'font-size:.78rem;font-weight:700;letter-spacing:-.01em;box-shadow:0 6px 18px -8px rgba(24,25,28,.5);'
      +'transform:translateY(-110%);transition:transform .35s cubic-bezier(.2,.8,.25,1);}'
+   +'.caro-off-bar:not(.on){visibility:hidden;box-shadow:none;}'
    +'.caro-off-bar.on{transform:translateY(0);}'
    +'.caro-off-bar svg{width:15px;height:15px;stroke:#c8a96e;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:0 0 auto;}'
     /* 2) 빈 화면 CTA */
@@ -7458,7 +7459,8 @@
   }
   window.addEventListener('online',function(){ setNet(true); });
   window.addEventListener('offline',function(){ setNet(false); });
-  try{ if(navigator.onLine===false) setNet(false); }catch(e){}
+  /* ★[v110.4] 앱 시작 직후 잠깐의 연결 지연으로 상단 띠가 깜빡이지 않게 — 3초 뒤에도 끊겨 있을 때만 표시 */
+  setTimeout(function(){ try{ if(navigator.onLine===false) setNet(false); }catch(e){} }, 3000);
 
   /* ───── 2) 빈 화면 CTA ───── */
   function addCta(listId, txt){

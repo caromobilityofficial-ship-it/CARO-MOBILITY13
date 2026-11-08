@@ -541,7 +541,7 @@ document.addEventListener('DOMContentLoaded', function(){
       var _cur=document.querySelector('.screen.active');
       if(!_cur||_cur.id!=='main-screen') goTo('main-screen');   /* ★ [v101] 이미 main 이면 같은 화면 재전환(활성 화면 사라짐) 방지 */
       if(shortcut) window._pendingShortcut = shortcut;
-    }, 4500);
+    }, 1500);   /* ★[v110.4] 로딩 화면 4.5초 → 1.5초 */
 
   /* 토스페이먼츠 결제 성공 처리 — ★[v106] 서버 모드에서는 caro-secure.js 가 confirmPayment 로 처리하므로 여기서는 손대지 않는다 */
   var urlParams2=new URLSearchParams(window.location.search);
