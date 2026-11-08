@@ -86,6 +86,13 @@
       list.sort(function(a,b){ return new Date(b.start)-new Date(a.start); });
       return list[0]||null;
     }catch(e){ return null; } }
+  /* ★[v110.7] 신규 가입 첫 1시간 무료 — 취소하지 않은 예약이 하나도 없는 회원(처음 가입·예약했다 취소만 한 회원)에게 홈에서 안내 */
+  function freeEligible(){ try{ return !!(window._caroLoggedIn && window._caroResLoaded && !getRecent()); }catch(e){ return false; } }
+  function freeCardHtml(){
+    return '<div class="nh-recent nh-free" data-recent="1"><div class="nh-free-row"><span class="nh-free-ic">1H<small>FREE</small></span>'
+      +'<span class="nh-free-tx"><span class="k">신규 가입 혜택</span><b>첫 1시간 무료</b><small>첫 예약 때 자동 적용 · 보험료는 별도</small></span>'
+      +'<span class="nh-free-go">예약하기</span></div></div>';
+  }
   function recentLabel(r){ var now=new Date(), s=new Date(r.start), e=new Date(r.end);
     if(r.returned || e<now) return fmtD(e)+' 반납';
     if(now>=s && now<=e) return '이용 중';
@@ -93,7 +100,7 @@
 
   /* ★[25차] 실제로 적용되는 혜택만 — 예전 배너(30%·반값·친구초대·심야특가)는 요금 계산에 없는 광고였다.
      운영화면 공지·이벤트에서 '이벤트'로 등록하면 아래에 자동으로 붙는다(window.caroEventNotices) */
-  var EVENTS=[ {t:'쿠폰 CARO30', s:'예약 결제 화면에 코드 입력 시 3,000원 할인 (1인 1회)', ic:'coupon'} ];
+  var EVENTS=[ {t:'신규 가입 첫 1시간 무료', s:'첫 예약 차량 요금 1시간 무료 · 보험료는 별도', ic:'coupon'} ];   /* ★[v110.7] CARO30(3,000원) 종료 */
   function eventsNow(){ var ex=(window.caroEventNotices||[]).slice(0,4).map(function(n){ return {t:n.title||'', s:(n.body||'').replace(/<[^>]+>/g,'').slice(0,40), ic:'gift', id:n.id}; }); return ex.concat(EVENTS); }
   var PLANS=[
     {tag:'개인', name:'CARO 라이트', price:'월 4,900원', ic:'user'},
@@ -244,6 +251,15 @@
     .nh-recent-date{ font-size:11.5px; font-weight:600; color:var(--text-m); margin-top:3px; }
     .nh-recent-arr{ width:20px; height:20px; color:var(--p1-line2,#c8ced6); flex:0 0 auto; }
     .nh-recent-empty{ font-size:12.5px; font-weight:600; color:var(--text-m); padding:4px 0 2px; }
+    .nh-free{ cursor:pointer; }
+    .nh-free-row{ display:flex; align-items:center; gap:14px; }
+    .nh-free-ic{ flex:0 0 auto; width:48px; height:48px; border-radius:14px; background:linear-gradient(145deg,#20232b,#14151a); color:#d8c08f; display:flex; flex-direction:column; align-items:center; justify-content:center; font-size:15px; font-weight:900; line-height:1; letter-spacing:.02em; }
+    .nh-free-ic small{ font-size:8px; font-weight:800; letter-spacing:.12em; margin-top:3px; color:rgba(216,192,143,.75); }
+    .nh-free-tx{ flex:1; min-width:0; }
+    .nh-free-tx .k{ display:block; font-size:11px; font-weight:800; color:#8a8f99; letter-spacing:.02em; }
+    .nh-free-tx b{ display:block; font-size:16px; font-weight:800; color:var(--text-1); margin-top:2px; }
+    .nh-free-tx small{ display:block; font-size:11.5px; font-weight:600; color:#7b838e; margin-top:3px; }
+    .nh-free-go{ flex:0 0 auto; font-size:12px; font-weight:800; color:#fff; background:var(--accent,#18191c); border-radius:999px; padding:8px 13px; }
 
     /* 결제·면허 전체화면 */
     #nh-wallet-screen{ position:fixed; top:0; left:0; right:0; bottom:0; width:100%; height:100%; z-index:1300; background:var(--silver-base,#eff1f4); transform:translateX(100%); transition:transform .3s cubic-bezier(.22,1,.36,1); overflow-y:auto; -webkit-overflow-scrolling:touch; }
@@ -474,7 +490,8 @@
       (fuelPct==null?'x':fuelPct),
       rec ? carKey(rec) : 'x',
       settling?'s':'',
-      window._caroLoggedIn?'1':'0'
+      window._caroLoggedIn?'1':'0',
+      freeEligible()?'F':''
     ].join('§');
     if(!force && _sig===_renderSig && root.querySelector('.nh-hero')){ return; }
     _renderSig=_sig;
@@ -483,6 +500,7 @@
         ? '<div class="nh-recent-row">'+carThumb(rec)+'<div class="nh-recent-info"><div class="nh-recent-car">'+esc(carName(rec))+'</div><div class="nh-recent-date">'+recentLabel(rec)+'</div></div><svg class="nh-recent-arr" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>'
         : '<div class="nh-recent-empty">최근 대여한 차량이 없습니다</div>')
       +'</div>';
+    if(!rec && freeEligible()) recent=freeCardHtml();
     var black='<div class="nh-sec">'+secHd('CARO The Black','black',true)
       +'<div class="nh-black" data-black="1"><div class="nh-black-l">'
       +'<div class="nh-black-t">◆ CARO THE BLACK</div>'
@@ -510,7 +528,7 @@
     if(settling) startSettlePoll();
 
     root.querySelector('[data-orb]').onclick=function(){ go(getActive()?'my-reservation-screen':'rental-screen'); };
-    var recEl=root.querySelector('[data-recent]'); if(recEl) recEl.onclick=function(){ go('usage-history-screen'); };
+    var recEl=root.querySelector('[data-recent]'); if(recEl) recEl.onclick=function(){ go(recEl.classList.contains('nh-free')?'rental-screen':'usage-history-screen'); };
     var blkEl=root.querySelector('[data-black]'); if(blkEl) blkEl.onclick=function(){ if(has('goBlackLabel')) call('goBlackLabel'); else go('black-label-screen'); };
     root.querySelectorAll('[data-all]').forEach(function(a){ a.onclick=function(e){ e.stopPropagation();
       var k=a.getAttribute('data-all');
@@ -592,6 +610,7 @@
           ? '<div class="nh-recent-row">'+carThumb(getRecent())+'<div class="nh-recent-info"><div class="nh-recent-car">'+esc(carName(getRecent()))+'</div><div class="nh-recent-date">'+recentLabel(getRecent())+'</div></div><svg class="nh-recent-arr" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>'
           : '<div class="nh-recent-empty">최근 대여한 차량이 없습니다</div>')
         +'</div>';
+    if(!act && !getRecent() && freeEligible()) newHtml=freeCardHtml();
     if(oldBlock && oldBlock.parentNode){
       var oldH=0; try{ oldH=oldBlock.getBoundingClientRect().height; }catch(e){}
       var tmp=document.createElement('div'); tmp.innerHTML=newHtml; var nb=tmp.firstChild;
@@ -601,7 +620,7 @@
         if(a==='extend'){ if(has('openExtendSheet')) call('openExtendSheet'); }
         else { if(has('ctrlActionHome')) call('ctrlActionHome','return'); else go('my-reservation-screen'); }
       }; }); }
-      else { nb.onclick=function(){ go('usage-history-screen'); }; }
+      else { nb.onclick=function(){ go(nb.classList.contains('nh-free')?'rental-screen':'usage-history-screen'); }; }
       /* 블록 높이 변화(최근↔이용중)를 부드럽게 → 아래 카로 더블랙이 툭 튀지 않고 스르르 이동 */
       try{
         var newH=nb.getBoundingClientRect().height;

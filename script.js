@@ -2315,6 +2315,15 @@ function fmtDT(d){
   return (d.getMonth()+1)+'/'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes());
 }
 
+/* ★[v110.7] 신규 가입 첫 1시간 무료 — 서버(createOrder)와 같은 기준: 취소하지 않은 예약이 하나도 없으면 첫 예약의 차량 요금 1시간분 무료(보험료 별도) */
+function caroFirstFreeAmt(car, hrs){
+  try{
+    if(!car || !window._caroLoggedIn || !window._caroResLoaded) return 0;
+    var has=(myReservations||[]).some(function(r){ return r && r.status!=='cancelled'; });
+    return has ? 0 : Math.round((car.pricePerHour||0) * Math.min(1, hrs||0));
+  }catch(e){ return 0; }
+}
+window.caroFirstFreeAmt=caroFirstFreeAmt;
 function updatePriceSummary(){
   if(!selectedCar) return;
   var s=new Date(document.getElementById('res-start').value);
@@ -2326,7 +2335,8 @@ function updatePriceSummary(){
   var insCost=ins.pricePerHour*hrs;
   var pa=document.getElementById('point-amount');
   pointDiscount=0;   /* ★[23차] 포인트 장부가 생기기 전까지 0 (서버도 0으로 계산) */
-  var total=Math.max(0,carCost+insCost-couponDiscount-pointDiscount);
+  var freeAmt=caroFirstFreeAmt(selectedCar, hrs);
+  var total=Math.max(0,carCost+insCost-couponDiscount-pointDiscount-freeAmt);
   var sum=document.getElementById('price-summary');
   if(!sum) return;
   var insName=currentLang==='en'?ins.nameen:currentLang==='ja'?ins.nameja:currentLang==='zh'?ins.namezh:ins.name;
@@ -2334,6 +2344,7 @@ function updatePriceSummary(){
   sum.innerHTML=
     '<div class="price-row"><span>차량 요금</span><span>'+carCost.toLocaleString()+'원</span></div>'+
     '<div class="price-row"><span>면책 ('+insName+')</span><span>'+insCost.toLocaleString()+'원</span></div>'+
+    (freeAmt>0?'<div class="price-row"><span>첫 1시간 무료 <small style="color:#8a8f99;font-weight:600">(보험료 별도)</small></span><span style="color:#1d7a3a">-'+freeAmt.toLocaleString()+'원</span></div>':'')+
     (couponDiscount>0?'<div class="price-row"><span>쿠폰 할인</span><span style="color:#1d7a3a">-'+couponDiscount.toLocaleString()+'원</span></div>':'')+
     (pointDiscount>0?'<div class="price-row"><span>포인트 할인</span><span style="color:#1d7a3a">-'+pointDiscount.toLocaleString()+'원</span></div>':'')+
     '<div class="price-row total"><span>총 결제 금액</span><span>'+total.toLocaleString()+'원</span></div>';
@@ -2341,8 +2352,8 @@ function updatePriceSummary(){
 
 function applyCoupon(){
   var code=val('coupon-code'), hint=document.getElementById('coupon-hint');
-  if(code==='CARO30'){ couponDiscount=3000; if(hint){ hint.style.color='#1d7a3a'; hint.textContent='쿠폰 적용: -3,000원'; } updatePriceSummary(); }
-  else{ couponDiscount=0; if(hint){ hint.style.color='#b23a3a'; hint.textContent='유효하지 않은 쿠폰 코드입니다.'; } }
+  /* ★[v110.7] CARO30(3,000원) 종료 — 신규 가입 첫 1시간 무료는 코드 없이 자동 적용 */
+  couponDiscount=0; if(hint){ hint.style.color='#b23a3a'; hint.textContent=code?'유효하지 않은 쿠폰 코드입니다.':''; } updatePriceSummary();
 }
 function togglePoint(cb){
   var row=document.getElementById('point-input-row'), pa=document.getElementById('point-amount');
@@ -2378,7 +2389,8 @@ function goToPayment(){
   var ins=selectedIns||INSURANCE[0];
   var pa=document.getElementById('point-amount');
   pointDiscount=0;   /* ★[23차] 포인트 장부가 생기기 전까지 0 (서버도 0으로 계산) */
-  var total=Math.max(0,(selectedCar.pricePerHour+ins.pricePerHour)*hrs-couponDiscount-pointDiscount);
+  var freeAmt=caroFirstFreeAmt(selectedCar, hrs);
+  var total=Math.max(0,(selectedCar.pricePerHour+ins.pricePerHour)*hrs-couponDiscount-pointDiscount-freeAmt);
   window._payData={car:selectedCar,ins:ins,hrs:hrs,total:total,start:s,end:e};
   var pcc=document.getElementById('pay-car-card');
   var insName=currentLang==='en'?ins.nameen:currentLang==='ja'?ins.nameja:currentLang==='zh'?ins.namezh:ins.name;
@@ -2394,7 +2406,7 @@ function goToPayment(){
       '</div>'+
     '</div>';
   var ptr=document.getElementById('pay-total-row');
-  if(ptr) ptr.textContent='총 결제 금액: '+total.toLocaleString()+'원';
+  if(ptr) ptr.textContent='총 결제 금액: '+total.toLocaleString()+'원'+(freeAmt>0?' (첫 1시간 무료 적용 · 보험료 별도)':'');
   renderPayMethods();
     goTo('payment-screen');
     /* BL 모드 결제 화면 스타일 */
@@ -9303,12 +9315,9 @@ window.devUploadAllCars=function(){
   ═══════════════════════════════════════════ */
   function renderCoupons(){
     const tab = window._apdCouponTab || 'available';
-    const coupons = STORE.get('coupons', [
-      { id:1, name:'신규 가입 30% 할인', discount:'-30%', expires:'2026.12.31', status:'available' },
-      { id:2, name:'주말 특별 할인', discount:'-5,000원', expires:'2026.06.30', status:'available' },
-      { id:3, name:'친구 추천 쿠폰', discount:'-3,000원', expires:'2026.05.01', status:'expired' },
-      { id:4, name:'이벤트 할인', discount:'-10%', expires:'2026.04.15', status:'used' }
-    ]);
+    /* ★[v110.7] 예시 쿠폰(30%·5,000원 등) 제거 — 실제로 쓸 수 있는 혜택만 표시 */
+    const _free = (function(){ try{ return !!(window._caroLoggedIn && window._caroResLoaded && !(myReservations||[]).some(function(r){ return r && r.status!=='cancelled'; })); }catch(e){ return false; } })();
+    const coupons = _free ? [ { id:'FIRST1H', name:'신규 가입 첫 1시간 무료', discount:'차량 요금 1시간 무료 · 보험료 별도', expires:'첫 예약 때 자동 적용', status:'available' } ] : [];
 
     const filtered = coupons.filter(c => c.status === tab);
     let html = `
@@ -9337,7 +9346,7 @@ window.devUploadAllCars=function(){
             <div class="apd-coupon-badge ${c.status}">${badgeText}</div>
             <div class="apd-coupon-name">${c.name}</div>
             <div class="apd-coupon-discount">${c.discount}</div>
-            <div class="apd-coupon-meta">유효기간: ~${c.expires}</div>
+            <div class="apd-coupon-meta">${c.id==='FIRST1H'?c.expires:'유효기간: ~'+c.expires}</div>
           </div>
         `;
       });
@@ -9368,8 +9377,7 @@ window.devUploadAllCars=function(){
       applyBtn.addEventListener('click', () => {
         const v = document.getElementById('apd-coupon-code').value.trim();
         if(!v){ toast('쿠폰 코드를 입력해주세요', false); return; }
-        if(v.toUpperCase() !== 'CARO30'){ toast('유효하지 않은 쿠폰 코드입니다', false); return; }   /* ★[23차] 실제 존재하는 쿠폰만 */
-        toast('쿠폰 CARO30 — 예약 결제 화면에서 코드를 입력하면 3,000원 할인(1회)됩니다');
+        toast('유효하지 않은 쿠폰 코드입니다', false); return;   /* ★[v110.7] CARO30 종료 — 신규 가입 첫 1시간 무료는 코드 없이 자동 적용 */
         document.getElementById('apd-coupon-code').value = '';
       });
     }

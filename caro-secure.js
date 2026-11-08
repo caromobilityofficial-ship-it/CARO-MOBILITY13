@@ -176,7 +176,7 @@
       carId: String(car.id), col: car.isBlackLabel ? 'bl_cars' : 'cars',
       start: s.toISOString(), end: e.toISOString(),
       insId: (ins && ins.id) || 'premium',
-      coupon: (window.couponDiscount > 0) ? 'CARO30' : '',
+      coupon: '',   /* ★[v110.7] CARO30 종료 — 첫 1시간 무료는 서버가 자동 적용 */
       points: Number(window.pointDiscount || 0)
     }).then(function(r){
       if(!r || !r.orderId) throw new Error('주문 생성 실패');
