@@ -1179,7 +1179,12 @@ function caroNormLicense(v, ctx){
   /* ★[v106] 번호는 하이픈·공백을 뺀 숫자만 보관 → "12-34-567890-12" 와 "123456789012" 를 같은 번호로 본다 (형식이 달라 '미등록'으로 보이던 것 방지) */
   function _n(x){ x=String(x==null?'':x).trim(); if(!x||x.indexOf('*')!==-1) return ''; var d=x.replace(/[^0-9]/g,''); return d.length>=10?d:x; }
   /* ★[v109] 서버가 암호화해 둔 면허(enc/masked/secure): 기기에는 가린 번호만 둔다 — 원래 번호는 서버(암호문)에만 */
-  if(v&&typeof v==='object'&&(v.secure||v.enc||(v.masked&&String(v.masked).indexOf('*')!==-1))){
+  /* ★[v110.10] 서버(assertEligible)와 같은 기준으로 '등록됨' 판단 — 서버엔 가린 번호(12-**-…)만 남아 있는 예전 회원도
+     예약은 되는데, 앱 홈에서는 '운전면허 등록 필요'로 잘못 뜨던 문제 수정 */
+  if(typeof v==='string' && v.indexOf('*')!==-1 && v.replace(/[^0-9*]/g,'').length>=6){
+    var ms=String(v).trim(); o={number:ms, masked:ms, name:ctx.name||'', birth:ctx.birth||'', type:'', expiry:'', verified:false, secure:true}; return o;
+  }
+  if(v&&typeof v==='object'&&(v.secure||v.enc||(v.masked&&String(v.masked).indexOf('*')!==-1)||(v.number&&String(v.number).indexOf('*')!==-1))){
     var mk=String(v.masked||v.number||'');
     o={number:mk, masked:mk, name:v.name||'', birth:v.birth||'', type:v.type||'', expiry:v.expiry||'', verified:!!v.verified, secure:true};
     if(!o.name&&ctx.name) o.name=ctx.name; if(!o.birth&&ctx.birth) o.birth=ctx.birth;

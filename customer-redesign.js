@@ -7546,7 +7546,7 @@
     if(!window._caroLoggedIn) return true;
     if(window._caroProfileLoaded) return true;
     var lt=window._caroLoginT||0;
-    return !!(lt && (Date.now()-lt > 2800));
+    return !!(lt && (Date.now()-lt > 8000));   /* ★[v110.10] 2.8초 → 8초: 서버 응답 전 '면허 등록 필요'가 잠깐 뜨던 것 방지 */
   }
   function dataReady(logged){
     if(!logged) return true;
