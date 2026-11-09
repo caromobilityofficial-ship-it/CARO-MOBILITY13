@@ -1047,19 +1047,114 @@ function drawLogs(){
   $('tbody').innerHTML=th||'<tr><td colspan="7" style="color:var(--muted);">이 날짜엔 주행 기록이 없습니다</td></tr>';
   drawRoute();
 }
-/* ═══════════ [v9.2] 선택 날짜 주행 경로를 지도에 선으로 + 충격 지점 표시 ═══════════ */
+/* ═══════════ [v9.2→v111] 선택 날짜 주행 경로 (튄 점 정리) + 충격 지점 + 출발·도착 표시 ═══════════ */
 var routeObjs=[];
+/* ★[v111] 이동경로 정리 — 실내·창가·빌딩숲에서 GPS가 튀는 점(수백m~1km 점프), 정차 중 떨림을 걸러 실제 이동만 선으로 그린다.
+   1) 좌표 이상(0·국외)·위성 부족(5개 미만)·HDOP 3 초과·gsrc none 은 버림
+   2) 앞 점과 비교해 계산 속도가 시속 150km를 넘으면 '튄 점'으로 버림 (같은 쪽으로 3번 연속 튀면 실제 이동으로 보고 다시 맞춤)
+   3) 정차(속도 5km/h 미만) 중 40m 안의 흔들림은 한 점으로 묶음
+   4) 갔다가 바로 돌아오는 뾰족한 점(스파이크) 제거
+   5) 10분 넘게 기록이 끊기면 선을 이어 그리지 않음(구간 분리) */
+var ROUTE_RAW=false, ROUTE_STAT=null;
+function _hv(a,b){ var R=6371000,r=Math.PI/180,dl=(b.lat-a.lat)*r,dn=(b.lng-a.lng)*r,
+  x=Math.sin(dl/2)*Math.sin(dl/2)+Math.cos(a.lat*r)*Math.cos(b.lat*r)*Math.sin(dn/2)*Math.sin(dn/2); return 2*R*Math.asin(Math.sqrt(x)); }
+function cleanRoute(rows){
+  var st={raw:0,bad:0,jump:0,still:0,spike:0,kept:0,segs:0};
+  var P=[];
+  rows.forEach(function(t){
+    if(t.lat==null||t.lng==null) return; st.raw++;
+    var p={lat:Number(t.lat),lng:Number(t.lng),t:toMs(t.ts),v:(t.speed!=null?Number(t.speed):null),
+           sats:(t.sats!=null?Number(t.sats):(t.sat!=null?Number(t.sat):null)),hdop:(t.hdop!=null?Number(t.hdop):null),gsrc:t.gsrc||''};
+    if(!isFinite(p.lat)||!isFinite(p.lng)||!p.t||p.lat<33||p.lat>39.5||p.lng<124||p.lng>132){ st.bad++; return; }
+    if((p.sats!=null&&p.sats<5&&p.gsrc!=='dr'&&p.gsrc!=='gnss+dr')||(p.hdop!=null&&p.hdop>3)||p.gsrc==='none'){ st.bad++; return; }
+    P.push(p);
+  });
+  P.sort(function(a,b){return a.t-b.t;});
+  var segs=[], cur=[], last=null, pend=[];
+  function flush(){ if(cur.length) segs.push(cur); cur=[]; }
+  function parkedAt(q){ return q.v==null||q.v<5; }
+  /* 구간 첫 점은 첫 5개 중 서로 가장 가까이 모인 점으로 — 첫 점이 튄 점이면 출발지가 엉뚱하게 찍힘 */
+  function anchorIdx(i){ var best=i,bs=Infinity; for(var a=i;a<Math.min(P.length,i+5);a++){ if((P[a].t-P[i].t)/1000>600) break;
+      var sm=0; for(var b=i;b<Math.min(P.length,i+5);b++){ if((P[b].t-P[i].t)/1000>600) break; sm+=_hv(P[a],P[b]); } if(sm<bs){bs=sm;best=a;} } return best; }
+  for(var i=0;i<P.length;i++){
+    var p=P[i];
+    if(!last){ var ai=anchorIdx(i); st.jump+=ai-i; i=ai; p=P[i]; cur.push(p); last=p; continue; }
+    var dt=(p.t-last.t)/1000; if(dt<=0) continue;
+    if(i>0 && (p.t-P[i-1].t)/1000>600){ flush(); pend=[]; var gi=anchorIdx(i); st.jump+=gi-i; i=gi; p=P[i]; cur.push(p); last=p; continue; }   /* 기록이 10분 넘게 끊김 → 새 구간 */
+    var d=_hv(last,p), kmh=d/dt*3.6;
+    if(kmh>150){                                                          /* 물리적으로 불가능한 속도 → 튄 점 */
+      pend.push(p);
+      if(pend.length>=3 && _hv(pend[0],pend[pend.length-1])<150){         /* 3번 연속 같은 곳 → 실제 이동 */
+        pend.forEach(function(q){cur.push(q);}); last=pend[pend.length-1]; pend=[]; continue; }
+      if(pend.length>=3) pend.shift();
+      st.jump++; continue;
+    }
+    pend=[];
+    if(parkedAt(last)){
+      if(d<40){ st.still++; continue; }                                   /* 정차 중 떨림 */
+      /* 정차 상태에서 벗어날 때는 다음 두 점이 계속 같은 방향으로 멀어지는지 확인 — 튀었다 돌아오는 점을 걸러냄 */
+      var n1=P[i+1], n2=P[i+2], ok=false;
+      if(n1 && (n1.t-p.t)/1000<=600){
+        var a1=_hv(last,n1);
+        ok = a1>=0.8*d && _hv(p,n1)<=a1+30;
+        if(ok && n2 && (n2.t-n1.t)/1000<=600){ var a2=_hv(last,n2); ok = a2>=0.8*a1 && _hv(n1,n2)<=a2+30; }
+      }
+      if(!ok){ st.jump++; continue; }
+    }
+    cur.push(p); last=p;
+  }
+  flush();
+  segs=segs.map(function(s){                                              /* 스파이크 제거 */
+    var out=s.slice(), changed=true, guard=0;
+    while(changed&&guard++<5){ changed=false;
+      for(var i=1;i<out.length-1;i++){ var a=out[i-1],b=out[i],c=out[i+1],ab=_hv(a,b),bc=_hv(b,c),ac=_hv(a,c);
+        if(ab>120&&bc>120&&ac<Math.min(ab,bc)*0.35){ out.splice(i,1); st.spike++; changed=true; i--; } } }
+    return out; }).filter(function(s){
+      if(s.length<2) return false;
+      var far=0; s.forEach(function(q){ far=Math.max(far,_hv(s[0],q)); });
+      if(far<100){ st.still+=s.length; return false; }                   /* 100m 안에서만 움직인 구간 = 실제로는 정차 */
+      return true; });
+  st.segs=segs.length; st.kept=segs.reduce(function(n,s){return n+s.length;},0);
+  return {segs:segs, stat:st};
+}
+
+function routeToggleRaw(){ ROUTE_RAW=!ROUTE_RAW; drawRoute(); }
+function routeNote(){
+  var ds=$('dsum'); if(!ds||!ROUTE_STAT) return;
+  var old=ds.querySelector('.rt-note'); if(old) old.remove();
+  var st=ROUTE_STAT, el=document.createElement('span'); el.className='rt-note';
+  el.style.cssText='margin-left:8px;color:var(--muted2);';
+  el.innerHTML=' · 경로 '+(ROUTE_RAW?'<b>원본</b> '+st.raw+'점':'정리 '+st.kept+'/'+st.raw+'점 (튄 점 '+(st.jump+st.spike)+' · 정차 떨림 '+st.still+' 제외)')
+    +' <a href="#" onclick="routeToggleRaw();return false;" style="color:var(--gold,#c8a96e);text-decoration:underline;">'+(ROUTE_RAW?'정리된 경로 보기':'원본 보기')+'</a>';
+  ds.appendChild(el);
+}
 function drawRoute(){
-  if(!mapKind) return;
+  if(!mapKind||mapKind==='none') return;
   routeObjs.forEach(function(o){ try{ mapKind==='kakao'?o.setMap(null):lmap.removeLayer(o); }catch(e){} }); routeObjs=[];
-  var pts=TELE.filter(function(t){return t.lat!=null&&t.lng!=null;}).sort(function(a,b){return toMs(a.ts)-toMs(b.ts);}).map(function(t){return [Number(t.lat),Number(t.lng)];});
+  var res=cleanRoute(TELE); ROUTE_STAT=res.stat;
+  var segs=res.segs.map(function(s){return s.map(function(p){return [p.lat,p.lng];});});
+  if(ROUTE_RAW){ var raw=TELE.filter(function(t){return t.lat!=null&&t.lng!=null;}).sort(function(a,b){return toMs(a.ts)-toMs(b.ts);}).map(function(t){return [Number(t.lat),Number(t.lng)];}); segs=raw.length>=2?[raw]:[]; }
+  /* 하루 종일 정차(이동 없음) → 선 대신 머문 위치 하나만 */
+  var stay=null;
+  if(!segs.length && !ROUTE_RAW){ var good=TELE.filter(function(t){return t.lat!=null&&t.lng!=null;}).map(function(t){return {lat:Number(t.lat),lng:Number(t.lng)};});
+    if(good.length){ var la=good.map(function(p){return p.lat;}).sort(), ln=good.map(function(p){return p.lng;}).sort(); stay=[la[la.length>>1],ln[ln.length>>1]]; } }
   var imps=EVTS.filter(function(e){return e.event==='impact'&&e.lat!=null;});
-  if(pts.length<2&&!imps.length) return;
+  routeNote();
+  if(!segs.length&&!imps.length&&!stay) return;
+  var col=ROUTE_RAW?'#9aa3ad':'#c8a96e';
+  var tag=function(txt,bg){ return '<div style="background:'+bg+';color:#fff;font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:9px;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.3)">'+txt+'</div>'; };
+  var s0=segs.length?segs[0][0]:null, sl=segs.length?segs[segs.length-1][segs[segs.length-1].length-1]:null;
   if(mapKind==='kakao'){
-    if(pts.length>=2){ var pl=new kakao.maps.Polyline({path:pts.map(function(p){return new kakao.maps.LatLng(p[0],p[1]);}),strokeWeight:4,strokeColor:'#c8a96e',strokeOpacity:0.85}); pl.setMap(kmap); routeObjs.push(pl); }
-    imps.forEach(function(e){ var ov=new kakao.maps.CustomOverlay({position:new kakao.maps.LatLng(Number(e.lat),Number(e.lng)),content:'<div style="background:#ff5a4a;color:#fff;font-size:10px;padding:2px 6px;border-radius:8px;white-space:nowrap">💥 '+(e.shock!=null?Number(e.shock).toFixed(1)+'g':'충격')+'</div>',yAnchor:1.4}); ov.setMap(kmap); routeObjs.push(ov); });
+    segs.forEach(function(sg){ var pl=new kakao.maps.Polyline({path:sg.map(function(p){return new kakao.maps.LatLng(p[0],p[1]);}),strokeWeight:4,strokeColor:col,strokeOpacity:0.9}); pl.setMap(kmap); routeObjs.push(pl); });
+    var add=function(pos,html,ya){ var ov=new kakao.maps.CustomOverlay({position:new kakao.maps.LatLng(pos[0],pos[1]),content:html,yAnchor:ya||1.4}); ov.setMap(kmap); routeObjs.push(ov); };
+    if(s0&&!ROUTE_RAW) add(s0,tag('출발','#2e9e5b')); if(sl&&!ROUTE_RAW) add(sl,tag('도착','#d9534f'));
+    if(stay) add(stay,tag('🅿️ 머문 위치 (이동 없음)','#5a6270'));
+    imps.forEach(function(e){ add([Number(e.lat),Number(e.lng)],tag('💥 '+(e.shock!=null?Number(e.shock).toFixed(1)+'g':'충격'),'#ff5a4a')); });
   } else {
-    if(pts.length>=2) routeObjs.push(L.polyline(pts,{color:'#c8a96e',weight:4,opacity:0.85}).addTo(lmap));
+    segs.forEach(function(sg){ routeObjs.push(L.polyline(sg,{color:col,weight:4,opacity:0.9}).addTo(lmap)); });
+    var mk=function(pos,txt,c){ routeObjs.push(L.circleMarker(pos,{radius:7,color:c,fillColor:c,fillOpacity:0.9}).bindTooltip(txt,{permanent:true,direction:'top'}).addTo(lmap)); };
+    if(s0&&!ROUTE_RAW) mk(s0,'출발','#2e9e5b'); if(sl&&!ROUTE_RAW) mk(sl,'도착','#d9534f');
+    if(stay) mk(stay,'머문 위치 (이동 없음)','#5a6270');
     imps.forEach(function(e){ routeObjs.push(L.circleMarker([Number(e.lat),Number(e.lng)],{radius:7,color:'#ff5a4a',fillColor:'#ff5a4a',fillOpacity:0.8}).bindTooltip('💥 '+(e.shock!=null?Number(e.shock).toFixed(1)+'g':'충격')).addTo(lmap)); });
   }
 }

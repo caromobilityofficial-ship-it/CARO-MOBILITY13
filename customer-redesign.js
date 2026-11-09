@@ -7689,15 +7689,16 @@
       var sel = ['.nh-wallet-back-btm','.caro-mr-backbtm','.nh-ev-back','.cnf-close','.caro-notif-close'];
       for(var i=0;i<sel.length;i++){
         var b = document.querySelector(sel[i]);
-        if(b && b.offsetParent!==null){ b.click(); return true; }
+        /* ★[v110.11] 안 보이는 화면(예: 이벤트 화면)의 뒤로 버튼까지 눌러서 홈에서 앱이 종료되지 않던 문제 → 실제로 보이는 버튼만 */
+        if(b && b.offsetParent!==null && getComputedStyle(b).visibility==='visible' && (!b.closest('.screen') || b.closest('.screen').classList.contains('active'))){ b.click(); return true; }
       }
       // 3) 현재 보이는 .screen 판별 — 홈이 아니면 홈으로
-      var active=null;
-      document.querySelectorAll('.screen').forEach(function(s){
-        try{ var cs=getComputedStyle(s); if(cs.display!=='none' && s.getBoundingClientRect().width>0 && s.getBoundingClientRect().height>0) active=s; }catch(e){}
-      });
+      /* ★[v110.11] 예전엔 '보이는 화면'을 크기로 찾아서 맨 마지막 화면(상담 채팅)이 항상 잡혔다 → 홈에서 뒤로가기를 눌러도
+         앱이 종료되지 않고 아무 일도 없었다. 지금 활성 화면(.screen.active)으로 판별 */
+      var active=document.querySelector('.screen.active');
       if(active && active.id && active.id!=='home-screen' && active.id!=='main-screen'){
-        if(window.goTo) goTo('home-screen'); else if(window.go) go('home-screen');
+        var _to=window._caroLoggedIn?'home-screen':'main-screen';   /* ★[v110.11] 로그인 전(로그인·회원가입 화면)에서 뒤로 → 첫 화면 */
+        if(window.goTo) goTo(_to); else if(window.go) go(_to);
         return true;
       }
       // 4) 홈(또는 로그인) → 앱이 종료 처리하도록 false
