@@ -100,7 +100,7 @@ button{font-family:inherit;cursor:pointer;}
 .lv:last-child{border-right:none;}
 .lv .k{font-size:10px;letter-spacing:1.5px;color:var(--muted);}
 .lv .v{font-family:'Saira','Noto Sans KR',system-ui,'Malgun Gothic','Apple SD Gothic Neo',sans-serif;font-size:17px;font-weight:600;margin-top:3px;color:var(--txt);}
-.lv .v.gold{color:var(--gold-soft);} .lv .v.ok{color:var(--ok);} .lv .v.bad{color:var(--bad);} .lv .v.use{color:var(--use);}
+.lv .v.gold{color:var(--gold-soft);} .lv .v.ok{color:var(--ok);} .lv .v.bad{color:var(--bad);} .lv .v.use{color:var(--use);} .lv .v.warn{color:var(--warn);}
 
 /* ── 우측 패널 ── */
 .rcol{display:flex;flex-direction:column;gap:14px;}
@@ -698,6 +698,7 @@ function render(){
       +'</div><div class="sub">'
       +(dev?('<b>'+esc(dev)+'</b>'):'<span>기기 미연결</span>')
       +(v.ctx?(v.ctx==='park'?'':('<span>'+(CTXLAB[v.ctx]||'')+((v.ctx==='out'&&typeof v.grade==='number'&&Math.abs(v.grade)>=3.5)?(' · '+gradeStr(v.grade)):'')+'</span>')):(v.floor!=null?('<span>'+floorStr(v.floor)+'</span>'):''))
+      +((v.online&&v.mstate&&MST[v.mstate])?('<span>'+MST[v.mstate][0]+'</span>'):'')
       +(typeof v.speed==='number'?('<span>'+Math.round(v.speed)+'km/h</span>'):'')
       +(v.fw?('<span>'+esc(v.fw)+'</span>'):'')
       +(function(){ var r=resvOf(v); return r?('<span style="color:'+(r.live==='반납지연'?'var(--warn)':'var(--gold-soft)')+'">'+esc(r.live)+' · '+esc(r.user)+'</span>'):'<span>예약 없음</span>'; })()
@@ -709,13 +710,15 @@ function render(){
   var v=FLEET.find(function(x){return x.id===selId;});
   if(v){
     var mv=$('lv-move');
-    mv.textContent = v.online?(v.moving?'주행중':'정지'):'오프라인';
-    mv.className='v '+(v.online?(v.moving?'ok':''):'bad');
+    var ms_=(v.online&&v.mstate&&MST[v.mstate])?MST[v.mstate]:null;
+    mv.textContent = v.online?(ms_?ms_[0]:(v.moving?'주행중':'정지')):'오프라인';
+    mv.className='v '+(v.online?(ms_?ms_[1]:(v.moving?'ok':'')):'bad');
+    mv.title = ms_?ms_[2]:'';
     $('lv-spd').textContent=(typeof v.speed==='number')?Math.round(v.speed)+'㎞/h':'—';
     $('lv-flr').textContent=floorStr(v.floor)+(v.env?(' '+v.env):'');
     /* ★[v110.13] 정밀 측정 펌웨어 : 층은 주차장 안에서만, 실외 언덕은 '주행 고도·경사' 로 따로 */
     var sub=function(id,t){ var e=$(id); if(e) e.textContent=t||'\u00a0'; };
-    sub('lv-moves', v.lastSeen?(ago(v.lastSeen)+' 수신'):''); sub('lv-spds', (typeof v.heading==='number')?('방위 '+Math.round(v.heading)+'°'):'');
+    sub('lv-moves', ms_?(ms_[2]+(mstDur(v)?(' · '+mstDur(v)):'')):(v.lastSeen?(ago(v.lastSeen)+' 수신'):'')); sub('lv-spds', (typeof v.heading==='number')?('방위 '+Math.round(v.heading)+'°'):'');
     sub('lv-sats', (typeof v.posAcc==='number'&&v.posAcc>0)?('위치 ±'+Math.round(v.posAcc)+' m'):''); sub('lv-srcs', v.gpsLive?'실시간':((typeof v.lat==='number')?'마지막 위치':''));
     sub('lv-bats', (typeof v.vbat==='number')?(v.vbat<11.6?'방전 주의':(v.vbat>13.2?'충전 중':'정상')):''); sub('lv-accs', (typeof v.accOffSec==='number'&&!v.acc&&v.accOffSec>0)?('끈 지 '+(v.accOffSec<3600?Math.floor(v.accOffSec/60)+'분':Math.floor(v.accOffSec/3600)+'시간')):'');
     if(v.ctx){
@@ -748,6 +751,11 @@ function render(){
   try{ pkRender(); }catch(e){ console.warn('pk',e); }
   mapDraw();
 }
+/* ★[v110.14] 움직임 상태 표기 : [이름, 색 클래스, 풀이] */
+var MST={drive:['주행중','ok','시속 12km 넘게 달리는 중'],slow:['서행중','ok','천천히 움직이는 중'],stop:['정차','gold','시동 켠 채 서 있음'],
+  park:['주차','','시동 끄고 서 있음'],shake:['흔들림','warn','서 있는데 차가 흔들림'],tow:['시동 꺼진 채 이동','bad','견인·무단 이동 의심'],move:['이동중','ok','위치 신호 없이 움직이는 중']};
+function mstDur(v){ if(typeof v.mstateSec!=='number') return ''; var s=v.mstateSec+(v.lastSeen?Math.max(0,Math.floor((Date.now()-v.lastSeen.getTime())/1000)):0);
+  return s<60?(s+'초째'):(s<3600?(Math.floor(s/60)+'분째'):(Math.floor(s/3600)+'시간 '+Math.floor(s%3600/60)+'분째')); }
 function ago(t){ if(!t)return '—'; var s=Math.floor((Date.now()-t.getTime())/1000);
   if(s<5)return '방금'; if(s<60)return s+'초 전'; if(s<3600)return Math.floor(s/60)+'분 전'; return Math.floor(s/3600)+'시간 전'; }
 function renderDiag(v){
@@ -1143,6 +1151,8 @@ function remap(){
     v.roadAlt=num(d.roadAlt); v.grade=num(d.grade); v.elev=num(d.elev);   /* 주행 고도(출발점 대비 m)·경사(%)·해발(m) — 층과 별개 */
     v.heading=num(d.heading); v.speed=num(d.speed); v.shock=num(d.shock);
     v.impact=(d.impact===true); v.over=(d.over===true); v.moving=(d.moving===true);
+    /* ★[v110.14] 움직임 상태 7가지 (v9.9-precise11 부터 보냄) — 없으면(옛 펌웨어) 빈값 → 예전처럼 주행중/정지 두 가지 */
+    v.mstate=(typeof d.mstate==='string')?d.mstate:''; v.mstateSec=num(d.mstateSec);
     v.fw=d.fw||''; v.ota=d.ota||''; v.lastSeen=ls;
     /* [v9 단말 추가 필드] */
     v.vbat=num(d.vbat); v.acc=(d.acc===true); v.in1=(d.in1===true); v.in2=(d.in2===true); v.temp=num(d.temp); v.csq=num(d.csq);
