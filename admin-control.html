@@ -104,6 +104,35 @@ button{font-family:inherit;cursor:pointer;}
 
 /* ── 우측 패널 ── */
 .rcol{display:flex;flex-direction:column;gap:14px;}
+/* ── ★[v110.13] 주차장 원기둥 ── */
+.ccol{display:flex;flex-direction:column;gap:14px;min-width:0;}
+.pkhead{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.pkchip{font-size:11px;font-weight:700;letter-spacing:.5px;padding:3px 10px;border-radius:20px;border:1px solid var(--border2);color:var(--muted);text-transform:none;}
+.pkchip.park{color:#15161a;background:var(--gold);border-color:var(--gold);}
+.pkchip.cand{color:var(--warn);border-color:rgba(224,162,96,.5);background:rgba(224,162,96,.08);}
+.pkchip.out{color:var(--ok);border-color:rgba(77,177,131,.4);background:rgba(77,177,131,.07);}
+.pkchip.tunnel{color:var(--use);border-color:rgba(91,150,224,.45);background:rgba(91,150,224,.08);}
+.pkbtns{margin-left:auto;display:flex;gap:6px;}
+.pkbtn{background:var(--row);border:1px solid var(--border2);color:var(--txt);border-radius:8px;padding:4px 10px;font-size:11.5px;font-weight:700;letter-spacing:0;}
+.pkbtn:hover{border-color:var(--gold-dim);color:var(--gold-soft);}
+.pkwrap{position:relative;height:430px;background:radial-gradient(ellipse at 45% 35%,#20242b 0%,#16181c 70%);touch-action:none;cursor:grab;}
+.pkwrap:active{cursor:grabbing;}
+.pkwrap canvas{position:absolute;left:0;top:0;width:100%;height:100%;}
+.pkbar{display:grid;grid-template-columns:repeat(8,1fr);border-top:1px solid var(--border);}
+/* 지도 아래 칸과 원기둥 아래 칸 : 같은 크기·같은 글자 (이름 / 값 / 보조 한 줄) */
+.lv{height:78px;display:flex;flex-direction:column;justify-content:center;overflow:hidden;}
+.lv .v{font-size:16.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.lv .s{font-size:10.5px;color:var(--muted);margin-top:2px;min-height:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.pktag{background:rgba(200,169,110,.14);color:var(--gold-soft);border:1px solid rgba(200,169,110,.4);border-radius:5px;padding:1px 6px;font-size:10.5px;font-weight:800;margin-left:6px;}
+/* 넓은 화면(1500px↑) : 지도와 원기둥을 나란히 — 한눈에 본다. 좁으면 지도 아래로 */
+@media(min-width:1500px){
+  .ccol{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);align-items:stretch;}   /* 두 카드 높이를 똑같이 */
+  .ccol>.card{display:flex;flex-direction:column;}
+  .ccol .pkwrap{flex:1 1 auto;height:auto;min-height:300px;}
+  .ccol .livebar,.ccol .pkbar{grid-template-columns:repeat(4,1fr);}
+  .ccol .lv{border-bottom:1px solid var(--border);}
+}
+
 .ctrl{display:grid;grid-template-columns:1fr 1fr;gap:9px;padding:14px 16px;}
 .cbtn{background:var(--panel2);border:1px solid var(--border2);color:var(--txt);border-radius:10px;
   padding:12px 6px;font-size:13px;font-weight:700;transition:all .15s;}
@@ -116,8 +145,8 @@ button{font-family:inherit;cursor:pointer;}
 .fb:hover{border-color:var(--gold);color:var(--gold-soft);}
 .fb.cur{background:var(--gold);color:#15161a;border-color:var(--gold);}
 /* 반층: 정규층 사이의 보조 스텝 — 배경·테두리 없이 작게(번잡함 최소화) */
-.fb.half{background:transparent;border:none;color:var(--muted);opacity:.4;font-size:9.5px;font-weight:500;}
-.fb.half:hover{opacity:1;color:var(--gold-soft);background:transparent;}
+.fb.half{color:var(--muted2);border-style:dashed;}   /* ★[v110.13] 반층 칸도 같은 크기 (예전엔 작게 그려 칸이 들쭉날쭉했다) */
+.fb.half:hover{color:var(--gold-soft);}
 .fb.half.cur{background:var(--gold);color:#15161a;opacity:1;font-weight:700;}
 .calfoot{display:flex;justify-content:center;padding:6px 16px 14px;}
 .creset{background:none;border:1px solid var(--bad);color:var(--bad);border-radius:8px;padding:6px 22px;font-size:12px;opacity:.85;}
@@ -238,6 +267,7 @@ body.ops .kpis, body.ops .main, body.ops .bottom{display:none!important;}
   .bottom{padding:0 12px 16px;gap:10px;}
   .mapbox{height:52vh;min-height:300px;}
   .livebar{grid-template-columns:repeat(4,1fr);}         /* 8칸 → 4칸 2줄 */
+  .pkbar{grid-template-columns:repeat(4,1fr);} .pkwrap{height:360px;}
   .lv{padding:10px 6px;}
   .ctrl{grid-template-columns:1fr 1fr;}
   .logdate{gap:6px;flex-wrap:wrap;}
@@ -293,19 +323,43 @@ body.ops .kpis, body.ops .main, body.ops .bottom{display:none!important;}
     <div class="flist" id="flist"></div>
   </div>
 
-  <!-- 중앙: 지도 + 라이브 -->
+  <!-- 중앙: 지도 + 라이브 + ★[v110.13] 주차장 원기둥 -->
+  <div class="ccol">
   <div class="card">
     <div class="mapbox"><div id="map"></div><div class="mapstat" id="mapstat"></div><div class="mappill" id="mappill">차량 선택</div><button class="followbtn on" id="followBtn" onclick="toggleFollow()">🎯 따라가기 ON</button></div>
     <div class="livebar">
-      <div class="lv"><div class="k">상태</div><div class="v" id="lv-move">—</div></div>
-      <div class="lv"><div class="k">속도</div><div class="v gold" id="lv-spd">—</div></div>
-      <div class="lv"><div class="k">층</div><div class="v use" id="lv-flr">—</div></div>
-      <div class="lv"><div class="k">고도</div><div class="v" id="lv-alt">—</div></div>
-      <div class="lv"><div class="k">위성</div><div class="v" id="lv-sat">—</div></div>
-      <div class="lv"><div class="k">위치출처</div><div class="v" id="lv-src">—</div></div>
-      <div class="lv"><div class="k">배터리</div><div class="v" id="lv-bat">—</div></div>
-      <div class="lv"><div class="k">시동</div><div class="v" id="lv-acc">—</div></div>
+      <div class="lv"><div class="k">상태</div><div class="v" id="lv-move">—</div><div class="s" id="lv-moves">&nbsp;</div></div>
+      <div class="lv"><div class="k">속도</div><div class="v gold" id="lv-spd">—</div><div class="s" id="lv-spds">&nbsp;</div></div>
+      <div class="lv"><div class="k">층 (주차장 안에서만)</div><div class="v use" id="lv-flr">—</div><div class="s" id="lv-flrs">&nbsp;</div></div>
+      <div class="lv"><div class="k" id="lv-altk">주행 고도 · 경사</div><div class="v" id="lv-alt">—</div><div class="s" id="lv-alts">&nbsp;</div></div>
+      <div class="lv"><div class="k">위성</div><div class="v" id="lv-sat">—</div><div class="s" id="lv-sats">&nbsp;</div></div>
+      <div class="lv"><div class="k">위치출처</div><div class="v" id="lv-src">—</div><div class="s" id="lv-srcs">&nbsp;</div></div>
+      <div class="lv"><div class="k">배터리</div><div class="v" id="lv-bat">—</div><div class="s" id="lv-bats">&nbsp;</div></div>
+      <div class="lv"><div class="k">시동</div><div class="v" id="lv-acc">—</div><div class="s" id="lv-accs">&nbsp;</div></div>
     </div>
+  </div>
+  <!-- ★[v110.13] 주차장 원기둥 : 선택한 차량이 주차장 안에서 움직인 위치(입구 기준 동·북·높이)를 원기둥 안에 그린다 -->
+  <div class="card" id="pkcard">
+    <h3 class="pkhead"><span class="dot"></span>주차장 원기둥
+      <span class="pkchip" id="pkchip">—</span>
+      <span class="pkbtns">
+        <button class="pkbtn" onclick="pkRot(-30)" title="왼쪽으로 돌려 보기">⟲</button>
+        <button class="pkbtn" onclick="pkRot(30)" title="오른쪽으로 돌려 보기">⟳</button>
+        <button class="pkbtn" onclick="pkTilt()" id="pktilt" title="위에서 보기 / 비스듬히 보기">위에서</button>
+        <button class="pkbtn" onclick="pkClear()" title="이 차량의 주차장 경로 기록을 화면에서 지웁니다">경로 지우기</button>
+      </span></h3>
+    <div class="pkwrap" id="pkwrap"><canvas id="pkc"></canvas></div>
+    <div class="pkbar">
+      <div class="lv"><div class="k">현재 층</div><div class="v gold" id="pk-flr">—</div><div class="s" id="pk-conf">&nbsp;</div></div>
+      <div class="lv"><div class="k">입구 대비 높이</div><div class="v" id="pk-alt">—</div><div class="s" id="pk-err">&nbsp;</div></div>
+      <div class="lv"><div class="k">수직 속도</div><div class="v" id="pk-vz">—</div><div class="s" id="pk-vzs">&nbsp;</div></div>
+      <div class="lv"><div class="k">입구에서 위치</div><div class="v" id="pk-pos">—</div><div class="s" id="pk-poss">&nbsp;</div></div>
+      <div class="lv"><div class="k">주행 거리</div><div class="v" id="pk-path">—</div><div class="s">진입 후</div></div>
+      <div class="lv"><div class="k">누적 회전</div><div class="v" id="pk-turn">—</div><div class="s" id="pk-turns">&nbsp;</div></div>
+      <div class="lv"><div class="k">머문 시간</div><div class="v" id="pk-time">—</div><div class="s">진입 후</div></div>
+      <div class="lv"><div class="k">기록된 점</div><div class="v" id="pk-n">—</div><div class="s" id="pk-ns">1초 간격</div></div>
+    </div>
+  </div>
   </div>
 
   <!-- 우: 제어 -->
@@ -486,6 +540,10 @@ function smoothPos(v){
   return [v.lat,v.lng];   /* 주행 중이거나 GPS 끊김 → 원시 좌표 그대로 */
 }
 function floorStr(f){ if(f==null) return '—'; return f>=1?f+'F':'B'+(1-f); }
+/* ★[v110.13] 층은 주차장 안에서만 적는다. 정밀 측정 펌웨어가 '주차장 아님' 이라고 알려 준 기록은 층 대신 그 상태를 적는다 */
+var CTXLAB={out:'실외',cand:'확인중',tunnel:'터널',unknown:'기준없음'};
+function flrOf(o){ var c=o&&o.ctx; if(typeof c==='string'&&c&&c!=='park') return CTXLAB[c]||'—'; return floorStr(num(o&&o.floor)); }
+function gradeStr(g){ if(typeof g!=='number') return ''; return Math.abs(g)<1.5?'평지':((g>0?'오르막 ':'내리막 ')+Math.abs(g).toFixed(1)+'%'); }
 
 /* ═══════════ 지도 (카카오 → 실패 시 Leaflet) ═══════════ */
 var mapKind=null,kmap=null,lmap=null,markers=[];
@@ -578,8 +636,9 @@ function mapDraw(){
   var live=v&&v.gpsLive;
   var pill='차량 선택';
   if(v){
-    if(v.gsrc==='dr') pill=v.name+' · 🧭 지하/터널 추정 이동중 (GPS 없음 · 추측항법)';
-    else if(live) pill=v.name+' · 🛰 실시간 추적';
+    if(v.ctx==='park'||v.ctx==='cand') pill=v.name+' · 🅿 '+(v.ctx==='park'?('주차장 안 · '+floorStr(v.floor)):'실내 확인중')+(v.gsrc==='dr'?' (추측항법 위치)':' (입구 위치 표시)');   /* ★[v110.13] */
+    else if(v.gsrc==='dr') pill=v.name+' · 🧭 지하/터널 추정 이동중 (GPS 없음 · 추측항법)';
+    else if(live) pill=v.name+' · 🛰 실시간 추적'+((v.ctx==='out'&&typeof v.grade==='number'&&Math.abs(v.grade)>=3.5)?(' · '+gradeStr(v.grade)+(typeof v.roadAlt==='number'?' ('+(v.roadAlt>=0?'+':'')+v.roadAlt.toFixed(0)+'m)':'')):'');
     else if(hasPos) pill=v.name+' · ⚠ GPS 끊김 (마지막 위치 · 위성'+(v.sats!=null?v.sats:0)+'개)';
     else if(IDMAP[v.id]) pill=v.name+' · GPS 탐색중 (위치 없음)';
     else pill=v.name+' · 기기 미연결 (실시간 위치 없음)';
@@ -633,11 +692,12 @@ function render(){
     h+='<div class="vcard'+(v.id===selId?' sel':'')+'" data-id="'+esc(v.id)+'">'
       +'<div class="nm"><span class="on'+(v.online?' live':'')+'"></span>'+esc(v.name||v.id)
       +(v.impact?'<span class="alerttag">⚠ 충격</span>':'')+(v.over?'<span class="alerttag">과속</span>':'')
+      +(v.inPark&&v.online?'<span class="pktag">🅿 '+floorStr(v.floor)+'</span>':'')
       +(v.immob?'<span class="alerttag">⛔ 차단</span>':'')+(v.doorOpen&&!v.acc?'<span class="alerttag">🚪 문열림</span>':'')
       +(typeof v.vbat==='number'&&v.vbat<11.6?'<span class="alerttag">🔋 저전압</span>':'')
       +'</div><div class="sub">'
       +(dev?('<b>'+esc(dev)+'</b>'):'<span>기기 미연결</span>')
-      +(v.floor!=null?('<span>'+floorStr(v.floor)+'</span>'):'')
+      +(v.ctx?(v.ctx==='park'?'':('<span>'+(CTXLAB[v.ctx]||'')+((v.ctx==='out'&&typeof v.grade==='number'&&Math.abs(v.grade)>=3.5)?(' · '+gradeStr(v.grade)):'')+'</span>')):(v.floor!=null?('<span>'+floorStr(v.floor)+'</span>'):''))
       +(typeof v.speed==='number'?('<span>'+Math.round(v.speed)+'km/h</span>'):'')
       +(v.fw?('<span>'+esc(v.fw)+'</span>'):'')
       +(function(){ var r=resvOf(v); return r?('<span style="color:'+(r.live==='반납지연'?'var(--warn)':'var(--gold-soft)')+'">'+esc(r.live)+' · '+esc(r.user)+'</span>'):'<span>예약 없음</span>'; })()
@@ -653,10 +713,24 @@ function render(){
     mv.className='v '+(v.online?(v.moving?'ok':''):'bad');
     $('lv-spd').textContent=(typeof v.speed==='number')?Math.round(v.speed)+'㎞/h':'—';
     $('lv-flr').textContent=floorStr(v.floor)+(v.env?(' '+v.env):'');
-    $('lv-alt').textContent=(typeof v.alt==='number')?((v.alt>=0?'+':'')+v.alt.toFixed(1)+'m'):'—';
+    /* ★[v110.13] 정밀 측정 펌웨어 : 층은 주차장 안에서만, 실외 언덕은 '주행 고도·경사' 로 따로 */
+    var sub=function(id,t){ var e=$(id); if(e) e.textContent=t||'\u00a0'; };
+    sub('lv-moves', v.lastSeen?(ago(v.lastSeen)+' 수신'):''); sub('lv-spds', (typeof v.heading==='number')?('방위 '+Math.round(v.heading)+'°'):'');
+    sub('lv-sats', (typeof v.posAcc==='number'&&v.posAcc>0)?('위치 ±'+Math.round(v.posAcc)+' m'):''); sub('lv-srcs', v.gpsLive?'실시간':((typeof v.lat==='number')?'마지막 위치':''));
+    sub('lv-bats', (typeof v.vbat==='number')?(v.vbat<11.6?'방전 주의':(v.vbat>13.2?'충전 중':'정상')):''); sub('lv-accs', (typeof v.accOffSec==='number'&&!v.acc&&v.accOffSec>0)?('끈 지 '+(v.accOffSec<3600?Math.floor(v.accOffSec/60)+'분':Math.floor(v.accOffSec/3600)+'시간')):'');
+    if(v.ctx){
+      if(v.ctx==='park'){ sub('lv-flrs','주차장'+(v.lift?' · 승강기':'')+(typeof v.floorConf==='number'?' · 신뢰 '+v.floorConf+'%':'')); $('lv-flr').textContent=floorStr(v.floor); }
+      else { $('lv-flr').textContent='—'; sub('lv-flrs',{out:'실외 · 층 없음',cand:'실내 확인중',tunnel:'터널·지하차도 · 층 없음',unknown:'기준 없음'}[v.ctx]||''); }
+    } else sub('lv-flrs','');
+    $('lv-alt').textContent=(typeof v.alt==='number')?((v.alt>=0?'+':'')+v.alt.toFixed(1)+'m'+((typeof v.altErr==='number'&&v.altErr>0)?' ±'+v.altErr.toFixed(1):'')):'—';
+    if(v.ctx==='park'||v.ctx==='cand'){ $('lv-altk').textContent='입구 대비 높이'; sub('lv-alts',(typeof v.vz==='number'&&Math.abs(v.vz)>=0.05)?((v.vz>0?'올라가는 중 ':'내려가는 중 ')+Math.abs(v.vz).toFixed(2)+'m/s'):'주차장 안'); }
+    else if(v.ctx){ $('lv-altk').textContent='주행 고도 · 경사';
+      $('lv-alt').textContent=(typeof v.roadAlt==='number')?((v.roadAlt>=0?'+':'')+v.roadAlt.toFixed(0)+' m'):'—';
+      sub('lv-alts',(gradeStr(v.grade)||'출발점 대비')+((typeof v.elev==='number')?(' · 해발 '+Math.round(v.elev)+'m'):'')); }
+    else { $('lv-altk').textContent='고도'; sub('lv-alts',''); }
     $('lv-sat').textContent=(v.sats!=null)?v.sats+'개':'—';
     var src=$('lv-src');
-    if(v.gsrc==='dr'){ src.textContent='추측항법(터널)'; src.className='v use'; }
+    if(v.gsrc==='dr'){ src.textContent=(v.ctx==='park'||v.ctx==='cand')?'추측항법(주차장)':'추측항법(터널)'; src.className='v use'; }
     else if(!v.gpsLive && typeof v.lat==='number'){ src.textContent='GPS 끊김'; src.className='v bad'; }
     else if(v.gsrc==='dr'){ src.textContent='추측항법'; src.className='v use'; }
     else if(v.sats>=4||v.gsrc==='gnss'||v.gsrc==='gnss+dr'){ src.textContent='GPS'; src.className='v gold'; }
@@ -667,10 +741,11 @@ function render(){
     /* 층 보정 현재층 하이라이트 */
     var cur=(v.floor>=1)?String(v.floor):('B'+(1-v.floor));
     document.querySelectorAll('#calgrid .fb').forEach(function(b){
-      b.classList.toggle('cur', b.getAttribute('data-f')===cur && v.floor!=null); });
+      b.classList.toggle('cur', b.getAttribute('data-f')===cur && v.floor!=null && (!v.ctx||v.ctx==='park')); });   /* 주차장 밖에서는 현재 층 표시 없음 */
     /* 진단 */
     renderDiag(v);
   }
+  try{ pkRender(); }catch(e){ console.warn('pk',e); }
   mapDraw();
 }
 function ago(t){ if(!t)return '—'; var s=Math.floor((Date.now()-t.getTime())/1000);
@@ -683,6 +758,11 @@ function renderDiag(v){
     ['위치 출처', {gnss:'<span class="g">위성(GNSS)</span>','gnss+dr':'<span class="g">위성+추측항법</span>',dr:'<span class="b">추측항법(실내)</span>',none:'<span class="y">없음</span>'}[v.gsrc]||'<span class="y">—</span>'],
     ['기압계(층)', (typeof v.alt==='number')?'<span class="g">정상</span>':'<span class="r">응답없음</span>'],
     ['지상기준 학습', v.groundSet?'<span class="g">완료</span>':'<span class="y">대기</span>'],
+    ['측정 상태', v.ctx?({out:'<span class="g">실외 (층 안 셈)</span>',cand:'<span class="y">실내 확인중</span>',park:'<span class="gd">주차장 안'+(v.lift?' · 승강기':'')+'</span>',tunnel:'<span class="b">터널·지하차도 (층 안 셈)</span>',unknown:'<span class="y">기준 없음 (위성 대기)</span>'}[v.ctx]||esc(v.ctx)):'<span class="y">옛 펌웨어 (정밀 측정 없음)</span>'],
+    ['주행 고도 · 경사', (v.ctx&&v.ctx!=='park'&&v.ctx!=='cand'&&typeof v.roadAlt==='number')?('<span class="gd">'+(v.roadAlt>=0?'+':'')+v.roadAlt.toFixed(1)+' m · '+(gradeStr(v.grade)||'—')+'</span>'):'<span class="gd">—</span>'],
+    ['고도 정밀도', (typeof v.altErr==='number'&&v.ctx&&v.ctx!=='out')?('<span class="'+(v.altErr<=0.5?'g':(v.altErr<=1.0?'y':'r'))+'">± '+v.altErr.toFixed(2)+' m</span>'):'<span class="gd">—</span>'],
+    ['층 판정 신뢰도', (v.inPark&&typeof v.floorConf==='number')?('<span class="'+(v.floorConf>=60?'g':(v.floorConf>=35?'y':'r'))+'">'+v.floorConf+' %</span>'):'<span class="gd">—</span>'],
+    ['위치 정확도', (typeof v.posAcc==='number'&&v.posAcc>0)?('<span class="'+(v.posAcc<=10?'g':(v.posAcc<=25?'y':'r'))+'">약 ± '+Math.round(v.posAcc)+' m'+(typeof v.hdop==='number'?' (HDOP '+v.hdop.toFixed(1)+')':'')+'</span>'):'<span class="gd">—</span>'],
     ['자이로(충격)', (typeof v.heading==='number')?'<span class="g">정상</span>':'<span class="r">응답없음</span>'],
     ['펌웨어', '<span class="gd">'+esc(v.fw||'—')+'</span>'],
   ];
@@ -737,6 +817,157 @@ function renderDiag(v){
   var hab=$('hazackbtn'); if(hab) hab.style.display=v.hazUnknown?'':'none';   /* [v9.7] 단말이 비상등 상태를 모를 때만 확인 버튼 */
   $('diagt').innerHTML=rows.map(function(r){return '<tr><td>'+r[0]+'</td><td>'+r[1]+'</td></tr>';}).join('');
 }
+
+/* ═══════════ ★[v110.13] 주차장 원기둥 ═══════════
+   단말(정밀 측정 펌웨어)이 주차장 안에서 보내는 값으로 그린다 :
+     ptrk  = "시작번호;동,북,높이,방위;…"  1초 간격 궤적 (동·북·높이는 0.1m 단위 정수, 입구 기준)
+     relE/relN/alt/heading = 지금 위치,  psess = 주차장 진입 회차(바뀌면 새 궤적)
+   위치(동·북)를 아는 단말(NEO-M8U 추측항법)은 실제 평면 위치로, 모르면 방위로 감은 나선으로 그린다.
+   차량마다 따로 쌓고(PK[기기번호]) 브라우저에 보관해서, 새로 고쳐도 마지막 주차장 경로가 남는다. */
+var PK={}, pkAz=-32, pkTop=false, pkDrag=null;
+function pkKey(dev){ return 'caroPk1_'+dev; }
+function pkGet(dev){
+  if(PK[dev]) return PK[dev];
+  var o=null; try{ var j=localStorage.getItem(pkKey(dev)); if(j){ o=JSON.parse(j); if(!o||!Array.isArray(o.pts)) o=null; } }catch(e){ o=null; }
+  return (PK[dev]=o||{sess:null,pts:[],last:-1,relOk:false,end:null});
+}
+function pkSave(dev){ try{ var o=PK[dev]; if(o) localStorage.setItem(pkKey(dev),JSON.stringify({sess:o.sess,pts:o.pts.slice(-900),last:o.last,relOk:o.relOk,end:o.end})); }catch(e){} }
+function pkIngest(dev,d){
+  var ctx=(typeof d.ctx==='string')?d.ctx:''; if(!ctx) return;                 /* 옛 펌웨어 */
+  var o=pkGet(dev), inside=(ctx==='park'||ctx==='cand');
+  if(!inside){ if(o.sess!=null&&!o.end&&o.pts.length){ o.end=Date.now(); pkSave(dev); } return; }
+  var sess=num(d.psess); if(sess==null) sess=0;
+  if(o.sess!==sess||o.end){ o.sess=sess; o.pts=[]; o.last=-1; o.relOk=false; o.end=null; }
+  var added=false;
+  if(d.relOk===true) o.relOk=true;
+  if(typeof d.ptrk==='string'&&d.ptrk.length&&d.ptrk.length<4000){
+    var ps=d.ptrk.split(';'), q0=parseInt(ps[0],10);
+    if(isFinite(q0)) for(var i=1;i<ps.length;i++){ var q=q0+i-1; if(q<=o.last) continue;
+      var f=ps[i].split(','); if(f.length<4) continue;
+      var e=+f[0]/10,n=+f[1]/10,a=+f[2]/10,h=+f[3]; if(!isFinite(e)||!isFinite(n)||!isFinite(a)||!isFinite(h)) continue;
+      o.pts.push({e:e,n:n,a:a,h:h}); o.last=q; added=true; }
+  }
+  var a2=num(d.alt);                                                             /* 궤적 문자열이 없는 보고 : 지금 값으로 한 점 */
+  if(!added&&a2!=null){ var lp=o.pts[o.pts.length-1], e2=num(d.relE)||0, n2=num(d.relN)||0, h2=num(d.heading)||0;
+    if(!lp||Math.abs(lp.a-a2)>=0.3||Math.abs(lp.e-e2)+Math.abs(lp.n-n2)>=1.5){ o.pts.push({e:e2,n:n2,a:a2,h:h2}); added=true; } }
+  if(o.pts.length>1500) o.pts.splice(0,o.pts.length-1500);
+  if(added) pkSave(dev);
+}
+function pkRot(d){ pkAz+=d; pkDraw(); }
+function pkTilt(){ pkTop=!pkTop; var b=$('pktilt'); if(b) b.textContent=pkTop?'비스듬히':'위에서'; pkDraw(); }
+function pkClear(){ var dev=devOf(); if(!dev) return; PK[dev]={sess:null,pts:[],last:-1,relOk:false,end:null}; try{ localStorage.removeItem(pkKey(dev)); }catch(e){} pkRender(); }
+function pkRender(){
+  var v=FLEET.find(function(x){return x.id===selId;}), set=function(id,t){ var e=$(id); if(e) e.textContent=t; };
+  var chip=$('pkchip');
+  if(chip){ var c=v?v.ctx:'', lab={park:'주차장 안',cand:'실내 확인중',out:'실외',tunnel:'터널·지하차도',unknown:'기준 없음'}[c]||'—';
+    if(v&&v.lift) lab='주차장 안 · 승강기'; chip.textContent=lab; chip.className='pkchip '+(c||''); }
+  var live=!!(v&&v.online&&(v.ctx==='park'||v.ctx==='cand'));
+  if(live){
+    set('pk-flr',floorStr(v.floor)); set('pk-conf',(v.ctx==='park'&&typeof v.floorConf==='number')?('신뢰도 '+v.floorConf+'%'):'경사로·주차 확인 전');
+    set('pk-alt',(typeof v.alt==='number')?((v.alt>=0?'+':'')+v.alt.toFixed(2)+' m'):'—'); set('pk-err',(typeof v.altErr==='number')?('오차 ±'+v.altErr.toFixed(2)+' m'):' ');
+    set('pk-vz',(typeof v.vz==='number')?((v.vz>0.05?'▲ ':(v.vz<-0.05?'▼ ':''))+Math.abs(v.vz).toFixed(2)+' m/s'):'—'); set('pk-vzs',(typeof v.vz==='number')?(Math.abs(v.vz)<0.05?'수평':(v.vz>0?'올라가는 중':'내려가는 중')):' ');
+    set('pk-pos',v.relOk?((v.relE>=0?'동 ':'서 ')+Math.abs(v.relE).toFixed(0)+' · '+(v.relN>=0?'북 ':'남 ')+Math.abs(v.relN).toFixed(0)+' m'):'—');
+    set('pk-poss',v.relOk?('직선 '+Math.round(Math.sqrt(v.relE*v.relE+v.relN*v.relN))+' m'):'위치 신호 없음(회전으로 표시)');
+    set('pk-path',(typeof v.pathM==='number')?Math.round(v.pathM)+' m':'—');
+    set('pk-turn',(typeof v.turn==='number')?Math.round(v.turn)+'°':'—'); set('pk-turns',(typeof v.turn==='number')?((v.turn/360).toFixed(1)+' 바퀴'):' ');
+    set('pk-time',(typeof v.inSec==='number')?(v.inSec<60?v.inSec+'초':Math.floor(v.inSec/60)+'분 '+(v.inSec%60)+'초'):'—');
+  } else { ['pk-flr','pk-alt','pk-vz','pk-pos','pk-path','pk-turn','pk-time'].forEach(function(i){ set(i,'—'); }); ['pk-conf','pk-err','pk-vzs','pk-poss','pk-turns'].forEach(function(i){ set(i,' '); }); }
+  var dev=v?IDMAP[v.id]:null, o=dev?pkGet(dev):null;
+  set('pk-n',o&&o.pts.length?o.pts.length+'개':'—');
+  pkDraw();
+}
+function pkDraw(){
+  var cv=$('pkc'), box=$('pkwrap'); if(!cv||!box) return;
+  var W=box.clientWidth, H=box.clientHeight; if(!W||!H) return;
+  var dpr=Math.min(window.devicePixelRatio||1,2);
+  if(cv.width!==Math.round(W*dpr)||cv.height!==Math.round(H*dpr)){ cv.width=Math.round(W*dpr); cv.height=Math.round(H*dpr); }
+  var g=cv.getContext('2d'); g.setTransform(dpr,0,0,dpr,0,0); g.clearRect(0,0,W,H);
+  var FONT="'Noto Sans KR',system-ui,'Malgun Gothic',sans-serif", NUM="'Saira','Noto Sans KR',system-ui,sans-serif";
+  var GOLD='#dcc28f', MUTED='#8b919c', LINE='#3b404a', OK='#4db183', USE='#5b96e0', BAD='#e0705e';
+  function msg(t,t2){ g.fillStyle=MUTED; g.textAlign='center'; g.textBaseline='middle'; g.font='500 14px '+FONT; g.fillText(t,W/2,H/2-(t2?10:0));
+    if(t2){ g.font='400 12px '+FONT; g.fillStyle='#5d636e'; g.fillText(t2,W/2,H/2+14); } }
+  var v=FLEET.find(function(x){return x.id===selId;});
+  if(!v){ msg('차량을 선택하세요'); return; }
+  var dev=IDMAP[v.id]; if(!dev){ msg('이 차량에는 연결된 기기가 없습니다'); return; }
+  var o=pkGet(dev), live=!!(v.online&&(v.ctx==='park'||v.ctx==='cand'));
+  if(!v.ctx&&!o.pts.length){ msg('정밀 측정 펌웨어(시험기 v45 · 기판 v9.9)를 올리면 표시됩니다','지금 기기 펌웨어 : '+(v.fw||'—')); return; }
+  if(!o.pts.length){ msg(v.ctx==='tunnel'?'터널·지하차도 통과 중 — 층을 세지 않습니다':(v.ctx==='unknown'?'위성 수신 대기 중 (기준 없음)':'실외 — 주차장에 들어가면 자동으로 그려집니다'),'층은 주차장 안에서만 셉니다'); return; }
+  var pts=o.pts, useRel=!!o.relOk, FH=(typeof v.floorH==='number'&&v.floorH>=2&&v.floorH<=6)?v.floorH:3.0, HR=14;
+  function XY(p){ if(useRel) return [p.e,p.n]; var r=p.h*Math.PI/180; return [HR*Math.sin(r),HR*Math.cos(r)]; }
+  /* 범위 */
+  var x0=useRel?0:-HR,x1=useRel?0:HR,y0=useRel?0:-HR,y1=useRel?0:HR,a0=0,a1=0;
+  pts.forEach(function(p){ var q=XY(p); if(q[0]<x0)x0=q[0]; if(q[0]>x1)x1=q[0]; if(q[1]<y0)y0=q[1]; if(q[1]>y1)y1=q[1]; if(p.a<a0)a0=p.a; if(p.a>a1)a1=p.a; });
+  var cx0=(x0+x1)/2, cy0=(y0+y1)/2, need=Math.sqrt((x1-x0)*(x1-x0)+(y1-y0)*(y1-y0))/2*1.12, R=20;
+  [20,30,40,60,80,120,160,240,400].some(function(c){ R=c; return c>=need; });
+  var k0=Math.floor(a0/FH-0.35), k1=Math.ceil(a1/FH+0.35); if(k1-k0<2){ if(a1>1) k1=k0+2; else k0=k1-2; }
+  var zLo=k0*FH, zHi=k1*FH;
+  /* 화면 배치 */
+  var padL=18, padR=112, padT=26, padB=30, el=pkTop?1.0:0.36;
+  var cw=W-padL-padR, s=Math.min((cw/2-6)/R, (H-padT-padB)*(pkTop?0.5:0.30)/(R*el));
+  var ry=R*s*el, zs=pkTop?0:Math.min((H-padT-padB-2*ry)/(zHi-zLo), 150/FH);   /* 높이는 화면에 맞춰 늘린다(층 사이가 잘 보이게) — 한 층 최대 150px */
+  var cxp=padL+cw/2, base=pkTop?(padT+(H-padT-padB)/2):(H-padB-ry-((H-padT-padB-2*ry)-(zHi-zLo)*zs)/2);
+  var az=pkAz*Math.PI/180, ca=Math.cos(az), sa=Math.sin(az);
+  function P(x,y,z){ var dx=x-cx0, dy=y-cy0, xr=dx*ca-dy*sa, yr=dx*sa+dy*ca; return {x:cxp+xr*s, y:base-(z-zLo)*zs-yr*s*el, d:yr}; }
+  function ring(z,col,lw,fill){ var cy=base-(z-zLo)*zs;
+    if(fill){ g.fillStyle=fill; g.beginPath(); g.ellipse(cxp,cy,R*s,ry,0,0,Math.PI*2); g.fill(); }
+    g.strokeStyle=col; g.lineWidth=lw;
+    g.setLineDash([3,4]); g.beginPath(); g.ellipse(cxp,cy,R*s,ry,0,Math.PI,Math.PI*2); g.stroke();     /* 뒤쪽 반 */
+    g.setLineDash([]);    g.beginPath(); g.ellipse(cxp,cy,R*s,ry,0,0,Math.PI); g.stroke(); return cy; } /* 앞쪽 반 */
+  var curF=(live&&typeof v.floor==='number')?v.floor:null, last=pts[pts.length-1];
+  var cur=live?{e:(v.relOk?v.relE:last.e),n:(v.relOk?v.relN:last.n),a:(typeof v.alt==='number'?v.alt:last.a),h:(typeof v.heading==='number'?v.heading:last.h)}:last;
+  /* 원기둥 옆선 + 층 원판 */
+  if(!pkTop){ g.strokeStyle=LINE; g.lineWidth=1; g.beginPath(); g.moveTo(cxp-R*s,base-(zHi-zLo)*zs); g.lineTo(cxp-R*s,base); g.moveTo(cxp+R*s,base-(zHi-zLo)*zs); g.lineTo(cxp+R*s,base); g.stroke(); }
+  for(var k=k0;k<=k1;k++){ var code=1+k, z=k*FH, isG=(k===0), isC=(curF!=null&&Math.round(curF)===code);
+    if(pkTop&&!isC&&!(curF==null&&isG)) continue;
+    var cy=ring(z, isC?GOLD:(isG?'#6f8f7c':LINE), isC?1.8:(isG?1.4:1), isC?'rgba(200,169,110,.10)':(isG?'rgba(77,177,131,.05)':null));
+    if(!pkTop){ g.textAlign='left'; g.textBaseline='middle'; g.font=(isC?'700 ':'600 ')+'13px '+NUM; g.fillStyle=isC?GOLD:(isG?'#8fb7a0':MUTED);
+      g.fillText(floorStr(code)+(isG?' · 입구 높이':''), cxp+R*s+10, cy-1);
+      g.font='400 10.5px '+NUM; g.fillStyle='#5d636e'; g.fillText((z>=0?'+':'')+z.toFixed(1)+' m', cxp+R*s+10, cy+12); } }
+  /* 입구 */
+  if(useRel){ var pe=P(0,0,0); g.fillStyle=OK; g.beginPath(); g.moveTo(pe.x,pe.y-9); g.lineTo(pe.x+6,pe.y+3); g.lineTo(pe.x-6,pe.y+3); g.closePath(); g.fill();
+    g.font='700 11px '+FONT; g.textAlign='center'; g.textBaseline='bottom'; g.fillStyle=OK; g.fillText('입구',pe.x,pe.y-11); }
+  /* 이동 경로 : 오래된 쪽은 파랑·흐리게, 최근은 금색·굵게. 원기둥 뒤쪽(먼 쪽)은 더 흐리게 */
+  var n=pts.length, prev=null;
+  if(useRel&&n){ var q0=XY(pts[0]), pA=P(0,0,0), pB=P(q0[0],q0[1],pts[0].a);               /* 입구 → 첫 기록점 (지붕 없는 진입 경사로) */
+    g.strokeStyle='rgba(77,177,131,.55)'; g.lineWidth=1.3; g.setLineDash([4,4]); g.beginPath(); g.moveTo(pA.x,pA.y); g.lineTo(pB.x,pB.y); g.stroke(); g.setLineDash([]); }
+  for(var i=0;i<n;i++){ var q=XY(pts[i]), p=P(q[0],q[1],pts[i].a);
+    if(prev){ var t=n>1?i/(n-1):1, far=(p.d>0&&!pkTop)?0.55:1;
+      g.strokeStyle='rgba('+Math.round(91+(220-91)*t)+','+Math.round(150+(194-150)*t)+','+Math.round(224+(143-224)*t)+','+((0.35+0.6*t)*far).toFixed(2)+')';
+      g.lineWidth=1.3+1.5*t; g.lineCap='round'; g.beginPath(); g.moveTo(prev.x,prev.y); g.lineTo(p.x,p.y); g.stroke(); }
+    prev=p; }
+  for(var j=0;j<n;j++){ if(n>160&&j%Math.ceil(n/160)) continue; var q2=XY(pts[j]), p2=P(q2[0],q2[1],pts[j].a);
+    g.fillStyle='rgba(232,234,238,'+(0.25+0.5*j/n).toFixed(2)+')'; g.beginPath(); g.arc(p2.x,p2.y,1.6,0,Math.PI*2); g.fill(); }
+  /* 지금 위치 : 그 층 원판에 그림자 + 수직 점선 + 오차 막대 + 진행 방향 화살표 */
+  var qc=XY(cur), pc=P(qc[0],qc[1],cur.a), col=live?GOLD:'#9aa1ad';
+  if(!pkTop){ var zf=(curF!=null)?(Math.round(curF)-1)*FH:Math.round(cur.a/FH)*FH, pf=P(qc[0],qc[1],zf);
+    g.fillStyle='rgba(0,0,0,.35)'; g.beginPath(); g.ellipse(pf.x,pf.y,7,7*el,0,0,Math.PI*2); g.fill();
+    g.strokeStyle='rgba(220,194,143,.45)'; g.setLineDash([2,3]); g.lineWidth=1; g.beginPath(); g.moveTo(pc.x,pc.y); g.lineTo(pf.x,pf.y); g.stroke(); g.setLineDash([]);
+    if(live&&typeof v.altErr==='number'&&v.altErr>0){ var eb=v.altErr*zs; g.strokeStyle='rgba(232,234,238,.75)'; g.lineWidth=1.2; g.beginPath();
+      g.moveTo(pc.x+13,pc.y-eb); g.lineTo(pc.x+13,pc.y+eb); g.moveTo(pc.x+9,pc.y-eb); g.lineTo(pc.x+17,pc.y-eb); g.moveTo(pc.x+9,pc.y+eb); g.lineTo(pc.x+17,pc.y+eb); g.stroke(); } }
+  g.shadowColor=col; g.shadowBlur=live?14:0; g.fillStyle=col; g.beginPath(); g.arc(pc.x,pc.y,6.5,0,Math.PI*2); g.fill(); g.shadowBlur=0;
+  g.strokeStyle='#15161a'; g.lineWidth=1.6; g.beginPath(); g.arc(pc.x,pc.y,6.5,0,Math.PI*2); g.stroke();
+  var hr=cur.h*Math.PI/180, hx=Math.sin(hr), hy=Math.cos(hr), ax=(hx*ca-hy*sa), ay=-(hx*sa+hy*ca)*el, al=Math.sqrt(ax*ax+ay*ay)||1;
+  g.strokeStyle=col; g.lineWidth=2.4; g.lineCap='round'; g.beginPath(); g.moveTo(pc.x,pc.y); g.lineTo(pc.x+ax/al*17,pc.y+ay/al*17); g.stroke();
+  g.font='700 12.5px '+NUM; g.textAlign=(pc.x>cxp)?'right':'left'; g.textBaseline='bottom'; g.fillStyle=col;
+  g.fillText((live?floorStr(v.floor):'마지막 위치')+'  '+(cur.a>=0?'+':'')+cur.a.toFixed(1)+'m'+((live&&typeof v.altErr==='number')?' ±'+v.altErr.toFixed(1):''), pc.x+((pc.x>cxp)?-12:22), pc.y-9);
+  /* 머리글 · 눈금 */
+  g.textAlign='left'; g.textBaseline='top'; g.font='500 11.5px '+FONT; g.fillStyle=MUTED;
+  g.fillText(useRel?('실제 위치(입구 기준) · 원기둥 반지름 '+R+' m'):'위치 신호 없음 — 방위(회전)로 감아 표시', 12, 8);
+  if(!live) { g.fillStyle=BAD; g.fillText(o.end?('지난 주차장 기록 · '+ago(new Date(o.end))+' 출차'):'지난 주차장 기록', 12, 24); }
+  if(useRel){ var bl=10*s; g.strokeStyle=MUTED; g.lineWidth=1.5; g.beginPath(); g.moveTo(12,H-14); g.lineTo(12+bl,H-14); g.moveTo(12,H-18); g.lineTo(12,H-10); g.moveTo(12+bl,H-18); g.lineTo(12+bl,H-10); g.stroke();
+    g.font='500 10.5px '+NUM; g.textBaseline='bottom'; g.fillStyle=MUTED; g.fillText('10 m', 12+bl+6, H-8);
+    /* 북쪽 화살표 */
+    var nx=cxp-R*s+16, ny=padT+18, vx=-sa, vy=-ca*el, vl=Math.sqrt(vx*vx+vy*vy)||1; g.strokeStyle='#9aa1ad'; g.lineWidth=1.6; g.beginPath(); g.moveTo(nx-vx/vl*10,ny-vy/vl*10); g.lineTo(nx+vx/vl*12,ny+vy/vl*12); g.stroke();
+    g.font='700 10.5px '+NUM; g.textAlign='center'; g.textBaseline='middle'; g.fillStyle='#9aa1ad'; g.fillText('N', nx+vx/vl*21, ny+vy/vl*21); }
+  g.textAlign='right'; g.textBaseline='bottom'; g.font='400 10.5px '+FONT; g.fillStyle='#5d636e'; g.fillText('끌어서 돌려 보기', W-10, H-8);
+}
+(function(){ var b=$('pkwrap'); if(!b) return;
+  b.addEventListener('pointerdown',function(e){ pkDrag={x:e.clientX,az:pkAz}; try{ b.setPointerCapture(e.pointerId); }catch(_){} });
+  b.addEventListener('pointermove',function(e){ if(!pkDrag) return; pkAz=pkDrag.az+(e.clientX-pkDrag.x)*0.5; pkDraw(); });
+  ['pointerup','pointercancel','pointerleave'].forEach(function(t){ b.addEventListener(t,function(){ pkDrag=null; }); });
+  window.addEventListener('resize',function(){ try{ pkDraw(); }catch(e){} });
+  try{ if(window.ResizeObserver) new ResizeObserver(function(){ try{ pkDraw(); }catch(e){} }).observe(b); }catch(e){}   /* 카드 높이가 지도에 맞춰 바뀔 때 다시 그림 */
+})();
 
 /* 차량 선택 */
 $('flist').onclick=function(e){
@@ -886,7 +1117,7 @@ function startFS(){
   try{ FN.onSnapshot(FN.collection(db,'reservations'),function(s){ applyResvSnap(s); },function(e){ console.warn('resv',e); }); }catch(e){}
   FN.onSnapshot(FN.collection(db,'devices'),function(s){
     DEV={};
-    s.forEach(function(doc){ DEV[doc.id]=doc.data()||{}; });
+    s.forEach(function(doc){ DEV[doc.id]=doc.data()||{}; try{ pkIngest(doc.id, DEV[doc.id]); }catch(e){ console.warn('pk',e); } });
     remap(); checkAlerts(); render();
     var n=Object.keys(IDMAP).length;
     var sy=$('sync');
@@ -905,6 +1136,11 @@ function remap(){
     var ls=(d.lastSeen&&d.lastSeen.toDate)?d.lastSeen.toDate():null;
     v.lat=num(d.lat); v.lng=num(d.lng); v.sats=num(d.sats); v.gsrc=d.gsrc||'';
     v.alt=num(d.alt); v.floor=num(d.floor); v.env=d.env||''; v.groundSet=(d.groundSet===true);
+    /* ★[v110.13] 정밀 측정 펌웨어(v45 · v9.9)가 보내는 값 — 없으면(옛 펌웨어) null/빈값 */
+    v.ctx=(typeof d.ctx==='string')?d.ctx:''; v.inPark=(d.inPark===true); v.altErr=num(d.altErr); v.vz=num(d.vz); v.floorConf=num(d.floorConf);
+    v.psess=num(d.psess); v.inSec=num(d.inSec); v.pathM=num(d.pathM); v.turn=num(d.turn); v.relOk=(d.relOk===true); v.relE=num(d.relE); v.relN=num(d.relN);
+    v.lift=(d.lift===true); v.posAcc=num(d.posAcc); v.hdop=num(d.hdop); v.floorH=num(d.floorH);
+    v.roadAlt=num(d.roadAlt); v.grade=num(d.grade); v.elev=num(d.elev);   /* 주행 고도(출발점 대비 m)·경사(%)·해발(m) — 층과 별개 */
     v.heading=num(d.heading); v.speed=num(d.speed); v.shock=num(d.shock);
     v.impact=(d.impact===true); v.over=(d.over===true); v.moving=(d.moving===true);
     v.fw=d.fw||''; v.ota=d.ota||''; v.lastSeen=ls;
@@ -1037,8 +1273,8 @@ function drawLogs(){
     +(parkHits>0?' · <b style="color:#ff7a68;">🅿️ 주차중 충격 '+parkHits+'건 확인요망</b>':''); }
   var th='';
   TELE.forEach(function(t){
-    th+='<tr><td>'+fmtTs(t.ts)+'</td><td>'+floorStr(num(t.floor))+'</td>'
-      +'<td>'+(t.alt!=null?Number(t.alt).toFixed(1)+'m':'—')+'</td>'
+    th+='<tr><td>'+fmtTs(t.ts)+'</td><td>'+flrOf(t)+'</td>'
+      +'<td>'+((typeof t.ctx==='string'&&t.ctx&&t.ctx!=='park'&&t.ctx!=='cand')?(t.roadAlt!=null?('주행 '+(Number(t.roadAlt)>=0?'+':'')+Number(t.roadAlt).toFixed(0)+'m'+(t.grade!=null&&Math.abs(Number(t.grade))>=1.5?' · '+Number(t.grade).toFixed(0)+'%':'')):'—'):(t.alt!=null?Number(t.alt).toFixed(1)+'m':'—'))+'</td>'
       +'<td>'+(t.speed!=null?Math.round(t.speed)+'km/h':'—')+'</td>'
       +'<td>'+(t.heading!=null?Math.round(t.heading)+'°':'—')+'</td>'
       +'<td>'+(t.shock!=null?Number(t.shock).toFixed(2)+'g':'—')+'</td>'
@@ -1162,7 +1398,7 @@ function csvExport(){
   var rows=[['시각','종류','충격구분','층','고도(m)','방향(deg)','속도(km/h)','충격(g)','위도','경도']];
   EVTS.forEach(function(e){ var cls=e.event==='impact'?(impactMode(e)==='park'?'주차중':'주행중'):'';
     rows.push([fmtTs(e.ts),e.event||'',cls,floorStr(num(e.floor)),e.alt!=null?e.alt:'',e.heading!=null?Math.round(e.heading):'',e.speed!=null?e.speed:'',e.shock!=null?e.shock:'',e.lat!=null?e.lat:'',e.lng!=null?e.lng:'']); });
-  TELE.forEach(function(t){ rows.push([fmtTs(t.ts),'주기','',floorStr(num(t.floor)),t.alt!=null?t.alt:'',t.heading!=null?Math.round(t.heading):'',t.speed!=null?t.speed:'',t.shock!=null?t.shock:'',t.lat!=null?t.lat:'',t.lng!=null?t.lng:'']); });
+  TELE.forEach(function(t){ rows.push([fmtTs(t.ts),'주기','',flrOf(t),t.alt!=null?t.alt:'',t.heading!=null?Math.round(t.heading):'',t.speed!=null?t.speed:'',t.shock!=null?t.shock:'',t.lat!=null?t.lat:'',t.lng!=null?t.lng:'']); });
   var csv='﻿'+rows.map(function(r){return r.map(function(c){ var t=String(c==null?'':c); if(/^[=+\-@]/.test(t)) t="'"+t; return /[",\n]/.test(t)?('"'+t.replace(/"/g,'""')+'"'):t; }).join(',');}).join('\n');   /* ★[v108] 엑셀 수식 주입 방지·쉼표 처리 */
   var a=document.createElement('a');
   a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
