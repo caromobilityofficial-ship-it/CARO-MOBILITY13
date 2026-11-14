@@ -4,6 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>CARO MOBILITY · 관제센터</title>
+<!-- ★[v110.18] 태블릿·PC 에 앱으로 설치 : 크롬 메뉴(⋮) → '앱 설치' 또는 '홈 화면에 추가' → 주소창 없이 전체 화면으로 열린다 -->
+<link rel="manifest" href="control-manifest.json?v=1">
+<meta name="theme-color" content="#141518">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="CARO 관제">
+<link rel="icon" href="admin-icon-192.png">
+<link rel="apple-touch-icon" href="admin-icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&family=Saira:wght@500;600;700&display=swap" rel="stylesheet">
@@ -249,6 +257,31 @@ html{max-width:100%;overflow-x:hidden;}
    (예전엔 운영 화면이 '고정 덮개'로만 얹혀 있어서 아래로 내리면 뒤의 관제 화면이 비쳐 보였다) */
 body.ops{overflow:hidden;height:100vh;}
 body.ops .kpis, body.ops .main, body.ops .bottom{display:none!important;}
+/* ★[v110.18] 태블릿(갤럭시 탭) 화면 : 가로로 들면 [차량 목록·원격 제어 | 지도] 두 칸으로 — 지도가 첫 화면에 보인다. (예전에는 한 줄로 쌓여 지도가 화면 아래로 밀렸다) */
+@media (min-width:700px) and (max-width:1100px){
+  .topbar{padding:9px 14px;gap:10px;}
+  .kpis{grid-template-columns:repeat(4,1fr);gap:9px;padding:10px 14px 0;}
+  .kpi{padding:9px 13px;border-radius:11px;} .kpi .vl{font-size:21px;margin-top:1px;} .kpi .lb{font-size:10px;letter-spacing:1px;}
+  .main{padding:10px 14px;gap:10px;} .bottom{padding:0 14px 14px;gap:10px;}
+}
+@media (min-width:700px) and (max-width:1100px) and (orientation:landscape){
+  .main{grid-template-columns:292px 1fr;grid-template-rows:auto 1fr;}
+  .main>.card{grid-column:1;grid-row:1;}
+  .main>.rcol{grid-column:1;grid-row:2;}
+  .main>.ccol{grid-column:2;grid-row:1 / span 2;min-width:0;}
+  .mapbox{height:calc(100vh - 250px);min-height:300px;}
+}
+@media (min-width:700px) and (max-width:1100px) and (orientation:portrait){
+  .mapbox{height:48vh;min-height:360px;}
+}
+/* 상태 칸 제목이 두 줄로 넘어가 아래 값(층·높이)이 잘려 보이던 것 → 한 줄로 */
+.lv .k{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+@media (max-width:1300px){ .lv .k{letter-spacing:.3px;} .lv{padding:12px 5px;} .lv .v{font-size:15px;} }
+/* 손가락으로 누르는 화면 : 단추를 조금 크게, 길게 눌러도 글자가 선택되지 않게 */
+@media (pointer:coarse){
+  button,.ntab,.car{-webkit-tap-highlight-color:transparent;touch-action:manipulation;}
+  .topbar,.kpis,.card h3,button{-webkit-user-select:none;user-select:none;}
+}
 @media (max-width:640px){
   .topbar{flex-wrap:wrap;gap:8px 10px;padding:10px 12px;}
   .logo{font-size:15px;letter-spacing:1px;}
