@@ -274,9 +274,14 @@ body.ops .kpis, body.ops .main, body.ops .bottom{display:none!important;}
 @media (min-width:700px) and (max-width:1100px) and (orientation:portrait){
   .mapbox{height:48vh;min-height:360px;}
 }
-/* 상태 칸 제목이 두 줄로 넘어가 아래 값(층·높이)이 잘려 보이던 것 → 한 줄로 */
-.lv .k{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-@media (max-width:1300px){ .lv .k{letter-spacing:.3px;} .lv{padding:12px 5px;} .lv .v{font-size:15px;} }
+/* ★[v110.19] 상태 칸(지도 아래·원기둥 아래) : 글자가 잘리지 않게 다시 짬.
+   예전에는 칸 높이를 78px 로 고정하고 넘치는 글자를 '…' 로 잘랐다 → 화면 폭에 따라 제목·값·설명이 잘려 보였다.
+   이제는 칸 높이가 내용에 맞춰 늘어나고(같은 줄의 칸은 서로 높이가 같다), 긴 글자는 낱말 단위로 줄을 바꾼다. */
+.lv{height:auto;min-height:80px;overflow:visible;padding:10px 6px;min-width:0;justify-content:flex-start;}
+.lv .k{white-space:normal;word-break:keep-all;overflow:visible;line-height:1.3;letter-spacing:.5px;min-height:13px;}
+.lv .v{white-space:normal;word-break:keep-all;overflow-wrap:anywhere;overflow:visible;text-overflow:clip;line-height:1.2;margin-top:4px;}
+.lv .s{white-space:normal;word-break:keep-all;overflow-wrap:anywhere;overflow:visible;text-overflow:clip;line-height:1.3;min-height:14px;margin-top:3px;}
+@media (max-width:1300px){ .lv{padding:9px 4px;} .lv .v{font-size:15px;} .lv .k{letter-spacing:.2px;} }
 /* 손가락으로 누르는 화면 : 단추를 조금 크게, 길게 눌러도 글자가 선택되지 않게 */
 @media (pointer:coarse){
   button,.ntab,.car{-webkit-tap-highlight-color:transparent;touch-action:manipulation;}
@@ -363,7 +368,7 @@ body.ops .kpis, body.ops .main, body.ops .bottom{display:none!important;}
     <div class="livebar">
       <div class="lv"><div class="k">상태</div><div class="v" id="lv-move">—</div><div class="s" id="lv-moves">&nbsp;</div></div>
       <div class="lv"><div class="k">속도</div><div class="v gold" id="lv-spd">—</div><div class="s" id="lv-spds">&nbsp;</div></div>
-      <div class="lv"><div class="k">층 (주차장 안에서만)</div><div class="v use" id="lv-flr">—</div><div class="s" id="lv-flrs">&nbsp;</div></div>
+      <div class="lv"><div class="k">층</div><div class="v use" id="lv-flr">—</div><div class="s" id="lv-flrs">&nbsp;</div></div>
       <div class="lv"><div class="k" id="lv-altk">주행 고도 · 경사</div><div class="v" id="lv-alt">—</div><div class="s" id="lv-alts">&nbsp;</div></div>
       <div class="lv"><div class="k">위성</div><div class="v" id="lv-sat">—</div><div class="s" id="lv-sats">&nbsp;</div></div>
       <div class="lv"><div class="k">위치출처</div><div class="v" id="lv-src">—</div><div class="s" id="lv-srcs">&nbsp;</div></div>
@@ -873,7 +878,7 @@ function renderDiag(v){
     ['지하 위치(추측항법)', (v.gFusion===false)?'<span class="gd">꺼 둠 (기기 고정 후 켜기)</span>':v.drOk?(({0:'<span class="y">보정 중 · 밖에서 주행 필요</span>',1:'<span class="g">준비됨</span>',2:'<span class="y">일시 중지</span>',3:'<span class="r">꺼짐</span>'})[v.drMode]||'<span class="gd">확인 중</span>'):'<span class="gd">—</span>'],
     /* ★[v110.17] GPS 수신 상태 : 위성으로 잡은 위치인지, 모듈을 몇 번 다시 시작시켰는지, 안테나 신호 */
     ['GPS 수신', (typeof v.gfix==='number')?('<span class="'+((v.gfix>=2&&v.gfix<=4)?'g':'r')+'">'+(({0:'위성 없음',1:'추측항법만',2:'2D',3:'3D',4:'위성+관성',5:'시각만'})[v.gfix]||v.gfix)+'</span>'
-        +((typeof v.gWd==='number'&&v.gWd>0)?(' · 재시작 '+v.gWd+'회'):'')+((typeof v.gAgc==='number'&&v.gAgc>=0)?(' · 증폭 '+Math.round(v.gAgc/81.91)+'%'):'')+((typeof v.rtPend==='number'&&v.rtPend>40)?(' · 밀린 경로 '+v.rtPend+'점'):'')):'<span class="gd">—</span>'],
+        +((typeof v.gWd==='number'&&v.gWd>0)?(' · 재시작 '+v.gWd+'회'):'')+((typeof v.gAgc==='number'&&v.gAgc>=0)?(' · 증폭 '+Math.round(v.gAgc/81.91)+'%'):'')+((typeof v.rtPend==='number'&&v.rtPend>40)?(' · 밀린 경로 '+v.rtPend+'점'):'')+(v.gCfg===1?' · 위성 4종(GPS·갈릴레오·베이더우·QZSS)':(v.gCfg===-1?' · 위성 기본(GPS·글로나스)':''))):'<span class="gd">—</span>'],   /* ★[v110.19] gCfg = 위성군 설정 결과 */
     ['자이로(충격)', (typeof v.heading==='number')?'<span class="g">정상</span>':'<span class="r">응답없음</span>'],
     ['펌웨어', '<span class="gd">'+esc(v.fw||'—')+'</span>'],
   ];
