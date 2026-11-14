@@ -335,7 +335,7 @@ body.ops .kpis, body.ops .main, body.ops .bottom{display:none!important;}
     <button class="ntab on" id="nt-live" onclick="switchView('live')">실시간 관제</button>
     <button class="ntab" id="nt-ops" onclick="switchView('ops')">운영 관리</button>
   </div>
-  <span class="sync off" id="sync">CONNECTING…</span>
+  <span class="sync off" id="sync">CONNECTING…</span><span id="pver" title="이 화면의 버전" style="font-size:11px;color:var(--muted);letter-spacing:.5px;white-space:nowrap;">v110.20</span>
   <span class="clock" id="clock">--:--:--</span>
   <span class="adm" id="adm">—</span>
   <button class="lgout" id="mfabtn" onclick="if(window.CaroMFA)CaroMFA.openSetup()">🔐 2단계 인증</button>
@@ -458,6 +458,26 @@ body.ops .kpis, body.ops .main, body.ops .bottom{display:none!important;}
 
 <script src="lib/leaflet/leaflet.js"></script>   <!-- ★13차: 외부 CDN 대신 자체 파일(변조·차단 방지) -->
 <link rel="stylesheet" href="lib/leaflet/leaflet.css">
+<script>
+/* ★[v110.20] 화면 버전 자가 점검 — 태블릿 앱·브라우저가 옛 화면을 붙잡고 있으면(캐시) 켤 때·다시 볼 때 스스로 새로 받는다.
+   로그인 전 화면에서도 동작한다(예전 자동 업데이트는 로그인 칸에 글자가 들어 있으면 '입력 중' 으로 보고 미뤘다). 같은 버전으로는 3번까지만 시도한다. */
+var CARO_PAGE_VER='110.20';
+function caroSelfCheck(){
+  try{
+    fetch('version.txt?t='+Date.now(),{cache:'no-store'}).then(function(r){ return r.ok?r.text():''; }).then(function(t){
+      var m=/v(\d+\.\d+)/.exec(t||''); if(!m||m[1]===CARO_PAGE_VER) return;
+      var a=CARO_PAGE_VER.split('.'), b=m[1].split('.'); if(!(Number(b[0])>Number(a[0])||(Number(b[0])===Number(a[0])&&Number(b[1])>Number(a[1])))) return;   /* 서버가 더 새 버전일 때만 */
+      var g=document.getElementById('gate'); var loggedIn=g&&g.style.display==='none';
+      if(loggedIn && window.CaroAutoUpdate) return;                       /* 로그인 뒤에는 기존 자동 업데이트(안내 띠 → 적용)가 처리한다 */
+      var k='caro_selfref_'+m[1], n=0; try{ n=Number(sessionStorage.getItem(k)||0); if(n>=3) return; sessionStorage.setItem(k,String(n+1)); }catch(e){ return; }
+      fetch(location.href.split('#')[0],{cache:'reload'}).then(function(){ location.reload(); },function(){ location.reload(); });
+    }).catch(function(){});
+  }catch(e){}
+}
+caroSelfCheck();
+document.addEventListener('visibilitychange',function(){ if(!document.hidden) caroSelfCheck(); });
+setInterval(caroSelfCheck, 120000);
+</script>
 <script>window.__kakaoSdkErr=null;</script>
 <!-- 카카오맵 SDK — 고객앱(index.html)과 **같은** 도메인 등록 키를 쓴다.
      예전엔 관제만 다른 키(905e7fbf…)를 쓰고 있어 카카오가 거부 → 조용히 OSM 으로 떨어졌다 (12차 검수) -->
@@ -1457,7 +1477,10 @@ function cleanRoute(rows){
     }
     pend=[];
     if(parkedAt(last)){
-      if(d<40){ st.still++; continue; }                                   /* 정차 중 떨림 */
+      if(d<40){ st.still++; continue; }
+      /* ★[v110.20] 두 점 모두 '서 있음(속도 5km/h 미만)' 인데 40m 넘게 떨어져 있다 = 차가 움직인 것이 아니라 GPS 위치가 바로잡힌 것(켠 직후 등).
+         선으로 잇지 않고 여기서 구간을 끊는다 — 예전에는 이것이 건물을 가로지르는 선으로 그려졌다. */
+      if(p.v!=null && p.v<5 && (p.gsrc==='rt'||last.gsrc==='rt'||dt<60)){ flush(); pend=[]; cur.push(p); last=p; st.jump++; continue; }                                   /* 정차 중 떨림 */
       /* 정차 상태에서 벗어날 때는 다음 두 점이 계속 같은 방향으로 멀어지는지 확인 — 튀었다 돌아오는 점을 걸러냄 */
       var n1=P[i+1], n2=P[i+2], ok=false;
       if(n1 && (n1.t-p.t)/1000<=600){
@@ -1479,6 +1502,9 @@ function cleanRoute(rows){
       if(s.length<2) return false;
       var far=0; s.forEach(function(q){ far=Math.max(far,_hv(s[0],q)); });
       if(far<100){ st.still+=s.length; return false; }                   /* 100m 안에서만 움직인 구간 = 실제로는 정차 */
+      /* ★[v110.20] 이동 없으면 이동 표시 없음 : 속도 기록이 있는 구간은 시속 8km 이상인 점이 3개는 있어야 '달린 구간' 으로 그린다 */
+      var kn=0, mv=0; s.forEach(function(q){ if(q.v!=null){ kn++; if(q.v>=8) mv++; } });
+      if(kn>=3 && mv<3){ st.still+=s.length; return false; }
       return true; });
   st.segs=segs.length; st.kept=segs.reduce(function(n,s){return n+s.length;},0);
   return {segs:segs, stat:st};
