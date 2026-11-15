@@ -203,6 +203,10 @@ button{font-family:inherit;cursor:pointer;}
 .csvbtn:hover{border-color:var(--gold);color:var(--gold-soft);}
 .sndbtn{background:none;border:1px solid var(--border2);color:var(--muted);border-radius:7px;padding:4px 12px;font-size:11px;}
 .sndbtn.on{color:var(--gold-soft);border-color:var(--gold);}
+/* ★[v110.31] 알림 음량 */
+.sndvol{display:inline-flex;align-items:center;gap:6px;margin-left:8px;vertical-align:middle;font-size:11px;font-weight:400;letter-spacing:0;color:var(--muted);white-space:nowrap;}
+.sndvol input{width:84px;height:14px;accent-color:var(--gold);cursor:pointer;margin:0;}
+.sndvol span{min-width:44px;}
 
 /* ── 토스트 ── */
 #toast{position:fixed;bottom:26px;left:50%;transform:translateX(-50%);background:var(--panel);
@@ -348,7 +352,7 @@ body.ops .kpis, body.ops .main, body.ops .bottom{display:none!important;}
     <button class="ntab on" id="nt-live" onclick="switchView('live')">실시간 관제</button>
     <button class="ntab" id="nt-ops" onclick="switchView('ops')">운영 관리</button>
   </div>
-  <span class="sync off" id="sync">CONNECTING…</span><span id="pver" title="이 화면의 버전" style="font-size:11px;color:var(--muted);letter-spacing:.5px;white-space:nowrap;">v110.28</span>
+  <span class="sync off" id="sync">CONNECTING…</span><span id="pver" title="이 화면의 버전" style="font-size:11px;color:var(--muted);letter-spacing:.5px;white-space:nowrap;">v110.31</span>
   <span class="clock" id="clock">--:--:--</span>
   <span class="adm" id="adm">—</span>
   <button class="lgout" id="mfabtn" onclick="if(window.CaroMFA)CaroMFA.openSetup()">🔐 2단계 인증</button>
@@ -455,7 +459,7 @@ body.ops .kpis, body.ops .main, body.ops .bottom{display:none!important;}
     <span class="dsum" id="dsum"></span>
   </div>
   <div class="card">
-    <h3><span class="dot"></span>이벤트 알림 <button class="sndbtn" id="sndbtn">🔔 소리 꺼짐</button></h3>
+    <h3><span class="dot"></span>이벤트 알림 <button class="sndbtn" id="sndbtn">🔔 소리 꺼짐</button><span class="sndvol" title="충격·과속·이벤트 알림 소리의 크기"><input type="range" id="sndvol" min="0" max="100" step="5" value="35" aria-label="알림 음량"><span id="sndvolv">음량 35</span></span></h3>
     <div class="loglist" id="evlist"></div>
   </div>
   <div class="card">
@@ -474,7 +478,7 @@ body.ops .kpis, body.ops .main, body.ops .bottom{display:none!important;}
 <script>
 /* ★[v110.20] 화면 버전 자가 점검 — 태블릿 앱·브라우저가 옛 화면을 붙잡고 있으면(캐시) 켤 때·다시 볼 때 스스로 새로 받는다.
    로그인 전 화면에서도 동작한다(예전 자동 업데이트는 로그인 칸에 글자가 들어 있으면 '입력 중' 으로 보고 미뤘다). 같은 버전으로는 3번까지만 시도한다. */
-var CARO_PAGE_VER='110.28';
+var CARO_PAGE_VER='110.31';
 function caroSelfCheck(){
   try{
     fetch('version.txt?t='+Date.now(),{cache:'no-store'}).then(function(r){ return r.ok?r.text():''; }).then(function(t){
@@ -548,14 +552,20 @@ function toast(m){ var t=$('toast'); t.textContent=m; t.classList.add('show');
   clearTimeout(_tt); _tt=setTimeout(function(){t.classList.remove('show');},2600); }
 
 /* ── 경보음 (WebAudio 비프 — 파일 불필요) ── */
+/* ★[v110.31] 알림 음량(0~100) — 이 브라우저에 기억한다. 35 가 예전 크기, 100 이면 그 8배 */
+var SND_VOL=35; try{ var _sv=parseInt(localStorage.getItem('caro_vol'),10); if(isFinite(_sv)&&_sv>=0&&_sv<=100) SND_VOL=_sv; }catch(e){}
+function sndGain(){ var x=SND_VOL/100; return x<=0?0:Math.max(0.002,x*x); }
 var _ac=null;   /* ★[v108] AudioContext 는 하나만 만든다 — 경보마다 새로 만들면 6개 이후 브라우저가 막아 소리가 끊겼다 */
-function beep(){ if(!soundOn) return;
+function beep(){ if(!soundOn||SND_VOL<=0) return;
   try{ var AC=window.AudioContext||window.webkitAudioContext; _ac=_ac||new AC(); var ac=_ac; if(ac.state==='suspended'){ try{ ac.resume(); }catch(e){} }
     var o=ac.createOscillator(), g=ac.createGain();
-    o.connect(g); g.connect(ac.destination); o.frequency.value=880; g.gain.value=0.12;
+    o.connect(g); g.connect(ac.destination); o.frequency.value=880; g.gain.value=sndGain();
     o.start(); o.frequency.setValueAtTime(660,ac.currentTime+0.15);
     g.gain.exponentialRampToValueAtTime(0.001,ac.currentTime+0.45); o.stop(ac.currentTime+0.5);
   }catch(e){} }
+(function(){ var r=$('sndvol'), t=$('sndvolv'); if(!r) return; r.value=SND_VOL; t.textContent='음량 '+SND_VOL;
+  r.oninput=function(){ SND_VOL=parseInt(r.value,10)||0; t.textContent=SND_VOL?('음량 '+SND_VOL):'음소거'; try{ localStorage.setItem('caro_vol',String(SND_VOL)); }catch(e){} };
+  r.onchange=function(){ if(soundOn) beep(); else toast('소리가 꺼져 있습니다 — 옆의 "소리" 버튼을 켜면 이 크기로 울립니다'); }; })();
 $('sndbtn').onclick=function(){ soundOn=!soundOn;
   this.classList.toggle('on',soundOn); this.textContent=soundOn?'🔔 소리 켜짐':'🔔 소리 꺼짐';
   if(soundOn) beep(); };
@@ -637,6 +647,7 @@ function routeRows(rows){
   var out=[], seen={};
   rows.forEach(function(d){
     var ms=toMs(d.ts);
+    if(!ROUTE_RAW&&(d.ctx==='park'||d.ctx==='cand')) return;   /* ★[v110.29] 도로가 아닌 곳(주차장 안·실내 확인중)의 점은 지도 경로에 그리지 않는다 */
     if(typeof d.rt==='string'&&d.rt){ rtDecode(d.rt,ms).forEach(function(q){ var k=Math.round(q.t/500); if(seen[k]) return; seen[k]=1;
         out.push({lat:q.lat,lng:q.lng,ts:q.t,speed:q.v,gsrc:'rt'}); }); }
     else if(d.lat!=null&&d.lng!=null) out.push(d);
@@ -1419,7 +1430,7 @@ function drawLogs(){
       var mode=impactMode(e), park=(mode==='park'); if(park) parkHits++;
       var g=(e.shock!=null?Number(e.shock).toFixed(2):'?');
       var tag='<span class="tag imp '+(park?'park':'drive')+'">'+(park?'주차중충격':'주행중충격')+'</span>';
-      var tx=park?('🅿️ 주차중 '+g+'g 충격 · 뺑소니 의심'):('🚗 주행중 '+g+'g 충격');
+      var tx=park?('주차중 '+g+'g 충격 · 뺑소니 의심'):('주행중 '+g+'g 충격');
       row='<div class="ev'+(park?' danger':'')+'">'+tag+'<span>'+tx+'</span><span class="ts">'+fmtTs(e.ts)+'</span></div>';
     } else if(e.event==='overspeed'){
       row='<div class="ev"><span class="tag spd">과속</span><span>'+(Math.round(e.speed||0)+'km/h 과속')+'</span><span class="ts">'+fmtTs(e.ts)+'</span></div>';
@@ -1444,7 +1455,7 @@ function drawLogs(){
   });
   $('evlist').innerHTML=eh||'<div style="padding:18px;color:var(--muted);font-size:12px;">이 날짜엔 이벤트가 없습니다</div>';
   var ds=$('dsum'); if(ds){ ds.innerHTML=(selDate||'')+' · 이벤트 '+EVTS.length+'건 · 주행 '+TELE.length+'건'
-    +(parkHits>0?' · <b style="color:#ff7a68;">🅿️ 주차중 충격 '+parkHits+'건 확인요망</b>':''); }
+    +(parkHits>0?' · <b style="color:#ff7a68;">주차중 충격 '+parkHits+'건 확인요망</b>':''); }
   var th='';
   TELE.forEach(function(t){
     th+='<tr><td>'+fmtTs(t.ts)+'</td><td>'+flrOf(t)+'</td>'
@@ -1543,7 +1554,7 @@ function cleanRoute(rows){
    · 서버가 응답하지 않거나 맞출 도로가 없으면 예전처럼 GPS 점 그대로 그린다(기능이 멈추지 않는다).
    · 이미 맞춘 구간은 다시 묻지 않고, 새로 늘어난 꼬리만 이어서 맞춘다. 요청은 1.1초에 한 번을 넘기지 않는다.
    · 서 있는 차(주차 위치)는 도로에 붙이지 않는다 — 주차장·골목 안 실제 자리를 그대로 보여 준다. */
-var SNAP={on:true,cache:{},queue:[],busy:false,last:0,ok:0,fail:0};
+var SNAP={on:true,cache:{},queue:[],busy:false,last:0,ok:0,fail:0,off:0};
 try{ if(localStorage.getItem('caro_snap')==='0') SNAP.on=false; }catch(e){}
 var SNAP_URL='https://router.project-osrm.org/match/v1/driving/';
 function snapToggle(){ SNAP.on=!SNAP.on; try{ localStorage.setItem('caro_snap',SNAP.on?'1':'0'); }catch(e){} drawRoute(); }
@@ -1554,8 +1565,11 @@ function snapFetch(pts){
   var url=SNAP_URL+co+'?geometries=geojson&overview=full&gaps=split&tidy=true&radiuses='+pts.map(function(){return 35;}).join(';')+'&timestamps='+ts.join(';');
   var wait=Math.max(0,1100-(Date.now()-SNAP.last));
   return new Promise(function(res){ setTimeout(res,wait); }).then(function(){ SNAP.last=Date.now(); return fetch(url,{cache:'no-store'}); })
-    .then(function(r){ if(!r.ok) throw new Error('http '+r.status); return r.json(); })
-    .then(function(j){ if(!j||j.code!=='Ok'||!j.matchings||!j.matchings.length) throw new Error('nomatch');
+    .then(function(r){ return r.json().then(function(j){ return {ok:r.ok,st:r.status,j:j}; },function(){ throw new Error('http '+r.status); }); })
+    .then(function(x){ var j=x.j;
+      /* ★[v110.29] '맞출 도로가 없음'(도로가 아닌 곳의 점) 과 '서버가 응답하지 않음' 을 구분한다 */
+      if(j&&(j.code==='NoMatch'||j.code==='NoSegment'||(j.code==='Ok'&&(!j.matchings||!j.matchings.length)))) throw new Error('nomatch');
+      if(!x.ok||!j||j.code!=='Ok') throw new Error('http '+x.st);
       var line=[]; j.matchings.forEach(function(m){ ((m.geometry&&m.geometry.coordinates)||[]).forEach(function(c){ if(isFinite(c[0])&&isFinite(c[1])) line.push([c[1],c[0]]); }); });
       if(line.length<2) throw new Error('short'); return line; });
 }
@@ -1568,8 +1582,8 @@ function snapSeg(s){
   var th=snapThin(tail), ended=(Date.now()-s[s.length-1].t>120000);
   if(!e.pending&&(Date.now()-e.fail>600000)&&(th.length>=4||(ended&&th.length>=2))){
     e.pending=true; SNAP.queue.push({k:k,pts:(e.lastPt?[e.lastPt]:[]).concat(th)}); snapPump(); }
-  if(e.line.length<2) return raw(s);
-  return e.line.concat(raw(tail));
+  /* ★[v110.29] 도로 맞춤이 켜져 있으면 '도로에 맞춘 선' 만 그린다. 아직 못 맞춘 꼬리·맞출 도로가 없는 구간은 그리지 않는다(예전에는 GPS 점 그대로 그려 건물 위로 선이 지나갔다). */
+  return e.line.length>=2?e.line:[];
 }
 function snapPump(){
   if(SNAP.busy||!SNAP.queue.length) return; SNAP.busy=true;
@@ -1579,7 +1593,8 @@ function snapPump(){
   (function next(){
     if(idx>=chunks.length){ if(e){ e.line=e.line.concat(line); e.lastPt=P[P.length-1]; e.upto=P[P.length-1].t; } SNAP.ok++; done(); return; }
     snapFetch(chunks[idx]).then(function(l){ l.forEach(function(q){ line.push(q); }); idx++; next(); },
-      function(){ if(e){ if(line.length>=2){ var done_=chunks[idx-1]; e.line=e.line.concat(line); e.lastPt=done_[done_.length-1]; e.upto=e.lastPt.t; } e.fail=Date.now(); } SNAP.fail++; done(); });
+      function(er){ if(er&&er.message==='nomatch'){ SNAP.off++; idx++; next(); return; }   /* 도로가 아닌 곳 → 그 토막은 그리지 않고 다음으로 */
+        if(e){ if(line.length>=2){ var done_=chunks[idx-1]; e.line=e.line.concat(line); e.lastPt=done_[done_.length-1]; e.upto=e.lastPt.t; } e.fail=Date.now(); } SNAP.fail++; done(); });
   })();
 }
 /* 달리는 마커를 도로 선 위로 : 가장 가까운 도로 선분에 수직으로 내린다 (35m 안일 때만) */
@@ -1598,23 +1613,23 @@ function routeNote(){
   var old=ds.querySelector('.rt-note'); if(old) old.remove();
   var st=ROUTE_STAT, el=document.createElement('span'); el.className='rt-note';
   el.style.cssText='margin-left:8px;color:var(--muted2);';
-  el.innerHTML=' · 경로 '+(ROUTE_RAW?'<b>원본</b> '+st.raw+'점':'정리 '+st.kept+'/'+st.raw+'점 (튄 점 '+(st.jump+st.spike)+' · 정차 떨림 '+st.still+' 제외)')
-    +' <a href="#" onclick="routeToggleRaw();return false;" style="color:var(--gold,#c8a96e);text-decoration:underline;">'+(ROUTE_RAW?'정리된 경로 보기':'원본 보기')+'</a>'
-    +' · <a href="#" onclick="snapToggle();return false;" style="color:var(--gold,#c8a96e);text-decoration:underline;">도로 맞춤 '+(SNAP.on?'켬':'끔')+'</a>'+(SNAP.on?(' ('+(SNAP.busy||SNAP.queue.length?'맞추는 중':'완료')+(SNAP.fail?(' · 실패 '+SNAP.fail):'')+')'):'');
+  el.innerHTML=' · 경로 '+(ROUTE_RAW?'<b style="color:#ff8a7a">진단용 원본(걸러내지 않은 점 — 건물 위로 선이 지나갈 수 있음)</b> '+st.raw+'점':'정리 '+st.kept+'/'+st.raw+'점 (튄 점 '+(st.jump+st.spike)+' · 정차 떨림 '+st.still+' 제외)')
+    +' <a href="#" onclick="routeToggleRaw();return false;" style="color:var(--gold,#c8a96e);text-decoration:underline;">'+(ROUTE_RAW?'정리된 경로로 돌아가기':'진단용 원본 보기')+'</a>'
+    +' · <a href="#" onclick="snapToggle();return false;" style="color:var(--gold,#c8a96e);text-decoration:underline;">도로 맞춤 '+(SNAP.on?'켬':'끔')+'</a>'+(SNAP.on?(' ('+(SNAP.busy||SNAP.queue.length?'맞추는 중':'도로 위 구간만 표시')+(SNAP.off?(' · 도로가 아닌 곳 '+SNAP.off+'토막 숨김'):'')+(SNAP.fail?(' · 도로 지도 서버 응답 없음 '+SNAP.fail+'회 — 10분 뒤 다시 시도'):'')+')'):' (GPS 점 그대로 — 도로 밖도 그려짐)');
   ds.appendChild(el);
 }
 function drawRoute(){
   if(!mapKind||mapKind==='none') return;
   routeObjs.forEach(function(o){ try{ mapKind==='kakao'?o.setMap(null):lmap.removeLayer(o); }catch(e){} }); routeObjs=[];
   var RR=routeRows(TELE); var res=cleanRoute(RR); ROUTE_STAT=res.stat;
-  var segs=res.segs.map(function(s){ return snapSeg(s); });   /* ★[v110.24] 도로에 맞춘 선 (못 맞추면 GPS 점 그대로) */
+  var segs=res.segs.map(function(s){ return snapSeg(s); }).filter(function(s){ return s&&s.length>=2; });   /* ★[v110.29] 도로에 맞춘 선만 (못 맞춘 구간은 그리지 않는다) */
   if(ROUTE_RAW){ var raw=RR.filter(function(t){return t.lat!=null&&t.lng!=null;}).sort(function(a,b){return toMs(a.ts)-toMs(b.ts);}).map(function(t){return [Number(t.lat),Number(t.lng)];}); segs=raw.length>=2?[raw]:[]; }
   /* 하루 종일 정차(이동 없음) → 선 대신 머문 위치 하나만 */
   var stay=null;
   if(!segs.length && !ROUTE_RAW){ var good=RR.filter(function(t){return t.lat!=null&&t.lng!=null;}).map(function(t){return {lat:Number(t.lat),lng:Number(t.lng)};});
     if(good.length){ var la=good.map(function(p){return p.lat;}).sort(), ln=good.map(function(p){return p.lng;}).sort(); stay=[la[la.length>>1],ln[ln.length>>1]]; } }
   /* ★[v110.17] 기록이 빠진 구간 : 두 구간 사이가 2시간 안쪽이면 점선으로 잇는다 (실제로 지나간 길은 모른다는 표시) */
-  var gapsL=[]; if(!ROUTE_RAW) for(var gi=0;gi+1<res.segs.length;gi++){ var ga=res.segs[gi][res.segs[gi].length-1], gb=res.segs[gi+1][0];
+  var gapsL=[]; if(!ROUTE_RAW&&!SNAP.on) for(var gi=0;gi+1<res.segs.length;gi++){ var ga=res.segs[gi][res.segs[gi].length-1], gb=res.segs[gi+1][0];
     if(ga&&gb&&gb.t-ga.t<7200000&&_hv(ga,gb)>30) gapsL.push([[ga.lat,ga.lng],[gb.lat,gb.lng]]); }
   var imps=EVTS.filter(function(e){return e.event==='impact'&&e.lat!=null;});
   routeNote();
@@ -1626,16 +1641,19 @@ function drawRoute(){
     segs.forEach(function(sg){ var pl=new kakao.maps.Polyline({path:sg.map(function(p){return new kakao.maps.LatLng(p[0],p[1]);}),strokeWeight:5,strokeColor:col,strokeOpacity:0.9}); pl.setMap(kmap); routeObjs.push(pl); });
     gapsL.forEach(function(sg){ var pl=new kakao.maps.Polyline({path:sg.map(function(p){return new kakao.maps.LatLng(p[0],p[1]);}),strokeWeight:3,strokeColor:'#8a93a0',strokeOpacity:0.8,strokeStyle:'shortdash'}); pl.setMap(kmap); routeObjs.push(pl); });
     var add=function(pos,html,ya){ var ov=new kakao.maps.CustomOverlay({position:new kakao.maps.LatLng(pos[0],pos[1]),content:html,yAnchor:ya||1.4}); ov.setMap(kmap); routeObjs.push(ov); };
-    if(s0&&!ROUTE_RAW) add(s0,tag('출발','#2e9e5b')); if(sl&&!ROUTE_RAW) add(sl,tag('도착','#d9534f'));
+    if(s0&&!ROUTE_RAW) add(s0,tag('출발','#2e9e5b'));   /* ★[v110.30] '도착' 표시는 없앴다 — 달리는 동안 경로 끝을 따라다니며 계속 떴다 */
     if(stay) add(stay,tag('🅿️ 머문 위치 (이동 없음)','#5a6270'));
-    imps.forEach(function(e){ add([Number(e.lat),Number(e.lng)],tag('💥 '+(e.shock!=null?Number(e.shock).toFixed(1)+'g':'충격'),'#ff5a4a')); });
+    /* ★[v110.30] 충격 표시를 단순하게 : 작은 점 + 흰 바탕의 얇은 글자표 (이모지·빨간 알약 없앰) */
+    var impTag=function(txt){ return '<div style="position:relative;width:8px;height:8px;pointer-events:none"><span style="position:absolute;left:0;top:0;width:8px;height:8px;box-sizing:border-box;border-radius:50%;background:#e0705e;border:1.5px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.25)"></span>'
+      +'<span style="position:absolute;left:12px;top:-5px;background:rgba(255,255,255,.94);color:#3a3f47;font-size:10px;line-height:15px;font-weight:600;padding:0 5px;border-radius:4px;border:1px solid rgba(0,0,0,.14);white-space:nowrap">'+txt+'</span></div>'; };
+    imps.forEach(function(e){ add([Number(e.lat),Number(e.lng)],impTag('충격 '+(e.shock!=null?Number(e.shock).toFixed(1)+'g':'')),0.5); });
   } else {
     segs.forEach(function(sg){ routeObjs.push(L.polyline(sg,{color:col,weight:5,opacity:0.9}).addTo(lmap)); });
     gapsL.forEach(function(sg){ routeObjs.push(L.polyline(sg,{color:'#8a93a0',weight:3,opacity:0.8,dashArray:'6 8'}).addTo(lmap)); });
     var mk=function(pos,txt,c){ routeObjs.push(L.circleMarker(pos,{radius:7,color:c,fillColor:c,fillOpacity:0.9}).bindTooltip(txt,{permanent:true,direction:'top'}).addTo(lmap)); };
-    if(s0&&!ROUTE_RAW) mk(s0,'출발','#2e9e5b'); if(sl&&!ROUTE_RAW) mk(sl,'도착','#d9534f');
+    if(s0&&!ROUTE_RAW) mk(s0,'출발','#2e9e5b');
     if(stay) mk(stay,'머문 위치 (이동 없음)','#5a6270');
-    imps.forEach(function(e){ routeObjs.push(L.circleMarker([Number(e.lat),Number(e.lng)],{radius:7,color:'#ff5a4a',fillColor:'#ff5a4a',fillOpacity:0.8}).bindTooltip('💥 '+(e.shock!=null?Number(e.shock).toFixed(1)+'g':'충격')).addTo(lmap)); });
+    imps.forEach(function(e){ routeObjs.push(L.circleMarker([Number(e.lat),Number(e.lng)],{radius:4,color:'#ffffff',weight:1.5,fillColor:'#e0705e',fillOpacity:1}).bindTooltip('충격 '+(e.shock!=null?Number(e.shock).toFixed(1)+'g':'')).addTo(lmap)); });
   }
 }
 function csvExport(){
