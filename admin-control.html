@@ -347,7 +347,7 @@ body.ops .kpis, body.ops .main, body.ops .bottom{display:none!important;}
     <button class="ntab on" id="nt-live" onclick="switchView('live')">실시간 관제</button>
     <button class="ntab" id="nt-ops" onclick="switchView('ops')">운영 관리</button>
   </div>
-  <span class="sync off" id="sync">CONNECTING…</span><span id="pver" title="이 화면의 버전" style="font-size:11px;color:var(--muted);letter-spacing:.5px;white-space:nowrap;">v110.24</span>
+  <span class="sync off" id="sync">CONNECTING…</span><span id="pver" title="이 화면의 버전" style="font-size:11px;color:var(--muted);letter-spacing:.5px;white-space:nowrap;">v110.26</span>
   <span class="clock" id="clock">--:--:--</span>
   <span class="adm" id="adm">—</span>
   <button class="lgout" id="mfabtn" onclick="if(window.CaroMFA)CaroMFA.openSetup()">🔐 2단계 인증</button>
@@ -473,7 +473,7 @@ body.ops .kpis, body.ops .main, body.ops .bottom{display:none!important;}
 <script>
 /* ★[v110.20] 화면 버전 자가 점검 — 태블릿 앱·브라우저가 옛 화면을 붙잡고 있으면(캐시) 켤 때·다시 볼 때 스스로 새로 받는다.
    로그인 전 화면에서도 동작한다(예전 자동 업데이트는 로그인 칸에 글자가 들어 있으면 '입력 중' 으로 보고 미뤘다). 같은 버전으로는 3번까지만 시도한다. */
-var CARO_PAGE_VER='110.24';
+var CARO_PAGE_VER='110.26';
 function caroSelfCheck(){
   try{
     fetch('version.txt?t='+Date.now(),{cache:'no-store'}).then(function(r){ return r.ok?r.text():''; }).then(function(t){
@@ -774,6 +774,8 @@ function mapDraw(){
   if(v){
     if(v.ctx==='park'||v.ctx==='cand') pill=v.name+' · 🅿 '+(v.ctx==='park'?('주차장 안 · '+floorStr(v.floor)):'실내 확인중')+(v.gsrc==='dr'?' (추측항법 위치)':' (입구 위치 표시)');   /* ★[v110.13] */
     else if(v.gsrc==='dr') pill=v.name+' · 🧭 지하/터널 추정 이동중 (GPS 없음 · 추측항법)';
+    else if(live&&v.gsrc==='wifi') pill=v.name+' · 📶 실내 — 주변 공유기로 잰 위치'+(v.wfAcc?(' (약 ±'+Math.round(v.wfAcc)+'m)'):'');   /* ★[v110.26] */
+    else if(live&&v.gWeak) pill=v.name+' · ⚠ 실내·지하(GPS 부정확) — 마지막 믿을 만한 자리';   /* ★[v110.25] */
     else if(live) pill=v.name+' · 🛰 실시간 추적'+((v.ctx==='out'&&typeof v.grade==='number'&&Math.abs(v.grade)>=3.5)?(' · '+gradeStr(v.grade)+(typeof v.roadAlt==='number'?' ('+(v.roadAlt>=0?'+':'')+v.roadAlt.toFixed(0)+'m)':'')):'');
     else if(hasPos) pill=v.name+' · ⚠ GPS 끊김 (마지막 위치 · 위성'+(v.sats!=null?v.sats:0)+'개)';
     else if(IDMAP[v.id]) pill=v.name+' · GPS 탐색중 (위치 없음)';
@@ -855,7 +857,7 @@ function render(){
     /* ★[v110.13] 정밀 측정 펌웨어 : 층은 주차장 안에서만, 실외 언덕은 '주행 고도·경사' 로 따로 */
     var sub=function(id,t){ var e=$(id); if(e) e.textContent=t||'\u00a0'; };
     sub('lv-moves', ms_?(ms_[2]+(mstDur(v)?(' · '+mstDur(v)):'')):(v.lastSeen?(ago(v.lastSeen)+' 수신'):'')); sub('lv-spds', (typeof v.heading==='number')?('방위 '+Math.round(v.heading)+'°'):'');
-    sub('lv-sats', (typeof v.posAcc==='number'&&v.posAcc>0)?('위치 ±'+Math.round(v.posAcc)+' m'):''); sub('lv-srcs', v.gpsLive?'실시간':((typeof v.lat==='number')?'마지막 위치':''));
+    sub('lv-sats', v.gsrc==='wifi'?('와이파이 ±'+Math.round(v.wfAcc||30)+' m'):v.gWeak?'신호 약함(실내)':((typeof v.posAcc==='number'&&v.posAcc>0)?('위치 ±'+Math.round(v.posAcc)+' m'):'')); sub('lv-srcs', v.gpsLive?'실시간':((typeof v.lat==='number')?'마지막 위치':''));
     sub('lv-bats', (typeof v.vbat==='number')?(v.vbat<11.6?'방전 주의':(v.vbat>13.2?'충전 중':'정상')):''); sub('lv-accs', (typeof v.accOffSec==='number'&&!v.acc&&v.accOffSec>0)?('끈 지 '+(v.accOffSec<3600?Math.floor(v.accOffSec/60)+'분':Math.floor(v.accOffSec/3600)+'시간')):'');
     if(v.ctx){
       if(v.ctx==='park'){ sub('lv-flrs','주차장'+(v.lift?' · 승강기':'')+(typeof v.floorConf==='number'?' · 신뢰 '+v.floorConf+'%':'')); $('lv-flr').textContent=floorStr(v.floor); }
@@ -872,6 +874,7 @@ function render(){
     if(v.gsrc==='dr'){ src.textContent=(v.ctx==='park'||v.ctx==='cand')?'추측항법(주차장)':'추측항법(터널)'; src.className='v use'; }
     else if(!v.gpsLive && typeof v.lat==='number'){ src.textContent='GPS 끊김'; src.className='v bad'; }
     else if(v.gsrc==='dr'){ src.textContent='추측항법'; src.className='v use'; }
+    else if(v.gsrc==='wifi'){ src.textContent='와이파이'; src.className='v use'; }
     else if(v.sats>=4||v.gsrc==='gnss'||v.gsrc==='gnss+dr'){ src.textContent='GPS'; src.className='v gold'; }
     else { src.textContent='—'; src.className='v'; }
     /* [v9] 배터리·시동 */
@@ -899,7 +902,7 @@ function renderDiag(v){
     ['통신 상태', v.online?(v.park?'<span class="g">● 온라인 (주차 절전 · 5분 보고)</span>':'<span class="g">● 온라인</span>'):'<span class="r">● 오프라인</span>'],
     ['마지막 수신', '<span class="gd">'+ago(v.lastSeen)+'</span>'],
     ['GPS', (typeof v.lat==='number')?('<span class="g">정상 · 위성'+(v.sats||0)+'</span>'):'<span class="y">탐색중</span>'],
-    ['위치 출처', {gnss:'<span class="g">위성(GNSS)</span>','gnss+dr':'<span class="g">위성+추측항법</span>',dr:'<span class="b">추측항법(실내)</span>',none:'<span class="y">없음</span>'}[v.gsrc]||'<span class="y">—</span>'],
+    ['위치 출처', {wifi:'<span class="b">와이파이 측량(실내)</span>',gnss:'<span class="g">위성(GNSS)</span>','gnss+dr':'<span class="g">위성+추측항법</span>',dr:'<span class="b">추측항법(실내)</span>',none:'<span class="y">없음</span>'}[v.gsrc]||'<span class="y">—</span>'],
     ['기압계(층)', (typeof v.alt==='number')?'<span class="g">정상</span>':'<span class="r">응답없음</span>'],
     ['지상기준 학습', v.groundSet?'<span class="g">완료</span>':'<span class="y">대기</span>'],
     ['측정 상태', v.ctx?({out:'<span class="g">실외 (층 안 셈)</span>',cand:'<span class="y">실내 확인중</span>',park:'<span class="gd">주차장 안'+(v.lift?' · 승강기':'')+'</span>',tunnel:'<span class="b">터널·지하차도 (층 안 셈)</span>',unknown:'<span class="y">기준 없음 (위성 대기)</span>'}[v.ctx]||esc(v.ctx)):'<span class="y">옛 펌웨어 (정밀 측정 없음)</span>'],
@@ -911,7 +914,7 @@ function renderDiag(v){
     ['지하 위치(추측항법)', (v.gFusion===false)?'<span class="gd">꺼 둠 (기기 고정 후 켜기)</span>':v.drOk?(({0:'<span class="y">보정 중 · 밖에서 주행 필요</span>',1:'<span class="g">준비됨</span>',2:'<span class="y">일시 중지</span>',3:'<span class="r">꺼짐</span>'})[v.drMode]||'<span class="gd">확인 중</span>'):'<span class="gd">—</span>'],
     /* ★[v110.17] GPS 수신 상태 : 위성으로 잡은 위치인지, 모듈을 몇 번 다시 시작시켰는지, 안테나 신호 */
     ['GPS 수신', (typeof v.gfix==='number')?('<span class="'+((v.gfix>=2&&v.gfix<=4)?'g':'r')+'">'+(({0:'위성 없음',1:'추측항법만',2:'2D',3:'3D',4:'위성+관성',5:'시각만'})[v.gfix]||v.gfix)+'</span>'
-        +((typeof v.gWd==='number'&&v.gWd>0)?(' · 재시작 '+v.gWd+'회'):'')+((typeof v.gAgc==='number'&&v.gAgc>=0)?(' · 증폭 '+Math.round(v.gAgc/81.91)+'%'):'')+((typeof v.rtPend==='number'&&v.rtPend>40)?(' · 밀린 경로 '+v.rtPend+'점'):'')+(v.gCfg===1?' · 위성 4종(GPS·갈릴레오·베이더우·QZSS)':(v.gCfg===-1?' · 위성 기본(GPS·글로나스)':''))+((typeof v.gDiff==='boolean')?(v.gDiff?' · <span class="g">보정 신호 사용 중</span>':' · 보정 신호 없음'):'')+((typeof v.gaOn==='boolean')?(' · 위치 고정 '+(v.gaOn?('켜짐(평균 '+(v.gaN||0)+'회)'):'꺼짐(이동 중·자리 잡는 중)')+((v.gaRel>0)?(' · 풀림 '+v.gaRel+'회('+(({1:'속도',2:'멀어짐',3:'서행'})[v.gaWhy]||'—')+')'):' · 풀림 0회')+((v.gaFix>0)?(' · 바로잡음 '+v.gaFix+'회'):'')+((v.gaD!=null&&v.gaD>=10)?(' · <span class="r">고정 위치와 GPS 가 '+Math.round(v.gaD)+'m 다름(바로잡는 중)</span>'):'')):'')   /* ★[v110.21] 정차 위치 고정 상태 */):'<span class="gd">—</span>'],   /* ★[v110.19] gCfg = 위성군 설정 결과 */
+        +((typeof v.gWd==='number'&&v.gWd>0)?(' · 재시작 '+v.gWd+'회'):'')+((typeof v.gAgc==='number'&&v.gAgc>=0)?(' · 증폭 '+Math.round(v.gAgc/81.91)+'%'):'')+((typeof v.rtPend==='number'&&v.rtPend>40)?(' · 밀린 경로 '+v.rtPend+'점'):'')+(v.gCfg===1?' · 위성 4종(GPS·갈릴레오·베이더우·QZSS)':(v.gCfg===-1?' · 위성 기본(GPS·글로나스)':''))+((v.gSky!=null)?(' · 신호 센 위성 '+v.gSky+'개'):'')+(v.gWeak?(v.gsrc==='wifi'?(' · <span class="b">하늘이 안 보이는 곳 — 주변 공유기 '+(v.wfUsed||0)+'개로 잰 위치 사용 중'+(v.wfAcc?(' (약 ±'+Math.round(v.wfAcc)+'m)'):'')+'</span>'):' · <span class="r">⚠ 하늘이 안 보이는 곳(실내·지하·건물 틈) — GPS 가 반사 신호로 계산해 수십~100m 틀릴 수 있어, 마지막으로 믿을 만했던 자리에 고정해 둠 (이 근처 공유기를 아직 못 배움)</span>'):'')+((v.wfN!=null)?(' · 기억한 공유기 '+v.wfN+'개(지금 '+(v.wfSeen||0)+'개 들림)'):'')+((typeof v.gDiff==='boolean')?(v.gDiff?' · <span class="g">보정 신호 사용 중</span>':' · 보정 신호 없음'):'')+((typeof v.gaOn==='boolean')?(' · 위치 고정 '+(v.gaOn?('켜짐(평균 '+(v.gaN||0)+'회)'):'꺼짐(이동 중·자리 잡는 중)')+((v.gaRel>0)?(' · 풀림 '+v.gaRel+'회('+(({1:'속도',2:'멀어짐',3:'서행'})[v.gaWhy]||'—')+')'):' · 풀림 0회')+((v.gaFix>0)?(' · 바로잡음 '+v.gaFix+'회'):'')+((v.gaD!=null&&v.gaD>=10)?(' · <span class="r">고정 위치와 GPS 가 '+Math.round(v.gaD)+'m 다름(바로잡는 중)</span>'):'')):'')   /* ★[v110.21] 정차 위치 고정 상태 */):'<span class="gd">—</span>'],   /* ★[v110.19] gCfg = 위성군 설정 결과 */
     ['자이로(충격)', (typeof v.heading==='number')?'<span class="g">정상</span>':'<span class="r">응답없음</span>'],
     ['펌웨어', '<span class="gd">'+esc(v.fw||'—')+'</span>'+(v.ota?(' · 원격 업데이트: '+esc(v.ota)):'')],   /* ★[v110.23] */
   ];
@@ -1293,7 +1296,7 @@ function remap(){
     v.ctx=(typeof d.ctx==='string')?d.ctx:''; v.inPark=(d.inPark===true); v.altErr=num(d.altErr); v.vz=num(d.vz); v.floorConf=num(d.floorConf);
     v.psess=num(d.psess); v.inSec=num(d.inSec); v.pathM=num(d.pathM); v.turn=num(d.turn); v.relOk=(d.relOk===true); v.relE=num(d.relE); v.relN=num(d.relN);
     v.drOk=(d.drOk===true); v.drMode=num(d.drMode); v.drAlign=num(d.drAlign);
-    v.gfix=num(d.gfix); v.gWd=num(d.gWd); v.gAgc=num(d.gAgc); v.rtPend=num(d.rtPend); v.gCfg=num(d.gCfg); v.ota=(typeof d.ota==='string')?d.ota:''; v.gDiff=(typeof d.gDiff==='boolean')?d.gDiff:null; v.gaOn=(typeof d.gaOn==='boolean')?d.gaOn:null; v.gaN=num(d.gaN); v.gaRel=num(d.gaRel); v.gaWhy=num(d.gaWhy); v.gaFix=num(d.gaFix); v.gaD=num(d.gaD);   /* ★[v110.21] */ v.gFusion=(d.gFusion===false)?false:(d.gFusion===true?true:null);
+    v.gfix=num(d.gfix); v.gWd=num(d.gWd); v.gAgc=num(d.gAgc); v.rtPend=num(d.rtPend); v.gCfg=num(d.gCfg); v.gSky=num(d.gSky); v.wfN=num(d.wfN); v.wfSeen=num(d.wfSeen); v.wfAcc=num(d.wfAcc); v.wfUsed=num(d.wfUsed); v.gWeak=(d.gWeak===true); v.ota=(typeof d.ota==='string')?d.ota:''; v.gDiff=(typeof d.gDiff==='boolean')?d.gDiff:null; v.gaOn=(typeof d.gaOn==='boolean')?d.gaOn:null; v.gaN=num(d.gaN); v.gaRel=num(d.gaRel); v.gaWhy=num(d.gaWhy); v.gaFix=num(d.gaFix); v.gaD=num(d.gaD);   /* ★[v110.21] */ v.gFusion=(d.gFusion===false)?false:(d.gFusion===true?true:null);
     v.lift=(d.lift===true); v.posAcc=num(d.posAcc); v.hdop=num(d.hdop); v.floorH=num(d.floorH);
     v.roadAlt=num(d.roadAlt); v.grade=num(d.grade); v.elev=num(d.elev);   /* 주행 고도(출발점 대비 m)·경사(%)·해발(m) — 층과 별개 */
     v.heading=num(d.heading); v.speed=num(d.speed); v.shock=num(d.shock);
