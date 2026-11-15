@@ -82,7 +82,7 @@ button{font-family:inherit;cursor:pointer;}
 .vcard .nm .bell.on{opacity:1;}
 .vcard .sub{font-size:11.5px;color:var(--muted);margin-top:4px;display:flex;gap:10px;flex-wrap:wrap;}
 .vcard .sub b{color:var(--gold-soft);font-weight:500;}
-.vcard .alerttag{font-size:10.5px;color:var(--bad);border:1px solid rgba(224,112,94,.4);border-radius:6px;padding:1px 6px;}
+.vcard .alerttag{font-size:10.5px;color:var(--bad);border:1px solid rgba(224,112,94,.4);border-radius:6px;padding:1px 6px;white-space:nowrap;flex:0 0 auto;}   /* ★[v110.27] 차 이름이 길어도 경고 딱지가 두 줄로 쪼개지지 않게 */
 
 /* ── 지도 + 라이브 ── */
 .mapbox{position:relative;height:56vh;min-height:420px;background:var(--panel2);}
@@ -96,7 +96,8 @@ button{font-family:inherit;cursor:pointer;}
 .mapstat .why{color:var(--warn);display:block;margin-top:3px;}
 .mapstat code{background:rgba(255,255,255,.07);padding:1px 5px;border-radius:4px;color:var(--txt);}
 .mappill{position:absolute;left:12px;top:12px;z-index:20;font-size:12px;background:rgba(24,26,30,.88);
-  border:1px solid var(--border2);padding:6px 12px;border-radius:9px;color:var(--gold-soft);backdrop-filter:blur(4px);}
+  border:1px solid var(--border2);padding:6px 12px;border-radius:9px;color:var(--gold-soft);backdrop-filter:blur(4px);
+  max-width:calc(100% - 176px);white-space:normal;word-break:keep-all;overflow-wrap:anywhere;line-height:1.4;box-sizing:border-box;}   /* ★[v110.27] 글이 길어도 오른쪽 '따라가기' 버튼을 덮지 않는다(버튼 폭만큼 비우고 줄바꿈). 정확한 폭은 fitPill() 이 버튼 실제 크기로 다시 맞춘다 */
 /* ★ 차량 따라가기(추적) 토글 버튼 */
 .followbtn{position:absolute;right:12px;top:12px;z-index:20;font-size:12px;font-weight:800;cursor:pointer;
   background:rgba(24,26,30,.88);border:1px solid var(--border2);padding:6px 12px;border-radius:9px;
@@ -323,7 +324,7 @@ body.ops .kpis, body.ops .main, body.ops .bottom{display:none!important;}
   .logdate{gap:6px;flex-wrap:wrap;}
   .dsum{margin-left:0;width:100%;}
   .followbtn{font-size:11px;padding:5px 9px;top:8px;right:8px;}
-  .mappill{font-size:11px;left:8px;top:8px;padding:5px 9px;max-width:60vw;}
+  .mappill{font-size:11px;left:8px;top:8px;padding:5px 9px;max-width:calc(100% - 140px);}
   .loglist,.tscroll{max-height:340px;}
 }
 </style>
@@ -347,7 +348,7 @@ body.ops .kpis, body.ops .main, body.ops .bottom{display:none!important;}
     <button class="ntab on" id="nt-live" onclick="switchView('live')">실시간 관제</button>
     <button class="ntab" id="nt-ops" onclick="switchView('ops')">운영 관리</button>
   </div>
-  <span class="sync off" id="sync">CONNECTING…</span><span id="pver" title="이 화면의 버전" style="font-size:11px;color:var(--muted);letter-spacing:.5px;white-space:nowrap;">v110.26</span>
+  <span class="sync off" id="sync">CONNECTING…</span><span id="pver" title="이 화면의 버전" style="font-size:11px;color:var(--muted);letter-spacing:.5px;white-space:nowrap;">v110.28</span>
   <span class="clock" id="clock">--:--:--</span>
   <span class="adm" id="adm">—</span>
   <button class="lgout" id="mfabtn" onclick="if(window.CaroMFA)CaroMFA.openSetup()">🔐 2단계 인증</button>
@@ -473,7 +474,7 @@ body.ops .kpis, body.ops .main, body.ops .bottom{display:none!important;}
 <script>
 /* ★[v110.20] 화면 버전 자가 점검 — 태블릿 앱·브라우저가 옛 화면을 붙잡고 있으면(캐시) 켤 때·다시 볼 때 스스로 새로 받는다.
    로그인 전 화면에서도 동작한다(예전 자동 업데이트는 로그인 칸에 글자가 들어 있으면 '입력 중' 으로 보고 미뤘다). 같은 버전으로는 3번까지만 시도한다. */
-var CARO_PAGE_VER='110.26';
+var CARO_PAGE_VER='110.28';
 function caroSelfCheck(){
   try{
     fetch('version.txt?t='+Date.now(),{cache:'no-store'}).then(function(r){ return r.ok?r.text():''; }).then(function(t){
@@ -775,13 +776,14 @@ function mapDraw(){
     if(v.ctx==='park'||v.ctx==='cand') pill=v.name+' · 🅿 '+(v.ctx==='park'?('주차장 안 · '+floorStr(v.floor)):'실내 확인중')+(v.gsrc==='dr'?' (추측항법 위치)':' (입구 위치 표시)');   /* ★[v110.13] */
     else if(v.gsrc==='dr') pill=v.name+' · 🧭 지하/터널 추정 이동중 (GPS 없음 · 추측항법)';
     else if(live&&v.gsrc==='wifi') pill=v.name+' · 📶 실내 — 주변 공유기로 잰 위치'+(v.wfAcc?(' (약 ±'+Math.round(v.wfAcc)+'m)'):'');   /* ★[v110.26] */
+    else if(live&&v.gaHeld) pill=v.name+' · 🅿 실내·지하 — 들어와 선 자리에 고정 (약 ±12m)';   /* ★[v110.27] 기기가 '달려와 선 자리' 에 임시로 고정해 둔 상태 */
     else if(live&&v.gWeak) pill=v.name+' · ⚠ 실내·지하(GPS 부정확) — 마지막 믿을 만한 자리';   /* ★[v110.25] */
     else if(live) pill=v.name+' · 🛰 실시간 추적'+((v.ctx==='out'&&typeof v.grade==='number'&&Math.abs(v.grade)>=3.5)?(' · '+gradeStr(v.grade)+(typeof v.roadAlt==='number'?' ('+(v.roadAlt>=0?'+':'')+v.roadAlt.toFixed(0)+'m)':'')):'');
     else if(hasPos) pill=v.name+' · ⚠ GPS 끊김 (마지막 위치 · 위성'+(v.sats!=null?v.sats:0)+'개)';
     else if(IDMAP[v.id]) pill=v.name+' · GPS 탐색중 (위치 없음)';
     else pill=v.name+' · 기기 미연결 (실시간 위치 없음)';
   }
-  $('mappill').textContent=pill;
+  $('mappill').textContent=pill; fitPill();
   if(selPos){
     var chg=(selId!==lastSel); lastSel=selId;
     try{
@@ -796,6 +798,10 @@ function mapDraw(){
     }catch(e){}
   }
 }
+/* ★[v110.27] 지도 위 안내 띠가 '따라가기' 버튼과 겹치지 않게 : 버튼의 실제 폭을 재서 띠의 최대 폭을 정한다 (글자 크기·화면 폭이 바뀌어도 맞음) */
+function fitPill(){ try{ var p=$('mappill'), b=$('followBtn'); if(!p||!b||!p.parentNode) return; var w=p.parentNode.clientWidth, bw=b.offsetWidth||0, l=p.offsetLeft||12;
+  if(w>0) p.style.maxWidth=Math.max(120, w-bw-l-24)+'px'; }catch(e){} }
+window.addEventListener('resize',fitPill);
 /* ═══════════ 차량 따라가기(추적) 토글 ═══════════
    ON  : 차량이 이동하면 지도가 계속 중앙에 두고 부드럽게 따라감(운행 감시용)
    OFF : 자유롭게 확대/이동해서 주변을 살펴볼 수 있음(화면 밖으로 나가면 그때만 복귀)
@@ -804,7 +810,7 @@ var followMode=true;
 function toggleFollow(){ setFollow(!followMode); if(followMode) mapDraw(); }
 function setFollow(on){
   followMode=on;
-  var b=$('followBtn'); if(b){ b.textContent=on?'🎯 따라가기 ON':'🎯 따라가기 OFF'; b.classList.toggle('on',on); }
+  var b=$('followBtn'); if(b){ b.textContent=on?'🎯 따라가기 ON':'🎯 따라가기 OFF'; b.classList.toggle('on',on); fitPill(); }
 }
 function bindMapDrag(){
   try{
@@ -857,7 +863,7 @@ function render(){
     /* ★[v110.13] 정밀 측정 펌웨어 : 층은 주차장 안에서만, 실외 언덕은 '주행 고도·경사' 로 따로 */
     var sub=function(id,t){ var e=$(id); if(e) e.textContent=t||'\u00a0'; };
     sub('lv-moves', ms_?(ms_[2]+(mstDur(v)?(' · '+mstDur(v)):'')):(v.lastSeen?(ago(v.lastSeen)+' 수신'):'')); sub('lv-spds', (typeof v.heading==='number')?('방위 '+Math.round(v.heading)+'°'):'');
-    sub('lv-sats', v.gsrc==='wifi'?('와이파이 ±'+Math.round(v.wfAcc||30)+' m'):v.gWeak?'신호 약함(실내)':((typeof v.posAcc==='number'&&v.posAcc>0)?('위치 ±'+Math.round(v.posAcc)+' m'):'')); sub('lv-srcs', v.gpsLive?'실시간':((typeof v.lat==='number')?'마지막 위치':''));
+    sub('lv-sats', v.gsrc==='wifi'?('와이파이 ±'+Math.round(v.wfAcc||30)+' m'):v.gaHeld?'실내 — 선 자리 고정':v.gWeak?'신호 약함(실내)':((typeof v.posAcc==='number'&&v.posAcc>0)?('위치 ±'+Math.round(v.posAcc)+' m'):'')); sub('lv-srcs', v.gpsLive?'실시간':((typeof v.lat==='number')?'마지막 위치':''));
     sub('lv-bats', (typeof v.vbat==='number')?(v.vbat<11.6?'방전 주의':(v.vbat>13.2?'충전 중':'정상')):''); sub('lv-accs', (typeof v.accOffSec==='number'&&!v.acc&&v.accOffSec>0)?('끈 지 '+(v.accOffSec<3600?Math.floor(v.accOffSec/60)+'분':Math.floor(v.accOffSec/3600)+'시간')):'');
     if(v.ctx){
       if(v.ctx==='park'){ sub('lv-flrs','주차장'+(v.lift?' · 승강기':'')+(typeof v.floorConf==='number'?' · 신뢰 '+v.floorConf+'%':'')); $('lv-flr').textContent=floorStr(v.floor); }
@@ -902,7 +908,7 @@ function renderDiag(v){
     ['통신 상태', v.online?(v.park?'<span class="g">● 온라인 (주차 절전 · 5분 보고)</span>':'<span class="g">● 온라인</span>'):'<span class="r">● 오프라인</span>'],
     ['마지막 수신', '<span class="gd">'+ago(v.lastSeen)+'</span>'],
     ['GPS', (typeof v.lat==='number')?('<span class="g">정상 · 위성'+(v.sats||0)+'</span>'):'<span class="y">탐색중</span>'],
-    ['위치 출처', {wifi:'<span class="b">와이파이 측량(실내)</span>',gnss:'<span class="g">위성(GNSS)</span>','gnss+dr':'<span class="g">위성+추측항법</span>',dr:'<span class="b">추측항법(실내)</span>',none:'<span class="y">없음</span>'}[v.gsrc]||'<span class="y">—</span>'],
+    ['위치 출처', ({wifi:'<span class="b">와이파이 측량(실내)</span>',gnss:'<span class="g">위성(GNSS)</span>','gnss+dr':'<span class="g">위성+추측항법</span>',dr:'<span class="b">추측항법(실내)</span>',none:'<span class="y">없음</span>'}[v.gsrc]||'<span class="y">—</span>')+(v.gaHeld?' <span class="b">· 실내: 들어와 선 자리에 고정</span>':'')],
     ['기압계(층)', (typeof v.alt==='number')?'<span class="g">정상</span>':'<span class="r">응답없음</span>'],
     ['지상기준 학습', v.groundSet?'<span class="g">완료</span>':'<span class="y">대기</span>'],
     ['측정 상태', v.ctx?({out:'<span class="g">실외 (층 안 셈)</span>',cand:'<span class="y">실내 확인중</span>',park:'<span class="gd">주차장 안'+(v.lift?' · 승강기':'')+'</span>',tunnel:'<span class="b">터널·지하차도 (층 안 셈)</span>',unknown:'<span class="y">기준 없음 (위성 대기)</span>'}[v.ctx]||esc(v.ctx)):'<span class="y">옛 펌웨어 (정밀 측정 없음)</span>'],
@@ -1058,7 +1064,7 @@ function pkDraw(){
   var k0=Math.floor(a0/FH-0.35), k1=Math.ceil(a1/FH+0.35); if(k1-k0<2){ if(a1>1) k1=k0+2; else k0=k1-2; }
   var zLo=k0*FH, zHi=k1*FH;
   /* 화면 배치 */
-  var padL=18, padR=112, padT=26, padB=30, el=pkTop?1.0:0.36;
+  var padL=18, padR=112, padT=(live?30:46), padB=30, el=pkTop?1.0:0.36;   /* ★[v110.27] 머리글이 한 줄(주차 중)·두 줄(지난 기록)일 때 그만큼 위를 비운다 — 원기둥 윗선과 글자가 겹치던 것 */
   var cw=W-padL-padR, s=Math.min((cw/2-6)/R, (H-padT-padB)*(pkTop?0.5:0.30)/(R*el));
   var ry=R*s*el, zs=pkTop?0:Math.min((H-padT-padB-2*ry)/(zHi-zLo), 150/FH);   /* 높이는 화면에 맞춰 늘린다(층 사이가 잘 보이게) — 한 층 최대 150px */
   var cxp=padL+cw/2, base=pkTop?(padT+(H-padT-padB)/2):(H-padB-ry-((H-padT-padB-2*ry)-(zHi-zLo)*zs)/2);
@@ -1105,7 +1111,10 @@ function pkDraw(){
   var hr=cur.h*Math.PI/180, hx=Math.sin(hr), hy=Math.cos(hr), ax=(hx*ca-hy*sa), ay=-(hx*sa+hy*ca)*el, al=Math.sqrt(ax*ax+ay*ay)||1;
   g.strokeStyle=col; g.lineWidth=2.4; g.lineCap='round'; g.beginPath(); g.moveTo(pc.x,pc.y); g.lineTo(pc.x+ax/al*17,pc.y+ay/al*17); g.stroke();
   g.font='700 12.5px '+NUM; g.textAlign=(pc.x>cxp)?'right':'left'; g.textBaseline='bottom'; g.fillStyle=col;
-  g.fillText((live?floorStr(v.floor):'마지막 위치')+'  '+(cur.a>=0?'+':'')+cur.a.toFixed(1)+'m'+((live&&typeof v.altErr==='number')?' ±'+v.altErr.toFixed(1):''), pc.x+((pc.x>cxp)?-12:22), pc.y-9);
+  var lbT=(live?floorStr(v.floor):'마지막 위치')+'  '+(cur.a>=0?'+':'')+cur.a.toFixed(1)+'m'+((live&&typeof v.altErr==='number')?' ±'+v.altErr.toFixed(1):''), lbR=(pc.x>cxp), lbX=pc.x+(lbR?-12:22), lbY=pc.y-9, lbW=g.measureText(lbT).width;
+  if(lbY-18<padT-14) lbY=pc.y+26;                                                   /* 위에 자리가 없으면 점 아래에 쓴다 */
+  g.fillStyle='rgba(21,22,26,.82)'; g.fillRect((lbR?lbX-lbW:lbX)-4, lbY-17, lbW+8, 19);   /* ★[v110.27] 글자 뒤 바탕 — 층 선·경로와 겹쳐도 읽힌다 */
+  g.fillStyle=col; g.fillText(lbT, lbX, lbY);
   /* 머리글 · 눈금 */
   g.textAlign='left'; g.textBaseline='top'; g.font='500 11.5px '+FONT; g.fillStyle=MUTED;
   g.fillText(useRel?('실제 위치(입구 기준) · 원기둥 반지름 '+R+' m'):'위치 신호 없음 — 방위(회전)로 감아 표시', 12, 8);
@@ -1296,7 +1305,7 @@ function remap(){
     v.ctx=(typeof d.ctx==='string')?d.ctx:''; v.inPark=(d.inPark===true); v.altErr=num(d.altErr); v.vz=num(d.vz); v.floorConf=num(d.floorConf);
     v.psess=num(d.psess); v.inSec=num(d.inSec); v.pathM=num(d.pathM); v.turn=num(d.turn); v.relOk=(d.relOk===true); v.relE=num(d.relE); v.relN=num(d.relN);
     v.drOk=(d.drOk===true); v.drMode=num(d.drMode); v.drAlign=num(d.drAlign);
-    v.gfix=num(d.gfix); v.gWd=num(d.gWd); v.gAgc=num(d.gAgc); v.rtPend=num(d.rtPend); v.gCfg=num(d.gCfg); v.gSky=num(d.gSky); v.wfN=num(d.wfN); v.wfSeen=num(d.wfSeen); v.wfAcc=num(d.wfAcc); v.wfUsed=num(d.wfUsed); v.gWeak=(d.gWeak===true); v.ota=(typeof d.ota==='string')?d.ota:''; v.gDiff=(typeof d.gDiff==='boolean')?d.gDiff:null; v.gaOn=(typeof d.gaOn==='boolean')?d.gaOn:null; v.gaN=num(d.gaN); v.gaRel=num(d.gaRel); v.gaWhy=num(d.gaWhy); v.gaFix=num(d.gaFix); v.gaD=num(d.gaD);   /* ★[v110.21] */ v.gFusion=(d.gFusion===false)?false:(d.gFusion===true?true:null);
+    v.gfix=num(d.gfix); v.gWd=num(d.gWd); v.gAgc=num(d.gAgc); v.rtPend=num(d.rtPend); v.gCfg=num(d.gCfg); v.gSky=num(d.gSky); v.wfN=num(d.wfN); v.wfSeen=num(d.wfSeen); v.wfAcc=num(d.wfAcc); v.wfUsed=num(d.wfUsed); v.gWeak=(d.gWeak===true); v.gaHeld=(d.gaHeld===true); v.ota=(typeof d.ota==='string')?d.ota:''; v.gDiff=(typeof d.gDiff==='boolean')?d.gDiff:null; v.gaOn=(typeof d.gaOn==='boolean')?d.gaOn:null; v.gaN=num(d.gaN); v.gaRel=num(d.gaRel); v.gaWhy=num(d.gaWhy); v.gaFix=num(d.gaFix); v.gaD=num(d.gaD);   /* ★[v110.21] */ v.gFusion=(d.gFusion===false)?false:(d.gFusion===true?true:null);
     v.lift=(d.lift===true); v.posAcc=num(d.posAcc); v.hdop=num(d.hdop); v.floorH=num(d.floorH);
     v.roadAlt=num(d.roadAlt); v.grade=num(d.grade); v.elev=num(d.elev);   /* 주행 고도(출발점 대비 m)·경사(%)·해발(m) — 층과 별개 */
     v.heading=num(d.heading); v.speed=num(d.speed); v.shock=num(d.shock);
@@ -1421,7 +1430,7 @@ function drawLogs(){
     } else if(e.event==='lowbat'){
       row='<div class="ev danger"><span class="tag imp park">배터리</span><span>🔋 배터리 부족 '+(e.vbat!=null?Number(e.vbat).toFixed(2)+'V':'')+'</span><span class="ts">'+fmtTs(e.ts)+'</span></div>';
     } else if(e.event==='boot'||e.event==='reconnect'){
-      row='<div class="ev"><span class="tag flr">기기</span><span>'+(e.event==='boot'?'⚡ 단말 부팅 '+esc(e.fw||'')+(e.rst?(' · 원인: '+({poweron:'전원 켜짐',brownout:'전압 순간 저하',wdt:'멈춤 감시 재시작',panic:'프로그램 오류',sw:'명령·자체 재시작',sleep:'절전에서 깸'}[e.rst]||esc(e.rst))):''):'📡 재접속')+'</span><span class="ts">'+fmtTs(e.ts)+'</span></div>';
+      row='<div class="ev"><span class="tag flr">기기</span><span>'+(e.event==='boot'?'⚡ 단말 부팅 '+esc(e.fw||'')+(e.rst?(' · 원인: '+({poweron:'전원 켜짐',brownout:'전압 순간 저하',wdt:'멈춤 감시 재시작',panic:'프로그램 오류',sw:'명령·자체 재시작',sleep:'절전에서 깸','sw-cmd':'관제 재부팅 명령','sw-ota':'원격 업데이트 적용','sw-otaback':'업데이트 되돌림','sw-net':'통신 2시간 두절'}[e.rst]||(/^sw-mem/.test(e.rst)?('여유 메모리 부족 '+esc(e.rst.replace('sw-mem',''))):esc(e.rst)))):''):'📡 재접속')+'</span><span class="ts">'+fmtTs(e.ts)+'</span></div>';
     } else if(e.event==='immob'){
       row='<div class="ev'+(e.on?' danger':'')+'"><span class="tag imp park">시동</span><span>'+(e.on?'⛔ 시동 차단됨':'✅ 시동 차단 해제')+'</span><span class="ts">'+fmtTs(e.ts)+'</span></div>';
     } else if(e.event==='door_sw'){
