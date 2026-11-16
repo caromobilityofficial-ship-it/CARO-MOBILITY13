@@ -352,7 +352,7 @@ body.ops .kpis, body.ops .main, body.ops .bottom{display:none!important;}
     <button class="ntab on" id="nt-live" onclick="switchView('live')">실시간 관제</button>
     <button class="ntab" id="nt-ops" onclick="switchView('ops')">운영 관리</button>
   </div>
-  <span class="sync off" id="sync">CONNECTING…</span><span id="pver" title="이 화면의 버전" style="font-size:11px;color:var(--muted);letter-spacing:.5px;white-space:nowrap;">v110.32</span>
+  <span class="sync off" id="sync">CONNECTING…</span><span id="pver" title="이 화면의 버전" style="font-size:11px;color:var(--muted);letter-spacing:.5px;white-space:nowrap;">v110.34</span>
   <span class="clock" id="clock">--:--:--</span>
   <span class="adm" id="adm">—</span>
   <button class="lgout" id="mfabtn" onclick="if(window.CaroMFA)CaroMFA.openSetup()">🔐 2단계 인증</button>
@@ -427,6 +427,7 @@ body.ops .kpis, body.ops .main, body.ops .bottom{display:none!important;}
         <button class="cbtn warn" onclick="sendCmd('hazard')">⚠ 비상등</button>
         <button class="cbtn" id="hazackbtn" style="display:none" onclick="caroConfirm('차량 비상등이 실제로 꺼져 있는 것을 확인했습니까? (누르지 않고 상태만 확정합니다)').then(function(ok){ if(ok) sendCmd('hazard_off',{value:'ack'}); })">✔ 비상등 꺼짐 확인</button>
         <button class="cbtn warn" onclick="hornCmd()">📣 경적 (0.5초)</button>
+        <button class="cbtn" onclick="buzzCmd()" title="기기 안의 부저를 세 번 울립니다 (차 경적이 아님)">부저 울리기</button>
         <button class="cbtn warn" onclick="immobOn()">⛔ 시동 차단</button>
         <button class="cbtn" onclick="immobOff()">✅ 차단 해제</button>
         <button class="cbtn" onclick="inModeCmd()">🔧 입력 극성 설정</button>
@@ -478,7 +479,7 @@ body.ops .kpis, body.ops .main, body.ops .bottom{display:none!important;}
 <script>
 /* ★[v110.20] 화면 버전 자가 점검 — 태블릿 앱·브라우저가 옛 화면을 붙잡고 있으면(캐시) 켤 때·다시 볼 때 스스로 새로 받는다.
    로그인 전 화면에서도 동작한다(예전 자동 업데이트는 로그인 칸에 글자가 들어 있으면 '입력 중' 으로 보고 미뤘다). 같은 버전으로는 3번까지만 시도한다. */
-var CARO_PAGE_VER='110.32';
+var CARO_PAGE_VER='110.34';
 function caroSelfCheck(){
   try{
     fetch('version.txt?t='+Date.now(),{cache:'no-store'}).then(function(r){ return r.ok?r.text():''; }).then(function(t){
@@ -642,29 +643,62 @@ function rtDecode(str, tsMs){
     out.push({lat:lat,lng:lng,t:t,v:parseInt(f[3],10)||0,h:parseInt(f[4],10)||0}); }
   return out;
 }
+/* ★[v110.34] 경로 점의 시각을 '기기 시계' 로 맞춘다.
+   예전에는 각 점의 시각을 "보고가 서버에 기록된 시각 − 그 점이 몇 초 전 것인지" 로 계산했다. 그런데 통신이 느려 보고가 20~70초 늦게 도착하면
+   그 묶음의 점 전체가 그만큼 '나중' 으로 밀려 다음 묶음의 점들과 시간 순서가 뒤섞였고, 지도에서는 두 묶음의 점을 번갈아 잇는 부채꼴·지그재그 선이 됐다
+   (11/16 남청라IC : 74초 늦게 도착한 보고 하나가 부채꼴을 만들었다. 유턴·나들목에서 선이 가로질러 그려진 것도 같은 원인).
+   기록 문서의 이름에 '부팅 번호-기기 시계(ms)-순번' 이 들어 있으므로, 부팅마다 (서버 시각 − 기기 시계) 가 가장 작았던 보고(= 가장 덜 늦은 보고)를 기준으로
+   모든 점의 시각을 기기 시계로 다시 계산한다 → 보고가 아무리 늦게 도착해도 점의 순서와 간격이 틀리지 않는다. 이미 쌓인 옛 기록에도 그대로 적용된다. */
+function rtIdMs(id){ if(typeof id!=='string') return null; var m=/^(\d+)-(\d+)-\d+-/.exec(id); if(!m) return null; var ms=Number(m[2]); return isFinite(ms)?{b:m[1],ms:ms}:null; }
+/* 위성 없이 추정한 위치(터널 안 등)인가 : 모듈이 밝힌 오차가 30m 를 넘는 추측항법·추정 위치는 도로에서 벗어나 있으므로 경로에 쓰지 않는다 */
+/* 차가 터널·지하차도 안에 있어 위치가 추정값인가 (기기 문서 기준) */
+function tunOf(v){ return !!v&&v.gsrc==='dr'&&v.ctx!=='park'&&v.ctx!=='cand'&&!(typeof v.posAcc==='number'&&v.posAcc>0&&v.posAcc<=30); }
+function rtEst(d){ var g=d.gfix, h=d.hacc; return (g===0||g===1)&&!(typeof h==='number'&&h>0&&h<=30); }
 /* 기록 문서 목록 → 경로용 점 목록. 묶음(rt)이 있으면 그 안의 점들을, 없으면(옛 펌웨어·정차 보고) 문서의 위치 한 점을 쓴다 */
 function routeRows(rows){
-  var out=[], seen={};
+  var out=[], seen={}, off={};
+  rows.forEach(function(d){ var k=rtIdMs(d._id), ms=toMs(d.ts); if(!k||!ms) return; var o=ms-k.ms; if(off[k.b]==null||o<off[k.b]) off[k.b]=o; });
   rows.forEach(function(d){
     var ms=toMs(d.ts);
     if(!ROUTE_RAW&&(d.ctx==='park'||d.ctx==='cand')) return;   /* ★[v110.29] 도로가 아닌 곳(주차장 안·실내 확인중)의 점은 지도 경로에 그리지 않는다 */
-    if(typeof d.rt==='string'&&d.rt){ rtDecode(d.rt,ms).forEach(function(q){ var k=Math.round(q.t/500); if(seen[k]) return; seen[k]=1;
-        out.push({lat:q.lat,lng:q.lng,ts:q.t,speed:q.v,gsrc:'rt'}); }); }
+    if(!ROUTE_RAW&&rtEst(d)) return;                             /* ★[v110.34] 터널 안 추정 위치는 그리지 않는다 — 그 구간은 도로 지도를 따라 점선으로 잇는다 */
+    if(typeof d.rt==='string'&&d.rt){
+      var k=rtIdMs(d._id), base=ms, bk='';
+      if(k&&off[k.b]!=null){ var b2=k.ms+off[k.b]; if(ms-b2>=0&&ms-b2<=900000){ base=b2; bk=k.b; } }   /* 15분 넘게 차이 나면(시계 넘침 등) 예전 방식 */
+      rtDecode(d.rt,base).forEach(function(q){
+        var kk=Math.round(q.t/300), key=bk+':'; if(seen[key+kk]||seen[key+(kk-1)]||seen[key+(kk+1)]) return; seen[key+kk]=1;   /* 다시 보낸 묶음(응답을 못 받아 한 번 더 보낸 것)의 같은 점은 한 번만 */
+        out.push({lat:q.lat,lng:q.lng,ts:q.t,speed:q.v,gsrc:'rt',sid:(bk?bk+':'+Math.round((q.t-off[bk])/100):null)}); }); }
     else if(d.lat!=null&&d.lng!=null) out.push(d);
   });
   return out;
 }
-/* ── 실시간 마커를 미끄러지듯 움직이기 : 선택한 차량이 보낸 최근 경로 점을 10초쯤 뒤따라가며 재생한다 ── */
-var GL={dev:null,pts:[],play:0,wall:0,pos:null,lastT:0,timer:null,mk:null};
-function glReset(dev){ GL.dev=dev; GL.pts=[]; GL.play=0; GL.wall=0; GL.pos=null; GL.lastT=0; }
+/* ── 실시간 마커를 미끄러지듯 움직이기 : 선택한 차량이 보낸 최근 경로 점을 따라가며 재생한다 ──
+   ★[v110.34] ① 점의 시각을 기기 시계로 맞춘다(새 펌웨어가 보내는 rtm) — 늦게 도착한 묶음 때문에 마커가 되돌아가거나 건너뛰지 않는다
+              ② 다음 보고가 올 때에 맞춰 받은 마지막 점에 닿도록 속도를 맞춘다 — 예전에는 받은 점을 실제 속도로만 재생해 늘 8~9초 뒤에 있었고 12초 넘게 밀려야 조금 빨라졌다
+              ③ 곧게(또는 완만하게 돌며) 빠르게 달리는 중에는 받은 마지막 점보다 최대 4.5초(3초) 앞까지 마지막 움직임을 이어 나아간다(다음 점이 오면 그 위로 부드럽게 붙는다)
+              ④ 속도 칸에는 가장 최근에 받은 속도를 적는다(예전에는 마커가 있는 '몇 초 전' 자리의 속도였다) */
+var GL={dev:null,pts:[],play:0,wall:0,pos:null,lastT:0,timer:null,mk:null,offB:null,offV:0,rtStr:'',shown:null,vShow:null,arr:0,ivl:0};
+function glReset(dev){ GL.dev=dev; GL.pts=[]; GL.play=0; GL.wall=0; GL.pos=null; GL.lastT=0; GL.offB=null; GL.offV=0; GL.rtStr=''; GL.shown=null; GL.vShow=null; GL.arr=0; GL.ivl=0; }
 function glFeed(dev,d){
   if(!dev||dev!==GL.dev||typeof d.rt!=='string'||!d.rt) return;
   var ls=(d.lastSeen&&d.lastSeen.toDate)?d.lastSeen.toDate().getTime():0; if(!ls) return;
-  var add=rtDecode(d.rt,ls).filter(function(q){ return q.t>GL.lastT+200; });
+  if(d.rt===GL.rtStr) return; GL.rtStr=d.rt;      /* 같은 묶음을 두 번 재생하지 않는다 (서 있을 때는 보고 시각만 바뀌고 묶음은 그대로다 → 예전에는 마지막 몇 초를 다시 재생했다) */
+  if(d.gsrc==='dr'&&!(typeof d.posAcc==='number'&&d.posAcc>0&&d.posAcc<=30)) return;   /* 터널 안 추정 위치는 재생하지 않는다 */
+  var base=ls, clk=false;
+  if(typeof d.rtm==='number'&&d.rtm>0){
+    var b=String(d.rtb!=null?d.rtb:''), dm=d.rtm*100, o=ls-dm;
+    if(GL.offB!==b||o>GL.offV+900000){ GL.offB=b; GL.offV=o; GL.pts=[]; GL.lastT=0; }
+    else if(o<GL.offV){ var sh=GL.offV-o; GL.offV=o; GL.pts.forEach(function(q){ q.t-=sh; }); GL.play-=sh; GL.lastT-=sh; }
+    base=dm+GL.offV; clk=true; }
+  var add=rtDecode(d.rt,base); if(!add.length) return;
+  if(clk) add=add.filter(function(q){ return q.t>GL.lastT+200; });
+  else if(GL.lastT&&add[0].t<=GL.lastT+200){ var sf=GL.lastT+800-add[0].t; add.forEach(function(q){ q.t+=sf; }); }   /* 옛 펌웨어 : 늦게 도착해 시각이 겹치면 버리지 않고 뒤로 밀어 순서를 지킨다 */
   if(!add.length) return;
-  if(Date.now()-add[add.length-1].t>120000){ GL.lastT=add[add.length-1].t; return; }     /* 2분 넘게 묵은 묶음(통신 복구 뒤 밀린 것)은 재생하지 않는다 — 경로 선에는 그려진다 */
-  if(!GL.pts.length||add[0].t-GL.pts[GL.pts.length-1].t>30000){ GL.pts=[]; GL.play=add[0].t; GL.wall=Date.now(); }   /* 새로 시작 */
-  add.forEach(function(q){ GL.pts.push(q); }); GL.lastT=add[add.length-1].t;
+  var endT=add[add.length-1].t;
+  if(Date.now()-endT>120000){ GL.lastT=endT; return; }     /* 2분 넘게 묵은 묶음(통신 복구 뒤 밀린 것)은 재생하지 않는다 — 경로 선에는 그려진다 */
+  if(!GL.pts.length||add[0].t-GL.pts[GL.pts.length-1].t>30000){ GL.pts=[]; GL.play=Math.max(add[0].t,endT-6000); GL.wall=Date.now(); GL.shown=null; }   /* 새로 시작 */
+  add.forEach(function(q){ GL.pts.push(q); }); GL.lastT=endT;
+  { var nw=Date.now(), iv=nw-(GL.arr||0); if(GL.arr&&iv>1500&&iv<20000) GL.ivl=GL.ivl?GL.ivl*0.6+iv*0.4:iv; if(GL.ivl){ if(GL.ivl<3000) GL.ivl=3000; if(GL.ivl>9000) GL.ivl=9000; } GL.arr=nw; }   /* 보고가 오는 간격(어림) — 다음 보고가 올 때를 가늠한다 */
   if(GL.pts.length>400) GL.pts.splice(0,GL.pts.length-400);
   if(!GL.timer) GL.timer=setInterval(glTick,100);
 }
@@ -674,20 +708,38 @@ function glAt(t){   /* 재생 시각 t 의 위치 (점 사이는 직선으로 �
   for(var i=1;i<P.length;i++){ if(t<=P[i].t){ var a=P[i-1],b=P[i],k=(b.t>a.t)?(t-a.t)/(b.t-a.t):1; GL.v=a.v+(b.v-a.v)*k; GL.h=b.h; return [a.lat+(b.lat-a.lat)*k,a.lng+(b.lng-a.lng)*k]; } }
   GL.v=P[P.length-1].v; GL.h=P[P.length-1].h; return [P[P.length-1].lat,P[P.length-1].lng];
 }
+/* 받은 마지막 점보다 얼마나 더 나아가도 되는가 : 곧게 빠르게 달리는 중이면 4.5초, 완만하게 도는 중이면 3초, 그 밖(급하게 도는 중·느림)에는 나아가지 않는다.
+   나아갈 때는 마지막 속도·속도 변화·도는 빠르기를 그대로 이어 간다(완만한 굽은 길을 따라 돌고, 줄이는 중이면 덜 나아간다) */
+function glExt(){ var P=GL.pts, n=P.length; if(n<3) return null; var a=P[n-1], b=P[n-2], c=P[n-3], dt=(a.t-c.t)/1000; if(!(dt>0.8&&dt<=15)) return null;
+  var dh=a.h-c.h; if(dh>180) dh-=360; if(dh<-180) dh+=360; var w=dh/dt, d2=(a.t-b.t)/1000, acc=d2>0.5?(a.v-b.v)/d2:0; if(acc>8) acc=8; if(acc<-12) acc=-12;
+  var aw=Math.abs(w);
+  if(a.v>=40&&aw<=1.5) return {ext:4500,w:w,acc:acc};
+  if(a.v>=30&&aw<=6) return {ext:3000,w:w,acc:acc};
+  return null; }
 function glTick(){
   var P=GL.pts; if(!P.length){ clearInterval(GL.timer); GL.timer=null; return; }
   var now=Date.now(), dt=now-GL.wall; GL.wall=now; if(dt<0||dt>2000) dt=100;
-  var end=P[P.length-1].t, lag=end-GL.play;
-  var rate=lag>20000?(lag/10000):(lag>12000?1.3:1);        /* 많이 밀리면 빨리 따라잡고, 평소에는 실제 속도 그대로 */
-  GL.play=Math.min(end,GL.play+dt*rate);
-  GL.pos=glAt(GL.play); if(GL.pos&&GL.v>=5) GL.pos=snapProject(GL.pos);   /* 달리는 중에는 도로 선 위로 */
-  try{ if(GL.pos&&GL.dev===devOf()&&typeof GL.v==='number'){ var se=$('lv-spd'); if(se) se.textContent=Math.round(GL.v)+'㎞/h'; var sh=$('lv-spds'); if(sh&&typeof GL.h==='number') sh.textContent='방위 '+Math.round(GL.h)+'°'; } }catch(e){}   /* ★[v110.24] 속도 칸을 0.1초마다 갱신 */
-  while(P.length>2&&P[1].t<GL.play) P.shift();
+  var L=P[P.length-1], end=L.t, E=glExt();
+  /* 다음 보고가 올 것으로 보이는 때에 맞춰 '받은 마지막 점(+더 나아가도 되는 만큼)' 에 닿도록 속도를 맞춘다 → 멈췄다 뛰었다 하지 않고 고르게 움직이면서 실제 차에 가장 가깝게 따라간다 */
+  var goal=end+(E?E.ext:0), left=(GL.ivl||5500)-(now-(GL.arr||now)); if(left<500) left=500;
+  if(goal-GL.play>30000) GL.play=goal-6000;                   /* 30초 넘게 밀렸으면(통신이 끊겼다 붙음) 건너뛴다 */
+  if(goal>GL.play){ var rate=(goal-GL.play)/left; if(rate<0.3) rate=0.3; if(rate>6) rate=6; GL.play=Math.min(goal,GL.play+dt*rate); }
+  else GL.play=goal;
+  var over=GL.play-end, pos;
+  if(over<=0||!E){ pos=glAt(GL.play); if(pos&&GL.v>=5) pos=snapProject(pos); }   /* 달리는 중에는 도로 선 위로 */
+  else { var tt=over/1000, N=Math.max(1,Math.ceil(tt/0.25)), ds=tt/N, x=0, y=0, vv=L.v, hh=L.h;      /* 받은 점보다 앞 : 마지막 움직임을 이어 간다 */
+    for(var q=0;q<N;q++){ var tm=(q+0.5)*ds; vv=Math.max(0,L.v+E.acc*tm); hh=L.h+E.w*tm; var dd=vv/3.6*ds*0.95; y+=dd*Math.cos(hh*0.0174532925); x+=dd*Math.sin(hh*0.0174532925); }
+    GL.v=vv; GL.h=hh; pos=[L.lat+y/111320, L.lng+x/(111320*Math.cos(L.lat*0.0174532925))]; }
+  if(pos){ if(GL.shown&&_m(GL.shown,pos)<120) pos=[GL.shown[0]+(pos[0]-GL.shown[0])*0.45, GL.shown[1]+(pos[1]-GL.shown[1])*0.45]; GL.shown=pos; }   /* 자리 바뀜을 부드럽게 */
+  GL.pos=pos;
+  try{ if(GL.pos&&GL.dev===devOf()&&!GL.tun){ var tv=L.v; GL.vShow=(GL.vShow==null||Math.abs(tv-GL.vShow)<0.6)?tv:GL.vShow+(tv-GL.vShow)*0.2;
+      var se=$('lv-spd'); if(se) se.textContent=Math.round(GL.vShow)+'㎞/h'; var sh=$('lv-spds'); if(sh&&typeof L.h==='number') sh.textContent='방위 '+Math.round(L.h)+'°'; } }catch(e){}   /* ★[v110.34] 가장 최근에 받은 속도 */
+  while(P.length>3&&P[1].t<GL.play) P.shift();
   if(GL.mk&&GL.pos){ try{
       if(mapKind==='kakao'){ var kp=new kakao.maps.LatLng(GL.pos[0],GL.pos[1]); GL.mk.setPosition(kp); if(followMode){ var c=kmap.getCenter(); if(Math.abs(c.getLat()-GL.pos[0])>1e-6||Math.abs(c.getLng()-GL.pos[1])>1e-6) kmap.setCenter(kp); } }
       else if(mapKind==='leaflet'){ GL.mk.setLatLng(GL.pos); if(followMode) lmap.panTo(GL.pos,{animate:false}); }
     }catch(e){} }
-  if(GL.play>=end&&now-end>20000){ GL.pts=[]; GL.pos=null; clearInterval(GL.timer); GL.timer=null; }   /* 다 따라갔고 20초 넘게 새 점이 없으면(정차) 재생 끝 — 그 뒤로는 보고 위치를 쓴다 */
+  if(GL.play>=end&&now-end>20000){ GL.pts=[]; GL.pos=null; GL.shown=null; clearInterval(GL.timer); GL.timer=null; }   /* 다 따라갔고 20초 넘게 새 점이 없으면(정차) 재생 끝 — 그 뒤로는 보고 위치를 쓴다 */
 }
 
 /* ═══════════ 지도 (카카오 → 실패 시 Leaflet) ═══════════ */
@@ -767,8 +819,11 @@ function mapDraw(){
   var v=FLEET.find(function(x){return x.id===selId;});
   if(v){
     var p=stopOnRoad(v,smoothPos(v));                                                 /* ★[v110.32] 서 있는 차 : 달려온 도로에서 12m 안이면 도로 위에 */
+    /* ★[v110.34] 터널·지하차도 안(위성 없이 추정한 위치, 오차 30m 초과) : 추정 위치는 도로에서 벗어나므로 쓰지 않고 '들어간 자리' 에 세워 둔다. 나오면 그 자리로 옮기고 지나온 길은 도로를 따라 점선으로 잇는다 */
+    v._tun=tunOf(v); GL.tun=v._tun;
+    if(v._tun){ if(v._gPos) p=v._gPos; } else if(p&&(v.gsrc==='gnss'||v.gsrc==='gnss+dr'||v.gsrc==='dr')) v._gPos=p;
     var gdev=IDMAP[v.id]||null; if(gdev!==GL.dev) glReset(gdev);                      /* ★[v110.17] 차량을 바꾸면 재생을 새로 시작 */
-    if(GL.pos&&GL.pts.length&&v.online) p=GL.pos;                                     /* 경로 재생 중이면 그 위치(미끄러지듯 이동) */
+    if(GL.pos&&GL.pts.length&&v.online&&!v._tun) p=GL.pos;                                     /* 경로 재생 중이면 그 위치(미끄러지듯 이동) */
     GL.mk=null;
     if(p){ selPos=p;
       if(mapKind==='kakao'){
@@ -785,7 +840,8 @@ function mapDraw(){
   var pill='차량 선택';
   if(v){
     if(v.ctx==='park'||v.ctx==='cand') pill=v.name+' · 🅿 '+(v.ctx==='park'?('주차장 안 · '+floorStr(v.floor)):'실내 확인중')+(v.gsrc==='dr'?' (추측항법 위치)':' (입구 위치 표시)');   /* ★[v110.13] */
-    else if(v.gsrc==='dr') pill=v.name+' · 🧭 지하/터널 추정 이동중 (GPS 없음 · 추측항법)';
+    else if(v._tun) pill=v.name+' · 🧭 터널·지하차도 통과 중 — 들어간 자리에 표시 (나오면 이어집니다)';
+    else if(v.gsrc==='dr') pill=v.name+' · 🧭 지하/터널 — 추측항법 위치'+(v.posAcc?(' (약 ±'+Math.round(v.posAcc)+'m)'):'');
     else if(live&&v.gsrc==='wifi') pill=v.name+' · 📶 실내 — 주변 공유기로 잰 위치'+(v.wfAcc?(' (약 ±'+Math.round(v.wfAcc)+'m)'):'');   /* ★[v110.26] */
     else if(live&&v.gaHeld) pill=v.name+' · 🅿 실내·지하 — 들어와 선 자리에 고정 (약 ±12m)';   /* ★[v110.27] 기기가 '달려와 선 자리' 에 임시로 고정해 둔 상태 */
     else if(live&&v.gWeak) pill=v.name+' · ⚠ 실내·지하(GPS 부정확) — 마지막 믿을 만한 자리';   /* ★[v110.25] */
@@ -869,7 +925,8 @@ function render(){
     mv.textContent = v.online?(ms_?ms_[0]:(v.moving?'주행중':'정지')):'오프라인';
     mv.className='v '+(v.online?(ms_?ms_[1]:(v.moving?'ok':'')):'bad');
     mv.title = ms_?ms_[2]:'';
-    if(!(GL.pos&&GL.dev===IDMAP[v.id]&&typeof GL.v==='number')) $('lv-spd').textContent=(typeof v.speed==='number')?Math.round(v.speed)+'㎞/h':'—';   /* 재생 중에는 glTick 이 쓴다 */
+    if(tunOf(v)) $('lv-spd').textContent=(typeof v.speed==='number')?Math.round(v.speed)+'㎞/h (추정)':'—';   /* ★[v110.34] 터널 안 : 위성 없이 어림한 속도임을 밝힌다 */
+    else if(!(GL.pos&&GL.dev===IDMAP[v.id]&&typeof GL.v==='number')) $('lv-spd').textContent=(typeof v.speed==='number')?Math.round(v.speed)+'㎞/h':'—';   /* 재생 중에는 glTick 이 쓴다 */
     $('lv-flr').textContent=floorStr(v.floor)+(v.env?(' '+v.env):'');
     /* ★[v110.13] 정밀 측정 펌웨어 : 층은 주차장 안에서만, 실외 언덕은 '주행 고도·경사' 로 따로 */
     var sub=function(id,t){ var e=$(id); if(e) e.textContent=t||'\u00a0'; };
@@ -942,6 +999,7 @@ function renderDiag(v){
     rows.push(['입력1 / 입력2', (v.in1?'<span class="y">IN1 ON</span>':'<span class="gd">IN1 off</span>')+' · '+(v.in2?'<span class="y">IN2 ON</span>':'<span class="gd">IN2 off</span>')]);
     if(typeof v.temp==='number') rows.push(['실내 온도','<span class="gd">'+v.temp.toFixed(1)+' ℃</span>']);
     if(typeof v.csq==='number') rows.push(['LTE 신호', v.csq>=99?'<span class="r">없음</span>':'<span class="'+(v.csq>=10?'g':'y')+'">'+v.csq+' / 31</span>']);
+    if(typeof v.cmtMs==='number') rows.push(['보고 지연', '<span class="'+(v.cmtMs<5000?'g':'y')+'">방금 '+(v.cmtMs/1000).toFixed(1)+'초</span>'+(typeof v.cmtMax==='number'?' · 켠 뒤 최대 '+(v.cmtMax/1000).toFixed(0)+'초':'')+(v.cmtSlow?' · <span class="y">10초 넘게 걸린 보고 '+v.cmtSlow+'회</span>':'')]);
     rows.push(['시동 차단', v.immob?'<span class="r">⛔ 차단 중</span>':'<span class="g">해제 (시동 가능)</span>']);
     rows.push(['문 (도어스위치)', v.doorOpen?'<span class="y">열림</span>':'<span class="g">닫힘</span>']);
     if(typeof v.accOffSec==='number'&&!v.acc) rows.push(['마지막 시동 후', '<span class="'+(v.accOffSec>3*86400?'r':'gd')+'">'+(v.accOffSec<3600?Math.floor(v.accOffSec/60)+'분':v.accOffSec<86400?Math.floor(v.accOffSec/3600)+'시간':Math.floor(v.accOffSec/86400)+'일')+' 경과</span>']);
@@ -1209,6 +1267,8 @@ function sendCmd(type,extra){
 function calSet(f){ sendCmd('setfloor',{value:String(f)}); }
 function calReset(){ sendCmd('resetfloor'); }
 /* ═══════════ [v9.2] 시동 차단 ═══════════ */
+/* ★[v110.33] 기기 안의 부저를 직접 울린다 (삐 세 번). 경적과 달리 차 밖으로 큰 소리가 나지 않으므로 확인 창 없이 바로 보낸다 */
+function buzzCmd(){ sendCmd('buzz',{value:'200'}); }   /* 서버 함수가 buzz 는 2~4자리 숫자 값을 요구한다 (한 번 울리는 길이 ms) */
 function hornCmd(){ caroConfirm('경적을 0.5초 울립니다. 실행할까요?').then(function(ok){ if(!ok) return; sendCmd('horn',{value:'500'}); }); }
 function immobOn(){
   var v=FLEET.find(function(x){return x.id===selId;}); if(!v){ toast('차량을 먼저 선택'); return; }
@@ -1324,6 +1384,7 @@ function remap(){
     /* ★[v110.14] 움직임 상태 7가지 (v9.9-precise11 부터 보냄) — 없으면(옛 펌웨어) 빈값 → 예전처럼 주행중/정지 두 가지 */
     v.mstate=(typeof d.mstate==='string')?d.mstate:''; v.mstateSec=num(d.mstateSec);
     v.fw=d.fw||''; v.ota=d.ota||''; v.lastSeen=ls; v.repMin=(d.repMin===true); v.rep400=num(d.rep400);   /* ★[v110.32] */
+    v.cmtMs=num(d.cmtMs); v.cmtMax=num(d.cmtMax); v.cmtSlow=num(d.cmtSlow);   /* ★[v110.34] 보고 한 번에 걸린 시간(통신 지연) */
     /* [v9 단말 추가 필드] */
     v.vbat=num(d.vbat); v.acc=(d.acc===true); v.in1=(d.in1===true); v.in2=(d.in2===true); v.temp=num(d.temp); v.csq=num(d.csq);
     v.immob=(d.immob===true); v.hazUnknown=(d.hazUnknown===true); v.doorOpen=(d.doorOpen===true||d.in1===true); v.accOffSec=num(d.accOffSec);
@@ -1399,7 +1460,7 @@ function subLogs(){
   try{
     unT=FN.onSnapshot(FN.query(FN.collection(db,'devices',dev,'telemetry'),
         FN.where('ts','>=',b[0]),FN.where('ts','<',b[1]),FN.orderBy('ts','desc'),FN.limit(4000)),
-      function(s){ TELE=[]; s.forEach(function(d){ TELE.push(d.data()||{}); }); drawLogs(); },
+      function(s){ TELE=[]; s.forEach(function(d){ var x=d.data()||{}; x._id=d.id; TELE.push(x); }); drawLogs(); },   /* ★[v110.34] 문서 이름(부팅 번호-기기 시계)을 같이 둔다 — 경로 점 시각을 기기 시계로 맞추는 데 쓴다 */
       function(err){ console.warn('tele',err); });
     unE=FN.onSnapshot(FN.query(FN.collection(db,'devices',dev,'events'),
         FN.where('ts','>=',b[0]),FN.where('ts','<',b[1]),FN.orderBy('ts','desc'),FN.limit(500)),
@@ -1485,7 +1546,7 @@ function cleanRoute(rows){
   rows.forEach(function(t){
     if(t.lat==null||t.lng==null) return; st.raw++;
     var p={lat:Number(t.lat),lng:Number(t.lng),t:toMs(t.ts),v:(t.speed!=null?Number(t.speed):null),
-           sats:(t.sats!=null?Number(t.sats):(t.sat!=null?Number(t.sat):null)),hdop:(t.hdop!=null?Number(t.hdop):null),gsrc:t.gsrc||''};
+           sats:(t.sats!=null?Number(t.sats):(t.sat!=null?Number(t.sat):null)),hdop:(t.hdop!=null?Number(t.hdop):null),gsrc:t.gsrc||'',sid:t.sid||null};
     if(!isFinite(p.lat)||!isFinite(p.lng)||!p.t||p.lat<33||p.lat>39.5||p.lng<124||p.lng>132){ st.bad++; return; }
     if((p.sats!=null&&p.sats<5&&p.gsrc!=='dr'&&p.gsrc!=='gnss+dr')||(p.hdop!=null&&p.hdop>3)||p.gsrc==='none'){ st.bad++; return; }
     P.push(p);
@@ -1554,57 +1615,177 @@ function cleanRoute(rows){
    · 서버가 응답하지 않거나 맞출 도로가 없으면 예전처럼 GPS 점 그대로 그린다(기능이 멈추지 않는다).
    · 이미 맞춘 구간은 다시 묻지 않고, 새로 늘어난 꼬리만 이어서 맞춘다. 요청은 1.1초에 한 번을 넘기지 않는다.
    · 서 있는 차(주차 위치)는 도로에 붙이지 않는다 — 주차장·골목 안 실제 자리를 그대로 보여 준다. */
-var SNAP={on:true,cache:{},queue:[],busy:false,last:0,ok:0,fail:0,off:0};
+var SNAP={on:true,cache:{},br:{},queue:[],busy:false,last:0,ok:0,fail:0,off:0,gap:1100,chain:Promise.resolve()};
 try{ if(localStorage.getItem('caro_snap')==='0') SNAP.on=false; }catch(e){}
-var SNAP_URL='https://router.project-osrm.org/match/v1/driving/';
+var SNAP_URL='https://router.project-osrm.org/match/v1/driving/', ROUTE_URL='https://router.project-osrm.org/route/v1/driving/';
 function snapToggle(){ SNAP.on=!SNAP.on; try{ localStorage.setItem('caro_snap',SNAP.on?'1':'0'); }catch(e){} drawRoute(); }
-function snapThin(s){ var out=[]; for(var i=0;i<s.length;i++){ var b=s[i]; if(!out.length){ out.push(b); continue; } var a=out[out.length-1]; if(b.t-a.t>=1000&&(_hv(a,b)>=25||i===s.length-1)) out.push(b); } return out; }
-function snapFetch(pts){
+function _m(a,b){ return _hv({lat:a[0],lng:a[1]},{lat:b[0],lng:b[1]}); }          /* [위도,경도] 두 점 사이 거리(m) */
+function _lineLen(L){ var s=0; for(var i=1;i<L.length;i++) s+=_m(L[i-1],L[i]); return s; }
+/* ★[v110.34] 도로 맞춤 다시 만듦 — 유턴·나들목·굽은 길에서 선이 가로질러 그려지던 것
+   ① 점 솎기 : 예전에는 25m 마다 한 점만 보내 굽은 길의 모양이 뭉개졌다 → 굽은 곳은 모양이 2.5m 넘게 달라지지 않게 촘촘히, 곧은 곳은 60m 까지 성기게.
+   ② 오차 반경 : 예전 35m(실제로는 그 3배까지 다른 도로를 후보로 봄) → 12m. 기기 위치 오차가 1~3m 이므로 옆 도로·지름길로 잘못 붙지 않는다. 맞는 도로가 없으면 25m 로 한 번 더.
+   ③ 맞춘 결과가 여러 토막으로 나오면 토막끼리 직선으로 잇지 않는다(예전 : 전부 한 줄로 이어 붙여 건물·나들목을 가로지르는 선이 됐다).
+      토막 사이가 30m 안(유턴으로 건너편 차로에 붙은 경우 등)이면 잇고, 도로 지도에 없는 길을 달린 구간은 GPS 점 그대로 점선으로, 점이 없는 구간(터널)은 도로를 따라 점선으로 잇는다.
+   ④ 점과 점 사이를 지도가 '돌아가는 길' 로 이은 곳(실제 이동 거리의 3배+60m 초과 — 지도에 없는 유턴 등)은 그 구간만 곧게 잇거나 비운다.
+   ⑤ 지금 달리는 중인 끝부분 두 점은 확정하지 않고 다음 점들과 함께 다시 맞춘다(앞길을 모르는 채 맞추면 교차로에서 옆길로 붙는 일이 있다). */
+function snapThin(s){
+  var n=s.length, i; if(n<=2) return s.slice();
+  var kx=111320*Math.cos(s[0].lat*0.0174532925), X=[], keep=[];
+  for(i=0;i<n;i++){ X.push([(s[i].lng-s[0].lng)*kx,(s[i].lat-s[0].lat)*111320]); keep.push(0); }
+  keep[0]=keep[n-1]=1; var st=[[0,n-1]];
+  while(st.length){ var r=st.pop(), a=r[0], b=r[1]; if(b-a<2) continue;
+    var ax=X[a][0], ay=X[a][1], dx=X[b][0]-ax, dy=X[b][1]-ay, len=dx*dx+dy*dy, md=0, mi=-1;
+    for(i=a+1;i<b;i++){ var px=X[i][0]-ax, py=X[i][1]-ay, t=len>0?Math.max(0,Math.min(1,(px*dx+py*dy)/len)):0, ex=px-dx*t, ey=py-dy*t, d=ex*ex+ey*ey; if(d>md){ md=d; mi=i; } }
+    if(mi>=0&&md>6.25){ keep[mi]=1; st.push([a,mi]); st.push([mi,b]); } }
+  var out=[s[0]], li=0;
+  for(i=1;i<n;i++){ var d2=Math.sqrt((X[i][0]-X[li][0])*(X[i][0]-X[li][0])+(X[i][1]-X[li][1])*(X[i][1]-X[li][1]));
+    if(i===n-1){ if(d2>=3||out.length<2) out.push(s[i]); break; }
+    if((keep[i]&&d2>=6)||d2>=60){ out.push(s[i]); li=i; } }
+  return out;
+}
+/* 도로 지도 서버 요청은 한 줄로 세워 1.1초에 한 번을 넘기지 않는다 */
+function osrmGet(url){
+  var p=SNAP.chain.then(function(){ var w=Math.max(0,SNAP.gap-(Date.now()-SNAP.last)); return new Promise(function(res){ setTimeout(res,w); }); })
+    .then(function(){ SNAP.last=Date.now(); return fetch(url,{cache:'no-store'}); })
+    .then(function(r){ return r.json().then(function(j){ return {ok:r.ok,st:r.status,j:j}; },function(){ throw new Error('http '+r.status); }); });
+  SNAP.chain=p.then(function(){},function(){});
+  return p;
+}
+/* 점 묶음 하나를 도로에 맞춘다 → 토막 목록. 토막 = 이어진 '점과 점 사이 길(leg)' 들. leg = {a,b:점 번호, line:[[위도,경도]…]} */
+function snapFetch(pts,rad){
   var co=pts.map(function(p){return Number(p.lng).toFixed(6)+','+Number(p.lat).toFixed(6);}).join(';');
-  var ts=[],lt=0; pts.forEach(function(p){ var t=Math.floor(p.t/1000); if(t<=lt) t=lt+1; lt=t; ts.push(t); });
-  var url=SNAP_URL+co+'?geometries=geojson&overview=full&gaps=split&tidy=true&radiuses='+pts.map(function(){return 35;}).join(';')+'&timestamps='+ts.join(';');
-  var wait=Math.max(0,1100-(Date.now()-SNAP.last));
-  return new Promise(function(res){ setTimeout(res,wait); }).then(function(){ SNAP.last=Date.now(); return fetch(url,{cache:'no-store'}); })
-    .then(function(r){ return r.json().then(function(j){ return {ok:r.ok,st:r.status,j:j}; },function(){ throw new Error('http '+r.status); }); })
-    .then(function(x){ var j=x.j;
+  var url=SNAP_URL+co+'?geometries=geojson&overview=full&steps=true&radiuses='+pts.map(function(){return rad||12;}).join(';');   /* 구간별 길(steps)과 전체 선(overview)을 같이 받는다 — 구간별 길을 못 읽으면 전체 선으로 그린다 */
+  return osrmGet(url).then(function(x){ var j=x.j;
       /* ★[v110.29] '맞출 도로가 없음'(도로가 아닌 곳의 점) 과 '서버가 응답하지 않음' 을 구분한다 */
       if(j&&(j.code==='NoMatch'||j.code==='NoSegment'||(j.code==='Ok'&&(!j.matchings||!j.matchings.length)))) throw new Error('nomatch');
       if(!x.ok||!j||j.code!=='Ok') throw new Error('http '+x.st);
-      var line=[]; j.matchings.forEach(function(m){ ((m.geometry&&m.geometry.coordinates)||[]).forEach(function(c){ if(isFinite(c[0])&&isFinite(c[1])) line.push([c[1],c[0]]); }); });
-      if(line.length<2) throw new Error('short'); return line; });
+      var tp=Array.isArray(j.tracepoints)?j.tracepoints:null, out=[];
+      j.matchings.forEach(function(m,mi){
+        var ix=[], i;
+        if(tp){ for(i=0;i<tp.length&&i<pts.length;i++){ var w=tp[i]; if(w&&w.matchings_index===mi&&Array.isArray(w.location)) ix.push({i:i,w:(typeof w.waypoint_index==='number'?w.waypoint_index:ix.length),loc:[w.location[1],w.location[0]]}); }
+          ix.sort(function(p,q){ return p.w-q.w; }); }
+        var LG=m.legs, per=ix.length>=2&&Array.isArray(LG)&&LG.length===ix.length-1&&LG.every(function(l){ return l&&Array.isArray(l.steps)&&l.steps.length; });
+        if(per){ var legs=[];
+          for(var k=0;k<LG.length;k++){ var A=ix[k], B=ix[k+1], line=[];
+            LG[k].steps.forEach(function(s){ ((s.geometry&&s.geometry.coordinates)||[]).forEach(function(c){ if(!isFinite(c[0])||!isFinite(c[1])) return; var z=line[line.length-1]; if(!z||z[0]!==c[1]||z[1]!==c[0]) line.push([c[1],c[0]]); }); });
+            if(line.length<2) line=[A.loc,B.loc];
+            if(B.i<=A.i) continue;
+            var hop=_hv(pts[A.i],pts[B.i]), dist=(typeof LG[k].distance==='number')?LG[k].distance:_lineLen(line);
+            if(dist>hop*3+60){ if(hop<=80) line=[A.loc,B.loc]; else continue; }      /* 돌아가는 길로 이은 구간 : 짧으면 곧게, 길면 비운다 */
+            legs.push({a:A.i,b:B.i,line:line}); }
+          if(legs.length) out.push({legs:legs});
+        } else {                                                                     /* 구간별 길이 없는 응답 → 토막 전체 선을 한 덩어리로 쓴다 */
+          var ln=[]; ((m.geometry&&m.geometry.coordinates)||[]).forEach(function(c){ if(isFinite(c[0])&&isFinite(c[1])) ln.push([c[1],c[0]]); });
+          if(ln.length<2) return;
+          var i0=ix.length?ix[0].i:(j.matchings.length===1?0:-1), i1=ix.length?ix[ix.length-1].i:(j.matchings.length===1?pts.length-1:-1);
+          if(i0<0){ var near=function(q,from){ var bi=-1,bd=1e9; for(var z=from;z<pts.length;z++){ var dz=_m(q,[pts[z].lat,pts[z].lng]); if(dz<bd){ bd=dz; bi=z; } } return bd<60?bi:-1; };   /* 점 번호를 알려 주지 않는 응답 : 선의 양 끝에서 가장 가까운 점으로 어림 */
+            i0=near(ln[0],out.length?out[out.length-1].legs[out[out.length-1].legs.length-1].b:0); i1=i0<0?-1:near(ln[ln.length-1],i0); }
+          if(i0<0||i1<=i0) return;
+          var rl=0; for(i=i0+1;i<=i1;i++) rl+=_hv(pts[i-1],pts[i]);
+          if(_lineLen(ln)>rl*2.2+150) return;
+          out.push({legs:[{a:i0,b:i1,line:ln,coarse:true}]}); }
+      });
+      if(!out.length) throw new Error('nomatch');
+      return out; });
 }
-/* 구간 하나를 그릴 좌표 : 도로에 맞춘 부분 + (아직 못 맞춘) 꼬리의 GPS 점 */
+/* 맞추지 못한 점들(도로 지도에 없는 길)을 GPS 점 그대로 잇는다 : a 다음 점부터 b 앞 점까지. 한 걸음이 250m 를 넘거나 거의 서 있던 점들이면(주차장·정차 떨림) 잇지 않는다 */
+function snapRawBridge(P,a,b,from,to){
+  var mid=[], vs=[], i; for(i=a+1;i<b&&i<P.length;i++){ if(i<0) continue; mid.push([P[i].lat,P[i].lng]); if(P[i].v!=null) vs.push(P[i].v); }
+  if(!mid.length) return null;
+  var line=(from?[from]:[]).concat(mid); if(to) line.push(to); if(line.length<2) return null;
+  for(i=1;i<line.length;i++) if(_m(line[i-1],line[i])>250) return null;
+  if(vs.length){ vs.sort(function(x,y){return x-y;}); if(vs[vs.length>>1]<10) return null; }
+  return line;
+}
+/* 맞춘 결과를 그 구간의 선 목록에 붙인다. upTo = 이 번호의 점까지 확정. 돌려주는 값 = 확정한 마지막 점 번호 */
+function snapCommit(e,P,legs,upTo,lead,ended){
+  var parts=e.parts, cur=null, endPt=null, lastIdx=lead?0:-1, i;
+  if(legs.some(function(l){ return l.coarse&&l.b>upTo; })) upTo=P.length-1;
+  if(lead){ if(parts.length&&!parts[parts.length-1].est){ cur=parts.pop().line; endPt=cur[cur.length-1]; } else endPt=[P[0].lat,P[0].lng]; }
+  function close(){ if(cur&&cur.length>=2) parts.push({line:cur,est:false}); cur=null; }
+  function app(line){ for(var q=0;q<line.length;q++){ var z=cur[cur.length-1]; if(!z||z[0]!==line[q][0]||z[1]!==line[q][1]) cur.push(line[q]); } }
+  e.prov=[]; var pv=null, pvIdx=-1;
+  for(i=0;i<legs.length;i++){ var lg=legs[i], st=lg.line[0];
+    if(lg.b>upTo){                                                       /* 아직 확정하지 않는 끝부분 : 임시로만 그린다 */
+      if(pv&&lg.a===pvIdx) lg.line.forEach(function(q){ pv.push(q); }); else { pv=lg.line.slice(); e.prov.push(pv); }
+      pvIdx=lg.b; continue; }
+    if(endPt&&lg.a-lastIdx<=1&&_m(endPt,st)<=30){ if(!cur) cur=[endPt]; app(lg.line); }
+    else {
+      if(endPt){ var rb=snapRawBridge(P,lastIdx,lg.a,endPt,st); close();
+        if(rb) parts.push({line:rb,est:true});
+        else if(_m(endPt,st)>30) snapGap(e,endPt,st,P[lg.a].t-P[Math.max(lastIdx,0)].t); }
+      cur=lg.line.slice(); }
+    endPt=cur[cur.length-1]; lastIdx=lg.b; }
+  var commit=upTo;
+  if(lastIdx<upTo){                                                      /* 확정 범위 끝에 맞추지 못한 점이 남았다 */
+    if(ended||upTo-lastIdx>60){ var tb=snapRawBridge(P,lastIdx,upTo+1,endPt,null); close(); if(tb) parts.push({line:tb,est:true}); }
+    else commit=lastIdx; }                                               /* 달리는 중 : 다음에 뒤 점들과 함께 다시 맞춰 본다 */
+  close();
+  if(commit>=0&&(commit>0||!lead)){ e.lastPt=P[commit]; e.upto=P[commit].t; }
+  return commit;
+}
+/* 선이 끊긴 자리(터널·맞춤이 갈라진 곳)를 도로를 따라 잇는다 — 길이가 직선거리의 1.6배+100m 안이고 걸린 시간에 갈 수 있는 거리일 때만. '추정' 이므로 점선으로 그린다 */
+function snapRoute(a,b,dtMs,cb){
+  var sd=_m(a,b); if(!(sd>30&&sd<20000)){ cb(null); return; }
+  osrmGet(ROUTE_URL+b_ll(a)+';'+b_ll(b)+'?geometries=geojson&overview=full').then(function(x){ var j=x.j, r=j&&j.code==='Ok'&&j.routes&&j.routes[0], line=[];
+      if(r) ((r.geometry&&r.geometry.coordinates)||[]).forEach(function(c){ if(isFinite(c[0])&&isFinite(c[1])) line.push([c[1],c[0]]); });
+      var len=r?(typeof r.distance==='number'?r.distance:_lineLen(line)):0;
+      if(line.length<2||len>sd*1.6+100||(dtMs>0&&len/(dtMs/1000)>50)||_m(line[0],a)>40||_m(line[line.length-1],b)>40){ cb(null); return; }
+      cb(line); },function(){ cb(null); });
+}
+function b_ll(p){ return Number(p[1]).toFixed(6)+','+Number(p[0]).toFixed(6); }
+function snapGap(e,a,b,dtMs){ snapRoute(a,b,dtMs,function(line){ if(line){ e.br.push({line:line,est:true}); try{ drawRoute(); }catch(x){} } }); }
+/* 구간과 구간 사이(터널처럼 기록이 비어 구간이 나뉜 곳)를 도로를 따라 잇는다 */
+function snapBridge(ga,gb){
+  if(!ga||!gb) return null; var dt=gb.t-ga.t; if(!(dt>0&&dt<1800000)) return null;
+  var k=(devOf()||'')+'|'+(ga.sid||ga.t)+'>'+(gb.sid||gb.t), c=SNAP.br[k];
+  if(!c){ c=SNAP.br[k]={line:null}; snapRoute([ga.lat,ga.lng],[gb.lat,gb.lng],dt,function(line){ c.line=line; if(line){ try{ drawRoute(); }catch(x){} } }); }
+  return c.line;
+}
+/* 구간 하나를 그릴 선 목록 : [{line:[[위도,경도]…], est:추정(점선)인가}] */
 function snapSeg(s){
-  var raw=function(a){ return a.map(function(p){return [p.lat,p.lng];}); };
-  if(!SNAP.on||s.length<2) return raw(s);
-  var k=String(s[0].t), e=SNAP.cache[k]; if(!e){ e=SNAP.cache[k]={line:[],upto:0,lastPt:null,pending:false,fail:0}; }
-  var tail=s.filter(function(p){ return p.t>e.upto; });
-  var th=snapThin(tail), ended=(Date.now()-s[s.length-1].t>120000);
-  if(!e.pending&&(Date.now()-e.fail>600000)&&(th.length>=4||(ended&&th.length>=2))){
-    e.pending=true; SNAP.queue.push({k:k,pts:(e.lastPt?[e.lastPt]:[]).concat(th)}); snapPump(); }
-  /* ★[v110.29] 도로 맞춤이 켜져 있으면 '도로에 맞춘 선' 만 그린다. 아직 못 맞춘 꼬리·맞출 도로가 없는 구간은 그리지 않는다(예전에는 GPS 점 그대로 그려 건물 위로 선이 지나갔다). */
-  return e.line.length>=2?e.line:[];
+  if(!SNAP.on||s.length<2) return [{line:s.map(function(p){return [p.lat,p.lng];}),est:false}];
+  var k=(devOf()||'')+'|'+String(s[0].sid||s[0].t), e=SNAP.cache[k];   /* 차량마다 따로 (기기 시계 값은 차량끼리 겹칠 수 있다) */ if(!e){ e=SNAP.cache[k]={parts:[],br:[],prov:[],upto:0,lastPt:null,pending:false,fail:0}; }
+  var tail=s.filter(function(p){ return p.t>e.upto; }), ended=(Date.now()-s[s.length-1].t>120000);
+  if(!e.pending&&(Date.now()-e.fail>600000)&&tail.length){
+    var th=snapThin((e.lastPt?[e.lastPt]:[]).concat(tail)), nw=th.length-(e.lastPt?1:0);
+    if(th.length>=2&&((nw>=4&&th.length>=(e.waitN||0))||(ended&&nw>=1&&e.endT!==s[s.length-1].t))){ e.pending=true; if(ended) e.endT=s[s.length-1].t; SNAP.queue.push({k:k,pts:th,lead:!!e.lastPt,ended:ended,u0:e.upto}); snapPump(); } }
+  /* ★[v110.29] 도로 맞춤이 켜져 있으면 '도로에 맞춘 선' 만 그린다. 아직 못 맞춘 꼬리는 그리지 않는다. */
+  var out=[]; e.parts.forEach(function(p){ if(p.line.length>=2) out.push(p); }); e.br.forEach(function(p){ out.push(p); });
+  e.prov.forEach(function(l){ if(l.length>=2) out.push({line:l,est:false}); });
+  return out;
 }
 function snapPump(){
   if(SNAP.busy||!SNAP.queue.length) return; SNAP.busy=true;
-  var job=SNAP.queue.shift(), P=job.pts, chunks=[], line=[], e=SNAP.cache[job.k], idx=0;
-  for(var i=0;i<P.length-1;i+=89) chunks.push(P.slice(i,Math.min(P.length,i+90)));
+  var job=SNAP.queue.shift(), P=job.pts, e=SNAP.cache[job.k], chunks=[], legs=[], idx=0;
+  for(var i=0;i<P.length-1;i+=89) chunks.push({o:i,p:P.slice(i,Math.min(P.length,i+90))});
   function done(){ SNAP.busy=false; if(e) e.pending=false; try{ drawRoute(); }catch(x){} snapPump(); }
-  (function next(){
-    if(idx>=chunks.length){ if(e){ e.line=e.line.concat(line); e.lastPt=P[P.length-1]; e.upto=P[P.length-1].t; } SNAP.ok++; done(); return; }
-    snapFetch(chunks[idx]).then(function(l){ l.forEach(function(q){ line.push(q); }); idx++; next(); },
-      function(er){ if(er&&er.message==='nomatch'){ SNAP.off++; idx++; next(); return; }   /* 도로가 아닌 곳 → 그 토막은 그리지 않고 다음으로 */
-        if(e){ if(line.length>=2){ var done_=chunks[idx-1]; e.line=e.line.concat(line); e.lastPt=done_[done_.length-1]; e.upto=e.lastPt.t; } e.fail=Date.now(); } SNAP.fail++; done(); });
-  })();
+  function fin(nOk,whole){ if(!e||nOk<=0||e.upto!==job.u0) return; var c=chunks[nOk-1], lastI=c.o+c.p.length-1;   /* 그 사이 다른 작업이 이 구간을 이미 늘렸으면 버린다(같은 선을 두 번 붙이지 않는다) */
+    var u0=e.upto; snapCommit(e,P,legs,(whole&&!job.ended)?Math.max(0,lastI-2):lastI,job.lead,whole&&job.ended);
+    e.waitN=(e.upto===u0)?P.length+2:0; }      /* 확정이 나아가지 않았으면(끝부분에 맞는 도로가 없음) 점이 두 개 더 쌓일 때까지 다시 묻지 않는다 */
+  (function next(rad){
+    if(idx>=chunks.length){ fin(idx,true); SNAP.ok++; done(); return; }
+    var c=chunks[idx];
+    snapFetch(c.p,rad).then(function(ps){ ps.forEach(function(pc){ pc.legs.forEach(function(l){ legs.push({a:l.a+c.o,b:l.b+c.o,line:l.line,coarse:l.coarse}); }); }); idx++; next(12); },
+      function(er){ if(er&&er.message==='nomatch'){ if(rad<25){ next(25); return; } SNAP.off++; idx++; next(12); return; }   /* 도로가 아닌 곳 → 그 토막은 건너뛴다 */
+        fin(idx,false); if(e){ e.fail=Date.now(); e.endT=0; } SNAP.fail++; done(); });
+  })(12);
 }
-/* 달리는 마커를 도로 선 위로 : 가장 가까운 도로 선분에 수직으로 내린다 (35m 안일 때만) */
+/* 달리는 마커를 도로 선 위로 : 가장 가까운 도로 선분에 수직으로 내린다 (35m 안일 때만).
+   ★[v110.34] 선의 맨 끝에 걸리는 경우(마커가 아직 맞추지 않은 앞쪽에 있다)는 8m 안일 때만 붙인다 — 예전에는 선 끝에 붙들려 서 있다가 건너뛰었다 */
 function snapProject(pos,lim){
-  if(!SNAP.on||!pos) return pos; var best=null,bd=lim||35;
-  for(var k in SNAP.cache){ var L=SNAP.cache[k].line; if(!L||L.length<2) continue;
-    for(var i=Math.max(1,L.length-120);i<L.length;i++){ var a=L[i-1],b=L[i];
-      var kx=111320*Math.cos(pos[0]*0.0174532925), ax=(a[1]-pos[1])*kx, ay=(a[0]-pos[0])*111320, bx=(b[1]-pos[1])*kx, by=(b[0]-pos[0])*111320;
+  if(!SNAP.on||!pos) return pos; var best=null,bd=lim||35,atEnd=false;
+  var kx=111320*Math.cos(pos[0]*0.0174532925);
+  function scan(L,last){ if(!L||L.length<2) return;
+    for(var i=Math.max(1,L.length-160);i<L.length;i++){ var a=L[i-1],b=L[i];
+      var ax=(a[1]-pos[1])*kx, ay=(a[0]-pos[0])*111320, bx=(b[1]-pos[1])*kx, by=(b[0]-pos[0])*111320;
       var dx=bx-ax, dy=by-ay, len=dx*dx+dy*dy, t=len>0?Math.max(0,Math.min(1,-(ax*dx+ay*dy)/len)):0, px=ax+dx*t, py=ay+dy*t, d=Math.sqrt(px*px+py*py);
-      if(d<bd){ bd=d; best=[a[0]+(b[0]-a[0])*t, a[1]+(b[1]-a[1])*t]; } } }
+      if(d<bd){ bd=d; best=[a[0]+(b[0]-a[0])*t, a[1]+(b[1]-a[1])*t]; atEnd=(last&&i===L.length-1&&t>=1); } } }
+  for(var k in SNAP.cache){ var e=SNAP.cache[k], n=e.parts?e.parts.length:0; if(!e.parts) continue;
+    var hasProv=e.prov&&e.prov.length;
+    for(var q=Math.max(0,n-3);q<n;q++) scan(e.parts[q].line, !hasProv&&q===n-1);
+    if(hasProv) for(var r=0;r<e.prov.length;r++) scan(e.prov[r], r===e.prov.length-1); }
+  if(best&&atEnd&&bd>8) return pos;
   return best||pos;
 }
 /* ★[v110.32] 서 있는 차도 도로 위에 : 방금 달려온 도로 선에서 12m 안에 서 있으면 그 도로 위에 찍는다.
@@ -1616,7 +1797,10 @@ function stopOnRoad(v,p){
   if(v.gsrc!=='gnss'&&v.gsrc!=='gnss+dr') return p;
   return snapProject(p,12);
 }
-function routeToggleRaw(){ ROUTE_RAW=!ROUTE_RAW; drawRoute(); }
+function routeToggleRaw(){ ROUTE_RAW=!ROUTE_RAW; drawRoute();
+  /* ★[v110.34] 진단용 원본을 보고 있는 동안에는 지도 위에 계속 알린다 — 걸러내지 않은 점이라 건물 위·주차장 안 선이 그대로 보인다 */
+  if(ROUTE_RAW) mapStat('<b>진단용 원본 보기 중</b><span class="why">걸러내지 않은 GPS 점을 그대로 이은 가는 선입니다. 서 있을 때의 떨림·주차장 안 점도 보입니다.</span><a href="#" onclick="routeToggleRaw();return false;" style="color:var(--gold-soft);text-decoration:underline;">정리된 경로로 돌아가기</a>', true);
+  else { var ms=$('mapstat'); if(ms) ms.className='mapstat'; } }
 function routeNote(){
   var ds=$('dsum'); if(!ds||!ROUTE_STAT) return;
   var old=ds.querySelector('.rt-note'); if(old) old.remove();
@@ -1624,18 +1808,21 @@ function routeNote(){
   el.style.cssText='margin-left:8px;color:var(--muted2);';
   el.innerHTML=' · 경로 '+(ROUTE_RAW?'<b style="color:#ff8a7a">진단용 원본(걸러내지 않은 점 — 건물 위로 선이 지나갈 수 있음)</b> '+st.raw+'점':'정리 '+st.kept+'/'+st.raw+'점 (튄 점 '+(st.jump+st.spike)+' · 정차 떨림 '+st.still+' 제외)')
     +' <a href="#" onclick="routeToggleRaw();return false;" style="color:var(--gold,#c8a96e);text-decoration:underline;">'+(ROUTE_RAW?'정리된 경로로 돌아가기':'진단용 원본 보기')+'</a>'
-    +' · <a href="#" onclick="snapToggle();return false;" style="color:var(--gold,#c8a96e);text-decoration:underline;">도로 맞춤 '+(SNAP.on?'켬':'끔')+'</a>'+(SNAP.on?(' ('+(SNAP.busy||SNAP.queue.length?'맞추는 중':'도로 위 구간만 표시')+(SNAP.off?(' · 도로가 아닌 곳 '+SNAP.off+'토막 숨김'):'')+(SNAP.fail?(' · 도로 지도 서버 응답 없음 '+SNAP.fail+'회 — 10분 뒤 다시 시도'):'')+')'):' (GPS 점 그대로 — 도로 밖도 그려짐)');
+    +' · <a href="#" onclick="snapToggle();return false;" style="color:var(--gold,#c8a96e);text-decoration:underline;">도로 맞춤 '+(SNAP.on?'켬':'끔')+'</a>'+(SNAP.on?(' ('+(SNAP.busy||SNAP.queue.length?'맞추는 중':'실선 = 도로에 맞춘 구간 · 점선 = 추정(터널·지도에 없는 길)')+(SNAP.off?(' · 도로가 아닌 곳 '+SNAP.off+'토막 숨김'):'')+(SNAP.fail?(' · 도로 지도 서버 응답 없음 '+SNAP.fail+'회 — 10분 뒤 다시 시도'):'')+')'):' (GPS 점 그대로 — 도로 밖도 그려짐)');
   ds.appendChild(el);
 }
 function drawRoute(){
   if(!mapKind||mapKind==='none') return;
   routeObjs.forEach(function(o){ try{ mapKind==='kakao'?o.setMap(null):lmap.removeLayer(o); }catch(e){} }); routeObjs=[];
   var RR=routeRows(TELE); var res=cleanRoute(RR); ROUTE_STAT=res.stat;
-  var segs=res.segs.map(function(s){ return snapSeg(s); }).filter(function(s){ return s&&s.length>=2; });   /* ★[v110.29] 도로에 맞춘 선만 (못 맞춘 구간은 그리지 않는다) */
-  if(ROUTE_RAW){ var raw=RR.filter(function(t){return t.lat!=null&&t.lng!=null;}).sort(function(a,b){return toMs(a.ts)-toMs(b.ts);}).map(function(t){return [Number(t.lat),Number(t.lng)];}); segs=raw.length>=2?[raw]:[]; }
+  /* ★[v110.34] 그릴 선 목록 : {line, est}. est = 추정 구간(터널을 도로 따라 이은 것 · 도로 지도에 없는 길) → 점선 */
+  var parts=[]; res.segs.forEach(function(s){ snapSeg(s).forEach(function(p){ if(p&&p.line&&p.line.length>=2) parts.push(p); }); });
+  if(!ROUTE_RAW&&SNAP.on) for(var bi=0;bi+1<res.segs.length;bi++){ var bl=snapBridge(res.segs[bi][res.segs[bi].length-1],res.segs[bi+1][0]); if(bl&&bl.length>=2) parts.push({line:bl,est:true}); }   /* 구간 사이(터널 등)는 도로를 따라 점선으로 */
+  if(ROUTE_RAW){ var raw=RR.filter(function(t){return t.lat!=null&&t.lng!=null;}).sort(function(a,b){return toMs(a.ts)-toMs(b.ts);}).map(function(t){return [Number(t.lat),Number(t.lng)];}); parts=raw.length>=2?[{line:raw,est:false,raw:true}]:[]; }
+  var segs=parts.map(function(p){ return p.line; });
   /* 하루 종일 정차(이동 없음) → 선 대신 머문 위치 하나만 */
   var stay=null;
-  if(!segs.length && !ROUTE_RAW){ var good=RR.filter(function(t){return t.lat!=null&&t.lng!=null;}).map(function(t){return {lat:Number(t.lat),lng:Number(t.lng)};});
+  if(!res.segs.length && !ROUTE_RAW){ var good=RR.filter(function(t){return t.lat!=null&&t.lng!=null;}).map(function(t){return {lat:Number(t.lat),lng:Number(t.lng)};});
     if(good.length){ var la=good.map(function(p){return p.lat;}).sort(), ln=good.map(function(p){return p.lng;}).sort(); stay=[la[la.length>>1],ln[ln.length>>1]]; } }
   /* ★[v110.17] 기록이 빠진 구간 : 두 구간 사이가 2시간 안쪽이면 점선으로 잇는다 (실제로 지나간 길은 모른다는 표시) */
   var gapsL=[]; if(!ROUTE_RAW&&!SNAP.on) for(var gi=0;gi+1<res.segs.length;gi++){ var ga=res.segs[gi][res.segs[gi].length-1], gb=res.segs[gi+1][0];
@@ -1645,9 +1832,9 @@ function drawRoute(){
   if(!segs.length&&!imps.length&&!stay) return;
   var col=ROUTE_RAW?'#9aa3ad':'#c8a96e';
   var tag=function(txt,bg){ return '<div style="background:'+bg+';color:#fff;font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:9px;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.3)">'+txt+'</div>'; };
-  var s0=segs.length?segs[0][0]:null, sl=segs.length?segs[segs.length-1][segs[segs.length-1].length-1]:null;
+  var s0=null; for(var si=0;si<parts.length&&!s0;si++){ if(!parts[si].est) s0=parts[si].line[0]; } if(!s0&&segs.length) s0=segs[0][0];
   if(mapKind==='kakao'){
-    segs.forEach(function(sg){ var pl=new kakao.maps.Polyline({path:sg.map(function(p){return new kakao.maps.LatLng(p[0],p[1]);}),strokeWeight:5,strokeColor:col,strokeOpacity:0.9}); pl.setMap(kmap); routeObjs.push(pl); });
+    parts.forEach(function(pt){ var pl=new kakao.maps.Polyline({path:pt.line.map(function(p){return new kakao.maps.LatLng(p[0],p[1]);}),strokeWeight:pt.raw?2:(pt.est?4:5),strokeColor:col,strokeOpacity:pt.est?0.8:0.9,strokeStyle:pt.est?'shortdash':'solid'}); pl.setMap(kmap); routeObjs.push(pl); });
     gapsL.forEach(function(sg){ var pl=new kakao.maps.Polyline({path:sg.map(function(p){return new kakao.maps.LatLng(p[0],p[1]);}),strokeWeight:3,strokeColor:'#8a93a0',strokeOpacity:0.8,strokeStyle:'shortdash'}); pl.setMap(kmap); routeObjs.push(pl); });
     var add=function(pos,html,ya){ var ov=new kakao.maps.CustomOverlay({position:new kakao.maps.LatLng(pos[0],pos[1]),content:html,yAnchor:ya||1.4}); ov.setMap(kmap); routeObjs.push(ov); };
     if(s0&&!ROUTE_RAW) add(s0,tag('출발','#2e9e5b'));   /* ★[v110.30] '도착' 표시는 없앴다 — 달리는 동안 경로 끝을 따라다니며 계속 떴다 */
@@ -1655,21 +1842,23 @@ function drawRoute(){
     /* ★[v110.30] 충격 표시를 단순하게 : 작은 점 + 흰 바탕의 얇은 글자표 (이모지·빨간 알약 없앰) */
     var impTag=function(txt){ return '<div style="position:relative;width:8px;height:8px;pointer-events:none"><span style="position:absolute;left:0;top:0;width:8px;height:8px;box-sizing:border-box;border-radius:50%;background:#e0705e;border:1.5px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.25)"></span>'
       +'<span style="position:absolute;left:12px;top:-5px;background:rgba(255,255,255,.94);color:#3a3f47;font-size:10px;line-height:15px;font-weight:600;padding:0 5px;border-radius:4px;border:1px solid rgba(0,0,0,.14);white-space:nowrap">'+txt+'</span></div>'; };
-    imps.forEach(function(e){ add([Number(e.lat),Number(e.lng)],impTag('충격 '+(e.shock!=null?Number(e.shock).toFixed(1)+'g':'')),0.5); });
+    /* ★[v110.34] 주행 중 작은 충격(2.5g 미만 — 포트홀·요철)은 글자표 없이 점만 찍는다(펌웨어 v9.9-precise42 부터 주행 중 1.9g 이상을 기록해 개수가 많다). 주차 중 충격과 큰 충격은 글자표까지 */
+    var impDot='<div style="width:7px;height:7px;box-sizing:border-box;border-radius:50%;background:#e9a23b;border:1.5px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.25);pointer-events:none"></div>';
+    imps.forEach(function(e){ var minor=(impactMode(e)!=='park'&&e.shock!=null&&Number(e.shock)<2.5); add([Number(e.lat),Number(e.lng)],minor?impDot:impTag('충격 '+(e.shock!=null?Number(e.shock).toFixed(1)+'g':'')),0.5); });
   } else {
-    segs.forEach(function(sg){ routeObjs.push(L.polyline(sg,{color:col,weight:5,opacity:0.9}).addTo(lmap)); });
+    parts.forEach(function(pt){ routeObjs.push(L.polyline(pt.line,{color:col,weight:pt.raw?2:(pt.est?4:5),opacity:pt.est?0.8:0.9,dashArray:pt.est?'7 7':null}).addTo(lmap)); });
     gapsL.forEach(function(sg){ routeObjs.push(L.polyline(sg,{color:'#8a93a0',weight:3,opacity:0.8,dashArray:'6 8'}).addTo(lmap)); });
     var mk=function(pos,txt,c){ routeObjs.push(L.circleMarker(pos,{radius:7,color:c,fillColor:c,fillOpacity:0.9}).bindTooltip(txt,{permanent:true,direction:'top'}).addTo(lmap)); };
     if(s0&&!ROUTE_RAW) mk(s0,'출발','#2e9e5b');
     if(stay) mk(stay,'머문 위치 (이동 없음)','#5a6270');
-    imps.forEach(function(e){ routeObjs.push(L.circleMarker([Number(e.lat),Number(e.lng)],{radius:4,color:'#ffffff',weight:1.5,fillColor:'#e0705e',fillOpacity:1}).bindTooltip('충격 '+(e.shock!=null?Number(e.shock).toFixed(1)+'g':'')).addTo(lmap)); });
+    imps.forEach(function(e){ var minor=(impactMode(e)!=='park'&&e.shock!=null&&Number(e.shock)<2.5); routeObjs.push(L.circleMarker([Number(e.lat),Number(e.lng)],{radius:minor?3:4,color:'#ffffff',weight:1.5,fillColor:minor?'#e9a23b':'#e0705e',fillOpacity:1}).bindTooltip('충격 '+(e.shock!=null?Number(e.shock).toFixed(1)+'g':'')).addTo(lmap)); });
   }
 }
 function csvExport(){
-  var rows=[['시각','종류','충격구분','층','고도(m)','방향(deg)','속도(km/h)','충격(g)','위도','경도','위성수','GPS종류','수평오차(m)','상태','부팅원인','경로점수']];
+  var rows=[['시각','종류','충격구분','층','고도(m)','방향(deg)','속도(km/h)','충격(g)','위도','경도','위성수','GPS종류','수평오차(m)','상태','부팅원인','경로점수','기압(hPa)','온도(C)']];
   EVTS.forEach(function(e){ var cls=e.event==='impact'?(impactMode(e)==='park'?'주차중':'주행중'):'';
-    rows.push([fmtTs(e.ts),e.event||'',cls,floorStr(num(e.floor)),e.alt!=null?e.alt:'',e.heading!=null?Math.round(e.heading):'',e.speed!=null?e.speed:'',e.shock!=null?e.shock:'',e.lat!=null?e.lat:'',e.lng!=null?e.lng:'','','','','',e.rst||'','']); });
-  TELE.forEach(function(t){ rows.push([fmtTs(t.ts),'주기','',flrOf(t),t.alt!=null?t.alt:'',t.heading!=null?Math.round(t.heading):'',t.speed!=null?t.speed:'',t.shock!=null?t.shock:'',t.lat!=null?t.lat:'',t.lng!=null?t.lng:'',t.sats!=null?t.sats:'',t.gfix!=null?t.gfix:'',t.hacc!=null?t.hacc:'',t.mstate||'','',(typeof t.rt==='string'&&t.rt)?(t.rt.split('|').length-4):'']); });
+    rows.push([fmtTs(e.ts),e.event||'',cls,floorStr(num(e.floor)),e.alt!=null?e.alt:'',e.heading!=null?Math.round(e.heading):'',e.speed!=null?e.speed:'',e.shock!=null?e.shock:'',e.lat!=null?e.lat:'',e.lng!=null?e.lng:'','','','','',e.rst||'','','','']); });
+  TELE.forEach(function(t){ rows.push([fmtTs(t.ts),'주기','',flrOf(t),t.alt!=null?t.alt:'',t.heading!=null?Math.round(t.heading):'',t.speed!=null?t.speed:'',t.shock!=null?t.shock:'',t.lat!=null?t.lat:'',t.lng!=null?t.lng:'',t.sats!=null?t.sats:'',t.gfix!=null?t.gfix:'',t.hacc!=null?t.hacc:'',t.mstate||'','',(typeof t.rt==='string'&&t.rt)?(t.rt.split('|').length-4):'',t.hpa!=null?t.hpa:'',t.temp!=null?t.temp:'']); });
   var csv='﻿'+rows.map(function(r){return r.map(function(c){ var t=String(c==null?'':c); if(/^[=+\-@]/.test(t)) t="'"+t; return /[",\n]/.test(t)?('"'+t.replace(/"/g,'""')+'"'):t; }).join(',');}).join('\n');   /* ★[v108] 엑셀 수식 주입 방지·쉼표 처리 */
   var a=document.createElement('a');
   a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
