@@ -352,7 +352,7 @@ body.ops .kpis, body.ops .main, body.ops .bottom{display:none!important;}
     <button class="ntab on" id="nt-live" onclick="switchView('live')">실시간 관제</button>
     <button class="ntab" id="nt-ops" onclick="switchView('ops')">운영 관리</button>
   </div>
-  <span class="sync off" id="sync">CONNECTING…</span><span id="pver" title="이 화면의 버전" style="font-size:11px;color:var(--muted);letter-spacing:.5px;white-space:nowrap;">v110.35</span>
+  <span class="sync off" id="sync">CONNECTING…</span><span id="pver" title="이 화면의 버전" style="font-size:11px;color:var(--muted);letter-spacing:.5px;white-space:nowrap;">v110.36</span>
   <span class="clock" id="clock">--:--:--</span>
   <span class="adm" id="adm">—</span>
   <button class="lgout" id="mfabtn" onclick="if(window.CaroMFA)CaroMFA.openSetup()">🔐 2단계 인증</button>
@@ -479,7 +479,7 @@ body.ops .kpis, body.ops .main, body.ops .bottom{display:none!important;}
 <script>
 /* ★[v110.20] 화면 버전 자가 점검 — 태블릿 앱·브라우저가 옛 화면을 붙잡고 있으면(캐시) 켤 때·다시 볼 때 스스로 새로 받는다.
    로그인 전 화면에서도 동작한다(예전 자동 업데이트는 로그인 칸에 글자가 들어 있으면 '입력 중' 으로 보고 미뤘다). 같은 버전으로는 3번까지만 시도한다. */
-var CARO_PAGE_VER='110.35';
+var CARO_PAGE_VER='110.36';
 function caroSelfCheck(){
   try{
     fetch('version.txt?t='+Date.now(),{cache:'no-store'}).then(function(r){ return r.ok?r.text():''; }).then(function(t){
@@ -652,20 +652,24 @@ function rtDecode(str, tsMs){
 function rtIdMs(id){ if(typeof id!=='string') return null; var m=/^(\d+)-(\d+)-\d+-/.exec(id); if(!m) return null; var ms=Number(m[2]); return isFinite(ms)?{b:m[1],ms:ms}:null; }
 /* 위성 없이 추정한 위치(터널 안 등)인가 : 모듈이 밝힌 오차가 30m 를 넘는 추측항법·추정 위치는 도로에서 벗어나 있으므로 경로에 쓰지 않는다 */
 /* 차가 터널·지하차도 안에 있어 위치가 추정값인가 (기기 문서 기준) */
-function tunOf(v){ return !!v&&v.gsrc==='dr'&&v.ctx!=='park'&&v.ctx!=='cand'&&!(typeof v.posAcc==='number'&&v.posAcc>0&&v.posAcc<=30); }
-function rtEst(d){ var g=d.gfix, h=d.hacc; return (g===0||g===1)&&typeof h==='number'&&h>30; }   /* 오차 값이 없는 기록(옛 펌웨어·위성 문장만 쓰는 기기)은 추정으로 보지 않는다 */
+var EST_ACC=8;   /* ★[v110.36] 위성 없이 이어 간 위치(추측항법)는 모듈이 밝힌 오차가 이 값(m) 이하일 때만 믿는다. 11/16 청라지하차도 : 오차 30m 라고 밝힌 점이 실제로는 도로에서 크게 벗어나 있었다(모듈은 자기 오차를 작게 말한다) */
+function tunOf(v){ return !!v&&v.gsrc==='dr'&&v.ctx!=='park'&&v.ctx!=='cand'&&!(typeof v.posAcc==='number'&&v.posAcc>0&&v.posAcc<=EST_ACC); }
+function rtEst(d){ var g=d.gfix, h=d.hacc; return (g===0||g===1)&&typeof h==='number'&&h>EST_ACC; }   /* 오차 8m 를 넘는 추측항법·추정 위치(터널·지하차도 안). 오차 값이 없는 기록(옛 펌웨어)은 추정으로 보지 않는다 */
 /* 기록 문서 목록 → 경로용 점 목록. 묶음(rt)이 있으면 그 안의 점들을, 없으면(옛 펌웨어·정차 보고) 문서의 위치 한 점을 쓴다 */
 function routeRows(rows){
   var out=[], seen={}, off={};
   rows.forEach(function(d){ var k=rtIdMs(d._id), ms=toMs(d.ts); if(!k||!ms) return; var o=ms-k.ms; if(off[k.b]==null||o<off[k.b]) off[k.b]=o; });
-  rows.forEach(function(d){
-    var ms=toMs(d.ts);
+  /* ★[v110.36] 터널을 막 나온 뒤의 첫 묶음에는 터널 안에서 추정한 점들이 섞여 있다(묶음마다 '보고할 때의 상태' 만 알 수 있다) → 그 묶음은 가장 최근 점 하나만 쓴다 */
+  var ord=rows.slice().sort(function(a,b){ return toMs(a.ts)-toMs(b.ts); }), prevEst=false;
+  ord.forEach(function(d){
+    var ms=toMs(d.ts), est=rtEst(d), afterEst=prevEst&&!est; prevEst=est;
     if(!ROUTE_RAW&&(d.ctx==='park'||d.ctx==='cand')) return;   /* ★[v110.29] 도로가 아닌 곳(주차장 안·실내 확인중)의 점은 지도 경로에 그리지 않는다 */
     if(!ROUTE_RAW&&rtEst(d)) return;                             /* ★[v110.34] 터널 안 추정 위치는 그리지 않는다 — 그 구간은 도로 지도를 따라 점선으로 잇는다 */
     if(typeof d.rt==='string'&&d.rt){
       var k=rtIdMs(d._id), base=ms, bk='';
       if(k&&off[k.b]!=null){ var b2=k.ms+off[k.b]; if(ms-b2>=0&&ms-b2<=900000){ base=b2; bk=k.b; } }   /* 15분 넘게 차이 나면(시계 넘침 등) 예전 방식 */
-      rtDecode(d.rt,base).forEach(function(q){
+      var dec=rtDecode(d.rt,base); if(afterEst&&!ROUTE_RAW&&dec.length>1) dec=dec.slice(-1);
+      dec.forEach(function(q){
         var kk=Math.round(q.t/300), key=bk+':'; if(seen[key+kk]||seen[key+(kk-1)]||seen[key+(kk+1)]) return; seen[key+kk]=1;   /* 다시 보낸 묶음(응답을 못 받아 한 번 더 보낸 것)의 같은 점은 한 번만 */
         out.push({lat:q.lat,lng:q.lng,ts:q.t,speed:q.v,gsrc:'rt',sid:(bk?bk+':'+Math.round((q.t-off[bk])/100):null)}); }); }
     else if(d.lat!=null&&d.lng!=null) out.push(d);
@@ -678,12 +682,12 @@ function routeRows(rows){
               ③ 곧게(또는 완만하게 돌며) 빠르게 달리는 중에는 받은 마지막 점보다 최대 4.5초(3초) 앞까지 마지막 움직임을 이어 나아간다(다음 점이 오면 그 위로 부드럽게 붙는다)
               ④ 속도 칸에는 가장 최근에 받은 속도를 적는다(예전에는 마커가 있는 '몇 초 전' 자리의 속도였다) */
 var GL={dev:null,pts:[],play:0,wall:0,pos:null,lastT:0,timer:null,mk:null,offB:null,offV:0,rtStr:'',shown:null,vShow:null,arr:0,ivl:0};
-function glReset(dev){ GL.dev=dev; GL.pts=[]; GL.play=0; GL.wall=0; GL.pos=null; GL.lastT=0; GL.offB=null; GL.offV=0; GL.rtStr=''; GL.shown=null; GL.vShow=null; GL.arr=0; GL.ivl=0; }
+function glReset(dev){ GL.dev=dev; GL.pts=[]; GL.play=0; GL.wall=0; GL.pos=null; GL.lastT=0; GL.offB=null; GL.offV=0; GL.rtStr=''; GL.shown=null; GL.vShow=null; GL.arr=0; GL.ivl=0; GL.afterEst=false; }
 function glFeed(dev,d){
   if(!dev||dev!==GL.dev||typeof d.rt!=='string'||!d.rt) return;
   var ls=(d.lastSeen&&d.lastSeen.toDate)?d.lastSeen.toDate().getTime():0; if(!ls) return;
   if(d.rt===GL.rtStr) return; GL.rtStr=d.rt;      /* 같은 묶음을 두 번 재생하지 않는다 (서 있을 때는 보고 시각만 바뀌고 묶음은 그대로다 → 예전에는 마지막 몇 초를 다시 재생했다) */
-  if(d.gsrc==='dr'&&!(typeof d.posAcc==='number'&&d.posAcc>0&&d.posAcc<=30)) return;   /* 터널 안 추정 위치는 재생하지 않는다 */
+  if(d.gsrc==='dr'&&!(typeof d.posAcc==='number'&&d.posAcc>0&&d.posAcc<=EST_ACC)){ GL.afterEst=true; return; }   /* 터널 안 추정 위치는 재생하지 않는다 */
   var base=ls, clk=false;
   if(typeof d.rtm==='number'&&d.rtm>0){
     var b=String(d.rtb!=null?d.rtb:''), dm=d.rtm*100, o=ls-dm;
@@ -691,6 +695,7 @@ function glFeed(dev,d){
     else if(o<GL.offV){ var sh=GL.offV-o; GL.offV=o; GL.pts.forEach(function(q){ q.t-=sh; }); GL.play-=sh; GL.lastT-=sh; }
     base=dm+GL.offV; clk=true; }
   var add=rtDecode(d.rt,base); if(!add.length) return;
+  if(GL.afterEst){ GL.afterEst=false; add=add.slice(-1); GL.pts=[]; }   /* 터널을 나온 직후의 묶음 : 안에서 추정한 점이 섞여 있다 → 가장 최근 점만 */
   if(clk) add=add.filter(function(q){ return q.t>GL.lastT+200; });
   else if(GL.lastT&&add[0].t<=GL.lastT+200){ var sf=GL.lastT+800-add[0].t; add.forEach(function(q){ q.t+=sf; }); }   /* 옛 펌웨어 : 늦게 도착해 시각이 겹치면 버리지 않고 뒤로 밀어 순서를 지킨다 */
   if(!add.length) return;
@@ -1691,12 +1696,12 @@ function snapFetch(pts,rad,old){
       if(!out.length) throw new Error('nomatch');
       return out; });
 }
-/* 맞추지 못한 점들(도로 지도에 없는 길)을 GPS 점 그대로 잇는다 : a 다음 점부터 b 앞 점까지. 한 걸음이 250m 를 넘거나 거의 서 있던 점들이면(주차장·정차 떨림) 잇지 않는다 */
+/* 맞추지 못한 점들(도로 지도에 없는 길)을 GPS 점 그대로 잇는다 : a 다음 점부터 b 앞 점까지. 한 걸음이 150m 를 넘거나 거의 서 있던 점들이면(주차장·정차 떨림) 잇지 않는다 */
 function snapRawBridge(P,a,b,from,to){
   var mid=[], vs=[], i; for(i=a+1;i<b&&i<P.length;i++){ if(i<0) continue; mid.push([P[i].lat,P[i].lng]); if(P[i].v!=null) vs.push(P[i].v); }
   if(!mid.length) return null;
   var line=(from?[from]:[]).concat(mid); if(to) line.push(to); if(line.length<2) return null;
-  for(i=1;i<line.length;i++) if(_m(line[i-1],line[i])>250) return null;
+  for(i=1;i<line.length;i++) if(_m(line[i-1],line[i])>150) return null;
   if(vs.length){ vs.sort(function(x,y){return x-y;}); if(vs[vs.length>>1]<10) return null; }
   return line;
 }
@@ -1773,8 +1778,10 @@ function snapSeg(s){
   e.prov.forEach(function(l){ if(l.length>=2) out.push({line:l,est:false}); });
   /* ★[v110.35] 아직 도로에 맞추지 못한 부분(맞추는 중이거나 도로 지도 서버가 응답하지 않을 때)은 GPS 점 그대로 옅은 선으로 먼저 그린다 — 예전에는 다 맞출 때까지(하루치 1~2분) 아무 선도 없었다.
      점 시각이 바로잡혀(v110.34) GPS 선이 건물을 가로지르지 않는다. 맞춤이 끝난 부분부터 도로 선으로 바뀐다. 맞출 도로가 없다고 판정된 곳(주차장 안 등)은 계속 숨긴다. */
-  var from=(e.prov.length&&e.provT)?e.provT:e.upto, pl=[]; s.forEach(function(p){ if(p.t>=from) pl.push([p.lat,p.lng]); });
-  if(pl.length>=2&&(e.pending||tail.length>1)) out.push({line:pl,est:false,pend:true});
+  var from=(e.prov.length&&e.provT)?e.provT:e.upto;
+  if(e.pending||tail.length>1){ var pl=[], lp=null;      /* ★[v110.36] 점 사이가 150m 넘게 비거나 20초 넘게 빈 곳(터널·지하차도)은 직선으로 잇지 않고 끊는다 */
+    s.forEach(function(p){ if(p.t<from) return; if(lp&&(_hv(lp,p)>150||p.t-lp.t>20000)){ if(pl.length>=2) out.push({line:pl,est:false,pend:true}); pl=[]; } pl.push([p.lat,p.lng]); lp=p; });
+    if(pl.length>=2) out.push({line:pl,est:false,pend:true}); }
   return out;
 }
 /* 지도 왼쪽 아래에 도로 맞춤 진행·실패를 알린다 (다른 안내가 떠 있으면 건드리지 않는다) */
