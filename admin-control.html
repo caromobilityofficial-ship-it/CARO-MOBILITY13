@@ -352,7 +352,7 @@ body.ops .kpis, body.ops .main, body.ops .bottom{display:none!important;}
     <button class="ntab on" id="nt-live" onclick="switchView('live')">실시간 관제</button>
     <button class="ntab" id="nt-ops" onclick="switchView('ops')">운영 관리</button>
   </div>
-  <span class="sync off" id="sync">CONNECTING…</span><span id="pver" title="이 화면의 버전" style="font-size:11px;color:var(--muted);letter-spacing:.5px;white-space:nowrap;">v110.31</span>
+  <span class="sync off" id="sync">CONNECTING…</span><span id="pver" title="이 화면의 버전" style="font-size:11px;color:var(--muted);letter-spacing:.5px;white-space:nowrap;">v110.32</span>
   <span class="clock" id="clock">--:--:--</span>
   <span class="adm" id="adm">—</span>
   <button class="lgout" id="mfabtn" onclick="if(window.CaroMFA)CaroMFA.openSetup()">🔐 2단계 인증</button>
@@ -478,7 +478,7 @@ body.ops .kpis, body.ops .main, body.ops .bottom{display:none!important;}
 <script>
 /* ★[v110.20] 화면 버전 자가 점검 — 태블릿 앱·브라우저가 옛 화면을 붙잡고 있으면(캐시) 켤 때·다시 볼 때 스스로 새로 받는다.
    로그인 전 화면에서도 동작한다(예전 자동 업데이트는 로그인 칸에 글자가 들어 있으면 '입력 중' 으로 보고 미뤘다). 같은 버전으로는 3번까지만 시도한다. */
-var CARO_PAGE_VER='110.31';
+var CARO_PAGE_VER='110.32';
 function caroSelfCheck(){
   try{
     fetch('version.txt?t='+Date.now(),{cache:'no-store'}).then(function(r){ return r.ok?r.text():''; }).then(function(t){
@@ -766,7 +766,7 @@ function mapDraw(){
      차량을 바꿔 누르면 그 차의 마커/위치로 즉시 전환된다. 기기 미연결 차는 위치가 없어 마커 없음. */
   var v=FLEET.find(function(x){return x.id===selId;});
   if(v){
-    var p=smoothPos(v);
+    var p=stopOnRoad(v,smoothPos(v));                                                 /* ★[v110.32] 서 있는 차 : 달려온 도로에서 12m 안이면 도로 위에 */
     var gdev=IDMAP[v.id]||null; if(gdev!==GL.dev) glReset(gdev);                      /* ★[v110.17] 차량을 바꾸면 재생을 새로 시작 */
     if(GL.pos&&GL.pts.length&&v.online) p=GL.pos;                                     /* 경로 재생 중이면 그 위치(미끄러지듯 이동) */
     GL.mk=null;
@@ -933,7 +933,7 @@ function renderDiag(v){
     ['GPS 수신', (typeof v.gfix==='number')?('<span class="'+((v.gfix>=2&&v.gfix<=4)?'g':'r')+'">'+(({0:'위성 없음',1:'추측항법만',2:'2D',3:'3D',4:'위성+관성',5:'시각만'})[v.gfix]||v.gfix)+'</span>'
         +((typeof v.gWd==='number'&&v.gWd>0)?(' · 재시작 '+v.gWd+'회'):'')+((typeof v.gAgc==='number'&&v.gAgc>=0)?(' · 증폭 '+Math.round(v.gAgc/81.91)+'%'):'')+((typeof v.rtPend==='number'&&v.rtPend>40)?(' · 밀린 경로 '+v.rtPend+'점'):'')+(v.gCfg===1?' · 위성 4종(GPS·갈릴레오·베이더우·QZSS)':(v.gCfg===-1?' · 위성 기본(GPS·글로나스)':''))+((v.gSky!=null)?(' · 신호 센 위성 '+v.gSky+'개'):'')+(v.gWeak?(v.gsrc==='wifi'?(' · <span class="b">하늘이 안 보이는 곳 — 주변 공유기 '+(v.wfUsed||0)+'개로 잰 위치 사용 중'+(v.wfAcc?(' (약 ±'+Math.round(v.wfAcc)+'m)'):'')+'</span>'):' · <span class="r">⚠ 하늘이 안 보이는 곳(실내·지하·건물 틈) — GPS 가 반사 신호로 계산해 수십~100m 틀릴 수 있어, 마지막으로 믿을 만했던 자리에 고정해 둠 (이 근처 공유기를 아직 못 배움)</span>'):'')+((v.wfN!=null)?(' · 기억한 공유기 '+v.wfN+'개(지금 '+(v.wfSeen||0)+'개 들림)'):'')+((typeof v.gDiff==='boolean')?(v.gDiff?' · <span class="g">보정 신호 사용 중</span>':' · 보정 신호 없음'):'')+((typeof v.gaOn==='boolean')?(' · 위치 고정 '+(v.gaOn?('켜짐(평균 '+(v.gaN||0)+'회)'):'꺼짐(이동 중·자리 잡는 중)')+((v.gaRel>0)?(' · 풀림 '+v.gaRel+'회('+(({1:'속도',2:'멀어짐',3:'서행'})[v.gaWhy]||'—')+')'):' · 풀림 0회')+((v.gaFix>0)?(' · 바로잡음 '+v.gaFix+'회'):'')+((v.gaD!=null&&v.gaD>=10)?(' · <span class="r">고정 위치와 GPS 가 '+Math.round(v.gaD)+'m 다름(바로잡는 중)</span>'):'')):'')   /* ★[v110.21] 정차 위치 고정 상태 */):'<span class="gd">—</span>'],   /* ★[v110.19] gCfg = 위성군 설정 결과 */
     ['자이로(충격)', (typeof v.heading==='number')?'<span class="g">정상</span>':'<span class="r">응답없음</span>'],
-    ['펌웨어', '<span class="gd">'+esc(v.fw||'—')+'</span>'+(v.ota?(' · 원격 업데이트: '+esc(v.ota)):'')],   /* ★[v110.23] */
+    ['펌웨어', '<span class="gd">'+esc(v.fw||'—')+'</span>'+(v.ota?(' · 원격 업데이트: '+esc(v.ota)):'')+(v.repMin?' · <span class="r">⚠ 서버가 전체 보고를 거부해 최소 보고만 받는 중'+((typeof v.rep400==='number'&&v.rep400>0)?(' (거부 '+v.rep400+'회)'):'')+'</span>':'')],   /* ★[v110.23] ★[v110.32] */
   ];
   /* [v9 단말] 전원·입력·신호 */
   if(typeof v.vbat==='number'){
@@ -1323,7 +1323,7 @@ function remap(){
     v.impact=(d.impact===true); v.over=(d.over===true); v.moving=(d.moving===true);
     /* ★[v110.14] 움직임 상태 7가지 (v9.9-precise11 부터 보냄) — 없으면(옛 펌웨어) 빈값 → 예전처럼 주행중/정지 두 가지 */
     v.mstate=(typeof d.mstate==='string')?d.mstate:''; v.mstateSec=num(d.mstateSec);
-    v.fw=d.fw||''; v.ota=d.ota||''; v.lastSeen=ls;
+    v.fw=d.fw||''; v.ota=d.ota||''; v.lastSeen=ls; v.repMin=(d.repMin===true); v.rep400=num(d.rep400);   /* ★[v110.32] */
     /* [v9 단말 추가 필드] */
     v.vbat=num(d.vbat); v.acc=(d.acc===true); v.in1=(d.in1===true); v.in2=(d.in2===true); v.temp=num(d.temp); v.csq=num(d.csq);
     v.immob=(d.immob===true); v.hazUnknown=(d.hazUnknown===true); v.doorOpen=(d.doorOpen===true||d.in1===true); v.accOffSec=num(d.accOffSec);
@@ -1598,14 +1598,23 @@ function snapPump(){
   })();
 }
 /* 달리는 마커를 도로 선 위로 : 가장 가까운 도로 선분에 수직으로 내린다 (35m 안일 때만) */
-function snapProject(pos){
-  if(!SNAP.on||!pos) return pos; var best=null,bd=35;
+function snapProject(pos,lim){
+  if(!SNAP.on||!pos) return pos; var best=null,bd=lim||35;
   for(var k in SNAP.cache){ var L=SNAP.cache[k].line; if(!L||L.length<2) continue;
     for(var i=Math.max(1,L.length-120);i<L.length;i++){ var a=L[i-1],b=L[i];
       var kx=111320*Math.cos(pos[0]*0.0174532925), ax=(a[1]-pos[1])*kx, ay=(a[0]-pos[0])*111320, bx=(b[1]-pos[1])*kx, by=(b[0]-pos[0])*111320;
       var dx=bx-ax, dy=by-ay, len=dx*dx+dy*dy, t=len>0?Math.max(0,Math.min(1,-(ax*dx+ay*dy)/len)):0, px=ax+dx*t, py=ay+dy*t, d=Math.sqrt(px*px+py*py);
       if(d<bd){ bd=d; best=[a[0]+(b[0]-a[0])*t, a[1]+(b[1]-a[1])*t]; } } }
   return best||pos;
+}
+/* ★[v110.32] 서 있는 차도 도로 위에 : 방금 달려온 도로 선에서 12m 안에 서 있으면 그 도로 위에 찍는다.
+   (위성 오차 몇 m 때문에 길 옆 건물·인도 위에 찍혀 보이던 것. 달리는 중에는 전부터 도로 선에 붙였다)
+   도로에서 12m 넘게 떨어진 곳(주차장·건물 앞마당)과 건물·지하주차장 안, 위성이 아닌 위치(와이파이·추측항법)는 보고된 자리 그대로 둔다 — 도로에 없는 차를 도로에 그리지 않는다. */
+function stopOnRoad(v,p){
+  if(!p||!v||!SNAP.on) return p;
+  if(v.ctx!=='out') return p;
+  if(v.gsrc!=='gnss'&&v.gsrc!=='gnss+dr') return p;
+  return snapProject(p,12);
 }
 function routeToggleRaw(){ ROUTE_RAW=!ROUTE_RAW; drawRoute(); }
 function routeNote(){
