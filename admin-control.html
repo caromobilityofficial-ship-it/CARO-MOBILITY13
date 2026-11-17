@@ -352,7 +352,7 @@ body.ops .kpis, body.ops .main, body.ops .bottom{display:none!important;}
     <button class="ntab on" id="nt-live" onclick="switchView('live')">실시간 관제</button>
     <button class="ntab" id="nt-ops" onclick="switchView('ops')">운영 관리</button>
   </div>
-  <span class="sync off" id="sync">CONNECTING…</span><span id="pver" title="이 화면의 버전" style="font-size:11px;color:var(--muted);letter-spacing:.5px;white-space:nowrap;">v110.36</span>
+  <span class="sync off" id="sync">CONNECTING…</span><span id="pver" title="이 화면의 버전" style="font-size:11px;color:var(--muted);letter-spacing:.5px;white-space:nowrap;">v110.38</span>
   <span class="clock" id="clock">--:--:--</span>
   <span class="adm" id="adm">—</span>
   <button class="lgout" id="mfabtn" onclick="if(window.CaroMFA)CaroMFA.openSetup()">🔐 2단계 인증</button>
@@ -479,7 +479,7 @@ body.ops .kpis, body.ops .main, body.ops .bottom{display:none!important;}
 <script>
 /* ★[v110.20] 화면 버전 자가 점검 — 태블릿 앱·브라우저가 옛 화면을 붙잡고 있으면(캐시) 켤 때·다시 볼 때 스스로 새로 받는다.
    로그인 전 화면에서도 동작한다(예전 자동 업데이트는 로그인 칸에 글자가 들어 있으면 '입력 중' 으로 보고 미뤘다). 같은 버전으로는 3번까지만 시도한다. */
-var CARO_PAGE_VER='110.36';
+var CARO_PAGE_VER='110.38';
 function caroSelfCheck(){
   try{
     fetch('version.txt?t='+Date.now(),{cache:'no-store'}).then(function(r){ return r.ok?r.text():''; }).then(function(t){
@@ -649,6 +649,10 @@ function rtDecode(str, tsMs){
    (11/16 남청라IC : 74초 늦게 도착한 보고 하나가 부채꼴을 만들었다. 유턴·나들목에서 선이 가로질러 그려진 것도 같은 원인).
    기록 문서의 이름에 '부팅 번호-기기 시계(ms)-순번' 이 들어 있으므로, 부팅마다 (서버 시각 − 기기 시계) 가 가장 작았던 보고(= 가장 덜 늦은 보고)를 기준으로
    모든 점의 시각을 기기 시계로 다시 계산한다 → 보고가 아무리 늦게 도착해도 점의 순서와 간격이 틀리지 않는다. 이미 쌓인 옛 기록에도 그대로 적용된다. */
+/* ★[v110.38] 말이 안 되는 기록 : 시속 200km 이상이거나 기기가 밝힌 수평 오차가 30m 를 넘는 보고는 경로에 쓰지 않는다.
+   11/17 14:04 — 지하 주차장에 서 있는 채 기기가 다시 켜진 직후 '시속 129~235km · 오차 최대 120m' 인 위치가 30초 동안 올라와 지도에 300m 짜리 대각선이 그려졌다
+   (펌웨어 v9.9-precise44 부터는 기기가 이런 값을 처음부터 버린다. 이 검사는 이미 쌓인 기록과 옛 펌웨어용) */
+function rtBogus(d){ return (typeof d.speed==='number'&&d.speed>=200)||(typeof d.hacc==='number'&&d.hacc>30); }
 function rtIdMs(id){ if(typeof id!=='string') return null; var m=/^(\d+)-(\d+)-\d+-/.exec(id); if(!m) return null; var ms=Number(m[2]); return isFinite(ms)?{b:m[1],ms:ms}:null; }
 /* 위성 없이 추정한 위치(터널 안 등)인가 : 모듈이 밝힌 오차가 30m 를 넘는 추측항법·추정 위치는 도로에서 벗어나 있으므로 경로에 쓰지 않는다 */
 /* 차가 터널·지하차도 안에 있어 위치가 추정값인가 (기기 문서 기준) */
@@ -664,12 +668,12 @@ function routeRows(rows){
   ord.forEach(function(d){
     var ms=toMs(d.ts), est=rtEst(d), afterEst=prevEst&&!est; prevEst=est;
     if(!ROUTE_RAW&&(d.ctx==='park'||d.ctx==='cand')) return;   /* ★[v110.29] 도로가 아닌 곳(주차장 안·실내 확인중)의 점은 지도 경로에 그리지 않는다 */
-    if(!ROUTE_RAW&&rtEst(d)) return;                             /* ★[v110.34] 터널 안 추정 위치는 그리지 않는다 — 그 구간은 도로 지도를 따라 점선으로 잇는다 */
+    if(!ROUTE_RAW&&(rtEst(d)||rtBogus(d))) return;                             /* ★[v110.34] 터널 안 추정 위치는 그리지 않는다 — 그 구간은 도로 지도를 따라 점선으로 잇는다 */
     if(typeof d.rt==='string'&&d.rt){
       var k=rtIdMs(d._id), base=ms, bk='';
       if(k&&off[k.b]!=null){ var b2=k.ms+off[k.b]; if(ms-b2>=0&&ms-b2<=900000){ base=b2; bk=k.b; } }   /* 15분 넘게 차이 나면(시계 넘침 등) 예전 방식 */
       var dec=rtDecode(d.rt,base); if(afterEst&&!ROUTE_RAW&&dec.length>1) dec=dec.slice(-1);
-      dec.forEach(function(q){
+      dec.forEach(function(q){ if(!ROUTE_RAW&&q.v>=200) return;
         var kk=Math.round(q.t/300), key=bk+':'; if(seen[key+kk]||seen[key+(kk-1)]||seen[key+(kk+1)]) return; seen[key+kk]=1;   /* 다시 보낸 묶음(응답을 못 받아 한 번 더 보낸 것)의 같은 점은 한 번만 */
         out.push({lat:q.lat,lng:q.lng,ts:q.t,speed:q.v,gsrc:'rt',sid:(bk?bk+':'+Math.round((q.t-off[bk])/100):null)}); }); }
     else if(d.lat!=null&&d.lng!=null) out.push(d);
@@ -1625,6 +1629,21 @@ try{ if(localStorage.getItem('caro_snap')==='0') SNAP.on=false; }catch(e){}
 var SNAP_URL='https://router.project-osrm.org/match/v1/driving/', ROUTE_URL='https://router.project-osrm.org/route/v1/driving/';
 function snapToggle(){ SNAP.on=!SNAP.on; try{ localStorage.setItem('caro_snap',SNAP.on?'1':'0'); }catch(e){} drawRoute(); }
 function _m(a,b){ return _hv({lat:a[0],lng:a[1]},{lat:b[0],lng:b[1]}); }          /* [위도,경도] 두 점 사이 거리(m) */
+/* ★[v110.37] 위성으로 잰 점이 300m 넘게 없는 곳(터널·지하차도)에는 선을 그리지 않는다.
+   v110.34~36 은 그 사이를 도로 지도(오픈스트리트맵)가 알려 주는 길로 이었는데, 그 지도는 청라지하차도 같은 지하 구간을 실제와 다르게(곧은 선으로) 그려 놓아
+   카카오 지도 위에서는 선이 도로 밖을 지나갔다. 기기가 추정한 위치도, 무료 도로 지도의 지하 구간도 믿을 수 없으므로 — 확인된 곳만 그리고 그 구간은 비워 둔 채 '터널' 표시만 한다. */
+var GAP_M=300;
+/* 두 점 사이가 '위성이 없던 구간' 인가 : 300m 넘게 떨어져 있고 그 사이 시간이 비어 있다(1초 간격 경로 점이면 9초, 보고마다 한 점뿐인 옛 기록이면 25초 넘게) */
+function snapIsGap(a,b){ if(!a||!b||_hv(a,b)<=GAP_M) return false; var dt=b.t-a.t; return !(dt>0)||dt>((a.gsrc==='rt'&&b.gsrc==='rt')?9000:25000); }
+function snapCutLong(ln,pts,i0,i1){   /* 한 덩어리 선에서 점 사이가 GAP_M 넘게 빈 부분을 잘라 낸다 */
+  var out=[], cur=0, a=i0, near=function(p,from){ var bi=from,bd=1e12; for(var z=from;z<ln.length;z++){ var d=_m(ln[z],[p.lat,p.lng]); if(d<bd){ bd=d; bi=z; } } return bi; };
+  for(var k=i0;k<i1;k++){ if(!snapIsGap(pts[k],pts[k+1])) continue;
+    var va=near(pts[k],cur), vb=near(pts[k+1],va);
+    if(k>a&&va>cur) out.push({a:a,b:k,line:ln.slice(cur,va+1),coarse:true});
+    cur=vb; a=k+1; }
+  if(i1>a&&ln.length-cur>=2) out.push({a:a,b:i1,line:ln.slice(cur),coarse:true});
+  return out;
+}
 function _lineLen(L){ var s=0; for(var i=1;i<L.length;i++) s+=_m(L[i-1],L[i]); return s; }
 /* ★[v110.34] 도로 맞춤 다시 만듦 — 유턴·나들목·굽은 길에서 선이 가로질러 그려지던 것
    ① 점 솎기 : 예전에는 25m 마다 한 점만 보내 굽은 길의 모양이 뭉개졌다 → 굽은 곳은 모양이 2.5m 넘게 달라지지 않게 촘촘히, 곧은 곳은 60m 까지 성기게.
@@ -1679,6 +1698,7 @@ function snapFetch(pts,rad,old){
             if(line.length<2) line=[A.loc,B.loc];
             if(B.i<=A.i) continue;
             var hop=_hv(pts[A.i],pts[B.i]), dist=(typeof LG[k].distance==='number')?LG[k].distance:_lineLen(line);
+            if(snapIsGap(pts[A.i],pts[B.i])) continue;                                                  /* 위성 점이 300m 넘게 없는 구간(터널) : 지도가 알려 주는 길을 믿지 않고 비운다 */
             if(dist>hop*3+60){ if(hop<=80) line=[A.loc,B.loc]; else continue; }      /* 돌아가는 길로 이은 구간 : 짧으면 곧게, 길면 비운다 */
             legs.push({a:A.i,b:B.i,line:line}); }
           if(legs.length) out.push({legs:legs});
@@ -1691,7 +1711,7 @@ function snapFetch(pts,rad,old){
           if(i0<0||i1<=i0) return;
           var rl=0; for(i=i0+1;i<=i1;i++) rl+=_hv(pts[i-1],pts[i]);
           if(_lineLen(ln)>rl*2.2+150) return;
-          out.push({legs:[{a:i0,b:i1,line:ln,coarse:true}]}); }
+          var cl=snapCutLong(ln,pts,i0,i1); if(cl.length) out.push({legs:cl}); }
       });
       if(!out.length) throw new Error('nomatch');
       return out; });
@@ -1732,9 +1752,9 @@ function snapCommit(e,P,legs,upTo,startIdx,ended){   /* startIdx = 이미 확정
   if(commit>startIdx){ e.lastPt=P[commit]; e.upto=P[commit].t; }
   return commit;
 }
-/* 선이 끊긴 자리(터널·맞춤이 갈라진 곳)를 도로를 따라 잇는다 — 길이가 직선거리의 1.6배+100m 안이고 걸린 시간에 갈 수 있는 거리일 때만. '추정' 이므로 점선으로 그린다 */
+/* 선이 짧게 끊긴 자리(맞춤이 갈라진 곳, 300m 이하)를 도로를 따라 잇는다 — 길이가 직선거리의 1.6배+100m 안이고 걸린 시간에 갈 수 있는 거리일 때만. '추정' 이므로 점선으로 그린다 */
 function snapRoute(a,b,dtMs,cb){
-  var sd=_m(a,b); if(!(sd>30&&sd<20000)){ cb(null); return; }
+  var sd=_m(a,b); if(!(sd>30&&sd<=GAP_M)){ cb(null); return; }   /* 300m 넘는 빈 곳(터널)은 잇지 않는다 */
   osrmGet(ROUTE_URL+b_ll(a)+';'+b_ll(b)+'?geometries=geojson&overview=full').then(function(x){ var j=x.j, r=j&&j.code==='Ok'&&j.routes&&j.routes[0], line=[];
       if(r) ((r.geometry&&r.geometry.coordinates)||[]).forEach(function(c){ if(isFinite(c[0])&&isFinite(c[1])) line.push([c[1],c[0]]); });
       var len=r?(typeof r.distance==='number'?r.distance:_lineLen(line)):0;
@@ -1751,13 +1771,13 @@ function snapBridge(ga,gb){
   return c.line;
 }
 /* ★[v110.35] 맞춘 선을 이 브라우저에 기억해 둔다 — 화면을 새로 열 때마다 하루치 경로를 1~2분씩 다시 맞추지 않게 (최근 12구간) */
-function snapStoreLoad(){ if(SNAP.store) return SNAP.store; SNAP.store={}; try{ var j=JSON.parse(localStorage.getItem('caro_snapc_v1')||'{}'); if(j&&typeof j==='object') SNAP.store=j; }catch(e){} return SNAP.store; }
+function snapStoreLoad(){ if(SNAP.store) return SNAP.store; SNAP.store={}; try{ localStorage.removeItem('caro_snapc_v1'); }catch(e){}   /* 예전 버전이 맞춰 둔 선은 버린다 */ try{ var j=JSON.parse(localStorage.getItem('caro_snapc_v2')||'{}'); if(j&&typeof j==='object') SNAP.store=j; }catch(e){} return SNAP.store; }
 function snapStoreSave(k,e){
   if(SNAP.noStore) return; var st=snapStoreLoad(), r5=function(l){ return l.map(function(q){ return [Math.round(q[0]*1e6)/1e6,Math.round(q[1]*1e6)/1e6]; }); };
   st[k]={w:Date.now(),u:e.upto,eT:e.endT||0,lp:e.lastPt?{lat:e.lastPt.lat,lng:e.lastPt.lng,t:e.lastPt.t,v:e.lastPt.v}:null,p:e.parts.map(function(p){ return {l:r5(p.line),e:p.est?1:0}; }),b:e.br.map(function(p){ return r5(p.line); })};
   for(var n=0;n<14;n++){ var ks=Object.keys(st).sort(function(a,b){ return (st[a].w||0)-(st[b].w||0); }), js='';
     while(ks.length>12){ delete st[ks.shift()]; }
-    try{ js=JSON.stringify(st); if(js.length>2500000) throw new Error('big'); localStorage.setItem('caro_snapc_v1',js); return; }catch(x){ if(ks.length<=1){ try{ localStorage.removeItem('caro_snapc_v1'); }catch(y){} return; } delete st[ks[0]]; } }
+    try{ js=JSON.stringify(st); if(js.length>2500000) throw new Error('big'); localStorage.setItem('caro_snapc_v2',js); return; }catch(x){ if(ks.length<=1){ try{ localStorage.removeItem('caro_snapc_v2'); }catch(y){} return; } delete st[ks[0]]; } }
 }
 function snapNew(k){
   var e={parts:[],br:[],prov:[],provT:0,upto:0,lastPt:null,pending:false,fail:0}, c=SNAP.noStore?null:snapStoreLoad()[k];
@@ -1767,7 +1787,8 @@ function snapNew(k){
 }
 /* 구간 하나를 그릴 선 목록 : [{line:[[위도,경도]…], est:추정(점선)인가, pend:아직 도로에 맞추지 않은 GPS 선인가}] */
 function snapSeg(s){
-  if(!SNAP.on||s.length<2) return [{line:s.map(function(p){return [p.lat,p.lng];}),est:false}];
+  if(!SNAP.on||s.length<2){ var ro=[], rl=[], rp=null;      /* 도로 맞춤을 끈 경우 : GPS 점 그대로. 300m 넘게 빈 곳(터널)은 잇지 않는다 */
+    s.forEach(function(p){ if(rp&&snapIsGap(rp,p)){ if(rl.length>=2) ro.push({line:rl,est:false}); rl=[]; } rl.push([p.lat,p.lng]); rp=p; }); if(rl.length>=2) ro.push({line:rl,est:false}); return ro; }
   var k=(devOf()||'')+'|'+String(s[0].sid||s[0].t), e=SNAP.cache[k];   /* 차량마다 따로 (기기 시계 값은 차량끼리 겹칠 수 있다) */
   if(!e) e=SNAP.cache[k]=snapNew(k);
   var tail=s.filter(function(p){ return p.t>e.upto; }), ended=(Date.now()-s[s.length-1].t>120000);
@@ -1779,8 +1800,8 @@ function snapSeg(s){
   /* ★[v110.35] 아직 도로에 맞추지 못한 부분(맞추는 중이거나 도로 지도 서버가 응답하지 않을 때)은 GPS 점 그대로 옅은 선으로 먼저 그린다 — 예전에는 다 맞출 때까지(하루치 1~2분) 아무 선도 없었다.
      점 시각이 바로잡혀(v110.34) GPS 선이 건물을 가로지르지 않는다. 맞춤이 끝난 부분부터 도로 선으로 바뀐다. 맞출 도로가 없다고 판정된 곳(주차장 안 등)은 계속 숨긴다. */
   var from=(e.prov.length&&e.provT)?e.provT:e.upto;
-  if(e.pending||tail.length>1){ var pl=[], lp=null;      /* ★[v110.36] 점 사이가 150m 넘게 비거나 20초 넘게 빈 곳(터널·지하차도)은 직선으로 잇지 않고 끊는다 */
-    s.forEach(function(p){ if(p.t<from) return; if(lp&&(_hv(lp,p)>150||p.t-lp.t>20000)){ if(pl.length>=2) out.push({line:pl,est:false,pend:true}); pl=[]; } pl.push([p.lat,p.lng]); lp=p; });
+  if(e.pending||tail.length>1){ var pl=[], lp=null;      /* 위성이 없던 곳(300m 넘게 비었거나 20초 넘게 빈 곳 — 터널·지하차도)은 직선으로 잇지 않고 끊는다 */
+    s.forEach(function(p){ if(p.t<from) return; if(lp&&(snapIsGap(lp,p)||p.t-lp.t>20000)){ if(pl.length>=2) out.push({line:pl,est:false,pend:true}); pl=[]; } pl.push([p.lat,p.lng]); lp=p; });
     if(pl.length>=2) out.push({line:pl,est:false,pend:true}); }
   return out;
 }
@@ -1856,7 +1877,7 @@ function routeNote(){
   el.style.cssText='margin-left:8px;color:var(--muted2);';
   el.innerHTML=' · 경로 '+(ROUTE_RAW?'<b style="color:#ff8a7a">진단용 원본(걸러내지 않은 점 — 건물 위로 선이 지나갈 수 있음)</b> '+st.raw+'점':'정리 '+st.kept+'/'+st.raw+'점 (튄 점 '+(st.jump+st.spike)+' · 정차 떨림 '+st.still+' 제외)')
     +' <a href="#" onclick="routeToggleRaw();return false;" style="color:var(--gold,#c8a96e);text-decoration:underline;">'+(ROUTE_RAW?'정리된 경로로 돌아가기':'진단용 원본 보기')+'</a>'
-    +' · <a href="#" onclick="snapToggle();return false;" style="color:var(--gold,#c8a96e);text-decoration:underline;">도로 맞춤 '+(SNAP.on?'켬':'끔')+'</a>'+(SNAP.on?(' ('+(SNAP.busy||SNAP.queue.length?('맞추는 중'+(SNAP.prog?(' '+(SNAP.prog.i+1)+'/'+SNAP.prog.n):'')+' — 옅은 선은 아직 맞추기 전의 GPS 선'):'실선 = 도로에 맞춘 구간 · 점선 = 추정(터널·지도에 없는 길)')+(SNAP.off?(' · 도로가 아닌 곳 '+SNAP.off+'토막 숨김'):'')+(SNAP.useOld?' · 예전 방식으로 맞춤':'')+(SNAP.fail?(' · <b style="color:#ff8a7a">도로 지도 서버 응답 없음 '+SNAP.fail+'회</b> — 옅은 선(GPS 그대로)으로 표시, 10분 뒤 다시 시도'):'')+(SNAP.lastErr?(' · 마지막 오류: '+esc(SNAP.lastErr)):'')+')'):' (GPS 점 그대로 — 도로 밖도 그려짐)');
+    +' · <a href="#" onclick="snapToggle();return false;" style="color:var(--gold,#c8a96e);text-decoration:underline;">도로 맞춤 '+(SNAP.on?'켬':'끔')+'</a>'+(SNAP.on?(' ('+(SNAP.busy||SNAP.queue.length?('맞추는 중'+(SNAP.prog?(' '+(SNAP.prog.i+1)+'/'+SNAP.prog.n):'')+' — 옅은 선은 아직 맞추기 전의 GPS 선'):'실선 = 도로에 맞춘 구간 · 점선 = 지도에 없는 길 · 터널·지하(위성 없음)는 선을 그리지 않음')+(SNAP.off?(' · 도로가 아닌 곳 '+SNAP.off+'토막 숨김'):'')+(SNAP.useOld?' · 예전 방식으로 맞춤':'')+(SNAP.fail?(' · <b style="color:#ff8a7a">도로 지도 서버 응답 없음 '+SNAP.fail+'회</b> — 옅은 선(GPS 그대로)으로 표시, 10분 뒤 다시 시도'):'')+(SNAP.lastErr?(' · 마지막 오류: '+esc(SNAP.lastErr)):'')+')'):' (GPS 점 그대로 — 도로 밖도 그려짐)');
   ds.appendChild(el);
 }
 function drawRoute(){
@@ -1875,9 +1896,12 @@ function drawRoute(){
   /* ★[v110.17] 기록이 빠진 구간 : 두 구간 사이가 2시간 안쪽이면 점선으로 잇는다 (실제로 지나간 길은 모른다는 표시) */
   var gapsL=[]; if(!ROUTE_RAW&&!SNAP.on) for(var gi=0;gi+1<res.segs.length;gi++){ var ga=res.segs[gi][res.segs[gi].length-1], gb=res.segs[gi+1][0];
     if(ga&&gb&&gb.t-ga.t<7200000&&_hv(ga,gb)>30) gapsL.push([[ga.lat,ga.lng],[gb.lat,gb.lng]]); }
+  /* ★[v110.37] 선을 비워 둔 곳(위성 점이 300m 넘게 없는 구간 = 터널·지하차도) 가운데에 작은 표시 */
+  var tuns=[]; if(!ROUTE_RAW){ var tun=function(a,b){ if(a&&b&&b.t-a.t>0&&b.t-a.t<1800000&&snapIsGap(a,b)) tuns.push({pos:[(a.lat+b.lat)/2,(a.lng+b.lng)/2],m:Math.round(_hv(a,b))}); };
+    res.segs.forEach(function(sg,si){ for(var q=1;q<sg.length;q++) tun(sg[q-1],sg[q]); if(si+1<res.segs.length) tun(sg[sg.length-1],res.segs[si+1][0]); }); }
   var imps=EVTS.filter(function(e){return e.event==='impact'&&e.lat!=null;});
   routeNote();
-  if(!segs.length&&!imps.length&&!stay) return;
+  if(!segs.length&&!imps.length&&!stay&&!tuns.length) return;
   var col=ROUTE_RAW?'#9aa3ad':'#c8a96e';
   var tag=function(txt,bg){ return '<div style="background:'+bg+';color:#fff;font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:9px;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.3)">'+txt+'</div>'; };
   var s0=null; if(res.segs.length&&res.segs[0].length) s0=[res.segs[0][0].lat,res.segs[0][0].lng]; for(var si=0;si<parts.length&&!s0;si++){ if(!parts[si].est) s0=parts[si].line[0]; } if(!s0&&segs.length) s0=segs[0][0];
@@ -1887,6 +1911,7 @@ function drawRoute(){
     var add=function(pos,html,ya){ var ov=new kakao.maps.CustomOverlay({position:new kakao.maps.LatLng(pos[0],pos[1]),content:html,yAnchor:ya||1.4}); ov.setMap(kmap); routeObjs.push(ov); };
     if(s0&&!ROUTE_RAW) add(s0,tag('출발','#2e9e5b'));   /* ★[v110.30] '도착' 표시는 없앴다 — 달리는 동안 경로 끝을 따라다니며 계속 떴다 */
     if(stay) add(stay,tag('🅿️ 머문 위치 (이동 없음)','#5a6270'));
+    tuns.forEach(function(t){ add(t.pos,'<div style="background:rgba(60,66,76,.88);color:#e8eaee;font-size:10px;font-weight:600;padding:1px 6px;border-radius:8px;white-space:nowrap;pointer-events:none">터널·지하 '+(t.m>=1000?(t.m/1000).toFixed(1)+'km':t.m+'m')+' · 위성 없음</div>',0.5); });
     /* ★[v110.30] 충격 표시를 단순하게 : 작은 점 + 흰 바탕의 얇은 글자표 (이모지·빨간 알약 없앰) */
     var impTag=function(txt){ return '<div style="position:relative;width:8px;height:8px;pointer-events:none"><span style="position:absolute;left:0;top:0;width:8px;height:8px;box-sizing:border-box;border-radius:50%;background:#e0705e;border:1.5px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.25)"></span>'
       +'<span style="position:absolute;left:12px;top:-5px;background:rgba(255,255,255,.94);color:#3a3f47;font-size:10px;line-height:15px;font-weight:600;padding:0 5px;border-radius:4px;border:1px solid rgba(0,0,0,.14);white-space:nowrap">'+txt+'</span></div>'; };
@@ -1899,6 +1924,7 @@ function drawRoute(){
     var mk=function(pos,txt,c){ routeObjs.push(L.circleMarker(pos,{radius:7,color:c,fillColor:c,fillOpacity:0.9}).bindTooltip(txt,{permanent:true,direction:'top'}).addTo(lmap)); };
     if(s0&&!ROUTE_RAW) mk(s0,'출발','#2e9e5b');
     if(stay) mk(stay,'머문 위치 (이동 없음)','#5a6270');
+    tuns.forEach(function(t){ routeObjs.push(L.circleMarker(t.pos,{radius:2,color:'#5a6270',fillColor:'#5a6270',fillOpacity:0.9}).bindTooltip('터널·지하 '+(t.m>=1000?(t.m/1000).toFixed(1)+'km':t.m+'m')+' · 위성 없음',{permanent:true,direction:'top'}).addTo(lmap)); });
     imps.forEach(function(e){ var minor=(impactMode(e)!=='park'&&e.shock!=null&&Number(e.shock)<2.5); routeObjs.push(L.circleMarker([Number(e.lat),Number(e.lng)],{radius:minor?3:4,color:'#ffffff',weight:1.5,fillColor:minor?'#e9a23b':'#e0705e',fillOpacity:1}).bindTooltip('충격 '+(e.shock!=null?Number(e.shock).toFixed(1)+'g':'')).addTo(lmap)); });
   }
 }
