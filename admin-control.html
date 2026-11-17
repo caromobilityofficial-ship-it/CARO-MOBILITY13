@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>CARO MOBILITY · 관제센터</title>
 <!-- ★[v110.18] 태블릿·PC 에 앱으로 설치 : 크롬 메뉴(⋮) → '앱 설치' 또는 '홈 화면에 추가' → 주소창 없이 전체 화면으로 열린다 -->
-<link rel="manifest" href="control-manifest.json?v=1">
+<link rel="manifest" href="control-manifest.json?v=2">
 <meta name="theme-color" content="#141518">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -292,13 +292,19 @@ body.ops .kpis, body.ops .main, body.ops .bottom{display:none!important;}
 .ccol>.diagwide{grid-column:1 / -1;margin-top:14px;}
 @media(min-width:1500px){ .ccol>.diagwide{margin-top:0;} }
 .diagwide .diagt{display:block;width:100%;}
+/* ★[v110.39] 칸마다 높이·글 시작 자리가 달라 어수선하던 것 : 짧은 항목은 같은 높이의 칸(한 줄)에 가지런히, 긴 설명이 붙는 항목은 아래에 가로 한 줄 전체를 쓴다. 빈 칸도 채워 테두리가 끝까지 맞는다 */
 .diagwide .diagt tbody{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));}
-.diagwide .diagt tr{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:8px 14px;border-bottom:1px solid var(--border);border-right:1px solid var(--border);min-width:0;}
+.diagwide .diagt tr{display:flex;justify-content:space-between;align-items:center;gap:14px;height:38px;padding:0 16px;border-bottom:1px solid var(--border);border-right:1px solid var(--border);min-width:0;box-sizing:border-box;}
+.diagwide .diagt tr.ce{border-right:0;}
 .diagwide .diagt td{padding:0;border:0;width:auto;font-size:12.5px;}
-.diagwide .diagt td:first-child{flex:0 0 auto;max-width:46%;width:auto;}
-.diagwide .diagt td:last-child{flex:1 1 auto;min-width:0;text-align:right;overflow-wrap:anywhere;word-break:keep-all;}
+.diagwide .diagt td:first-child{flex:0 0 auto;max-width:none;width:auto;white-space:nowrap;}
+.diagwide .diagt td:last-child{flex:1 1 auto;min-width:0;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.diagwide .diagt tr.wide{grid-column:1 / -1;height:auto;min-height:38px;padding:10px 16px;border-right:0;align-items:flex-start;justify-content:flex-start;}
+.diagwide .diagt tr.wide td:first-child{flex:0 0 118px;}
+.diagwide .diagt tr.wide td:last-child{text-align:left;white-space:normal;overflow:visible;line-height:1.6;word-break:keep-all;overflow-wrap:anywhere;}
+.diagwide .diagt tr.lastrow{border-bottom:0;}
 @media (max-width:1499px){ .diagwide .diagt tbody{grid-template-columns:repeat(2,minmax(0,1fr));} }
-@media (max-width:700px){ .diagwide .diagt tbody{grid-template-columns:1fr;} }
+@media (max-width:700px){ .diagwide .diagt tbody{grid-template-columns:1fr;} .diagwide .diagt tr{border-right:0;} .diagwide .diagt tr.wide{flex-direction:column;gap:3px;} .diagwide .diagt tr.wide td:first-child{flex:0 0 auto;} }
 /* 손가락으로 누르는 화면 : 단추를 조금 크게, 길게 눌러도 글자가 선택되지 않게 */
 @media (pointer:coarse){
   button,.ntab,.car{-webkit-tap-highlight-color:transparent;touch-action:manipulation;}
@@ -398,6 +404,7 @@ body.ops .kpis, body.ops .main, body.ops .bottom{display:none!important;}
     <h3 class="pkhead"><span class="dot"></span>주차장 원기둥
       <span class="pkchip" id="pkchip">—</span>
       <span class="pkbtns">
+        <button class="pkbtn" id="pkprev" onclick="pkHistNav(-1)" title="그날의 앞 주차장 기록" style="display:none">◀</button><span id="pkhlab" style="display:none;font-size:11.5px;color:var(--muted);align-self:center;white-space:nowrap"></span><button class="pkbtn" id="pknext" onclick="pkHistNav(1)" title="그날의 다음 주차장 기록" style="display:none">▶</button>
         <button class="pkbtn" onclick="pkRot(-30)" title="왼쪽으로 돌려 보기">⟲</button>
         <button class="pkbtn" onclick="pkRot(30)" title="오른쪽으로 돌려 보기">⟳</button>
         <button class="pkbtn" onclick="pkTilt()" id="pktilt" title="위에서 보기 / 비스듬히 보기">위에서</button>
@@ -426,7 +433,7 @@ body.ops .kpis, body.ops .main, body.ops .bottom{display:none!important;}
         <button class="cbtn" onclick="sendCmd('lock')">🔒 문 잠금</button>
         <button class="cbtn warn" onclick="sendCmd('hazard')">⚠ 비상등</button>
         <button class="cbtn" id="hazackbtn" style="display:none" onclick="caroConfirm('차량 비상등이 실제로 꺼져 있는 것을 확인했습니까? (누르지 않고 상태만 확정합니다)').then(function(ok){ if(ok) sendCmd('hazard_off',{value:'ack'}); })">✔ 비상등 꺼짐 확인</button>
-        <button class="cbtn warn" onclick="hornCmd()">📣 경적 (0.5초)</button>
+        <button class="cbtn warn" onclick="hornCmd()">📢 경적 (0.5초)</button>
         <button class="cbtn" onclick="buzzCmd()" title="기기 안의 부저를 세 번 울립니다 (차 경적이 아님)">부저 울리기</button>
         <button class="cbtn warn" onclick="immobOn()">⛔ 시동 차단</button>
         <button class="cbtn" onclick="immobOff()">✅ 차단 해제</button>
@@ -479,7 +486,7 @@ body.ops .kpis, body.ops .main, body.ops .bottom{display:none!important;}
 <script>
 /* ★[v110.20] 화면 버전 자가 점검 — 태블릿 앱·브라우저가 옛 화면을 붙잡고 있으면(캐시) 켤 때·다시 볼 때 스스로 새로 받는다.
    로그인 전 화면에서도 동작한다(예전 자동 업데이트는 로그인 칸에 글자가 들어 있으면 '입력 중' 으로 보고 미뤘다). 같은 버전으로는 3번까지만 시도한다. */
-var CARO_PAGE_VER='110.38';
+var CARO_PAGE_VER='110.39';
 function caroSelfCheck(){
   try{
     fetch('version.txt?t='+Date.now(),{cache:'no-store'}).then(function(r){ return r.ok?r.text():''; }).then(function(t){
@@ -686,12 +693,13 @@ function routeRows(rows){
               ③ 곧게(또는 완만하게 돌며) 빠르게 달리는 중에는 받은 마지막 점보다 최대 4.5초(3초) 앞까지 마지막 움직임을 이어 나아간다(다음 점이 오면 그 위로 부드럽게 붙는다)
               ④ 속도 칸에는 가장 최근에 받은 속도를 적는다(예전에는 마커가 있는 '몇 초 전' 자리의 속도였다) */
 var GL={dev:null,pts:[],play:0,wall:0,pos:null,lastT:0,timer:null,mk:null,offB:null,offV:0,rtStr:'',shown:null,vShow:null,arr:0,ivl:0};
-function glReset(dev){ GL.dev=dev; GL.pts=[]; GL.play=0; GL.wall=0; GL.pos=null; GL.lastT=0; GL.offB=null; GL.offV=0; GL.rtStr=''; GL.shown=null; GL.vShow=null; GL.arr=0; GL.ivl=0; GL.afterEst=false; }
+function glReset(dev){ GL.dev=dev; GL.pts=[]; GL.play=0; GL.wall=0; GL.pos=null; GL.lastT=0; GL.offB=null; GL.offV=0; GL.rtStr=''; GL.shown=null; GL.vShow=null; GL.arr=0; GL.ivl=0; GL.afterEst=false; GL.D=null; GL.skew=null; GL.av=null; GL.avT=0; }
 function glFeed(dev,d){
   if(!dev||dev!==GL.dev||typeof d.rt!=='string'||!d.rt) return;
   var ls=(d.lastSeen&&d.lastSeen.toDate)?d.lastSeen.toDate().getTime():0; if(!ls) return;
   if(d.rt===GL.rtStr) return; GL.rtStr=d.rt;      /* 같은 묶음을 두 번 재생하지 않는다 (서 있을 때는 보고 시각만 바뀌고 묶음은 그대로다 → 예전에는 마지막 몇 초를 다시 재생했다) */
   if(d.gsrc==='dr'&&!(typeof d.posAcc==='number'&&d.posAcc>0&&d.posAcc<=EST_ACC)){ GL.afterEst=true; return; }   /* 터널 안 추정 위치는 재생하지 않는다 */
+  { var sk=Date.now()-ls; if(GL.skew==null||sk<GL.skew) GL.skew=sk; }   /* ★[v110.39] 이 컴퓨터 시계와 서버 시계의 차이(가장 빨리 도착한 보고 기준) — 컴퓨터 시계가 몇 초 틀려도 마커가 더 늦어지지 않게 */
   var base=ls, clk=false;
   if(typeof d.rtm==='number'&&d.rtm>0){
     var b=String(d.rtb!=null?d.rtb:''), dm=d.rtm*100, o=ls-dm;
@@ -703,9 +711,16 @@ function glFeed(dev,d){
   if(clk) add=add.filter(function(q){ return q.t>GL.lastT+200; });
   else if(GL.lastT&&add[0].t<=GL.lastT+200){ var sf=GL.lastT+800-add[0].t; add.forEach(function(q){ q.t+=sf; }); }   /* 옛 펌웨어 : 늦게 도착해 시각이 겹치면 버리지 않고 뒤로 밀어 순서를 지킨다 */
   if(!add.length) return;
+  /* ★[v110.39] 보고를 만든 순간의 위치·속도를 묶음 끝에 잇는다(옛 펌웨어용 — v9.9-precise47 부터는 기기가 직접 넣어 보낸다).
+     경로점은 곧은 길에서 50m·5초마다 하나라, 묶음의 마지막 점이 보고 시각보다 몇 초 묵어 있었다 → 마커와 속도 숫자가 그만큼 더 늦었다 */
+  if(clk&&typeof d.lat==='number'&&typeof d.lng==='number'&&typeof d.speed==='number'&&d.speed>=3&&d.gsrc!=='dr'&&d.gsrc!=='wifi'){
+    var lq=add[add.length-1], dtm=base-lq.t;
+    if((dtm>700||(dtm>50&&Math.abs(d.speed-lq.v)>=5))&&dtm<8000){ var dd0=_m([lq.lat,lq.lng],[d.lat,d.lng]), lim0=Math.max(15,(Math.max(lq.v,d.speed)/3.6)*(dtm/1000)*1.6+10);
+      if(dd0<=lim0) add.push({lat:d.lat,lng:d.lng,t:base,v:d.speed,h:(typeof d.heading==='number')?d.heading:lq.h}); } }
   var endT=add[add.length-1].t;
-  if(Date.now()-endT>120000){ GL.lastT=endT; return; }     /* 2분 넘게 묵은 묶음(통신 복구 뒤 밀린 것)은 재생하지 않는다 — 경로 선에는 그려진다 */
-  if(!GL.pts.length||add[0].t-GL.pts[GL.pts.length-1].t>30000){ GL.pts=[]; GL.play=Math.max(add[0].t,endT-6000); GL.wall=Date.now(); GL.shown=null; }   /* 새로 시작 */
+  GL.av=(typeof d.av==='number')?d.av:null; GL.avT=endT;   /* 기기가 잰 '최근 2초 속도 변화'(km/h 매초) — 없으면(옛 펌웨어) 받은 점에서 어림한다 */
+  if(Date.now()-(GL.skew||0)-endT>120000){ GL.lastT=endT; return; }     /* 2분 넘게 묵은 묶음(통신 복구 뒤 밀린 것)은 재생하지 않는다 — 경로 선에는 그려진다 */
+  if(!GL.pts.length||add[0].t-GL.pts[GL.pts.length-1].t>30000){ GL.pts=[]; GL.play=Math.max(add[0].t,endT-3000); GL.wall=Date.now(); GL.shown=null; GL.D=null; }   /* 새로 시작 */
   add.forEach(function(q){ GL.pts.push(q); }); GL.lastT=endT;
   { var nw=Date.now(), iv=nw-(GL.arr||0); if(GL.arr&&iv>1500&&iv<20000) GL.ivl=GL.ivl?GL.ivl*0.6+iv*0.4:iv; if(GL.ivl){ if(GL.ivl<3000) GL.ivl=3000; if(GL.ivl>9000) GL.ivl=9000; } GL.arr=nw; }   /* 보고가 오는 간격(어림) — 다음 보고가 올 때를 가늠한다 */
   if(GL.pts.length>400) GL.pts.splice(0,GL.pts.length-400);
@@ -720,35 +735,54 @@ function glAt(t){   /* 재생 시각 t 의 위치 (점 사이는 직선으로 �
 /* 받은 마지막 점보다 얼마나 더 나아가도 되는가 : 곧게 빠르게 달리는 중이면 4.5초, 완만하게 도는 중이면 3초, 그 밖(급하게 도는 중·느림)에는 나아가지 않는다.
    나아갈 때는 마지막 속도·속도 변화·도는 빠르기를 그대로 이어 간다(완만한 굽은 길을 따라 돌고, 줄이는 중이면 덜 나아간다) */
 function glExt(){ var P=GL.pts, n=P.length; if(n<3) return null; var a=P[n-1], b=P[n-2], c=P[n-3], dt=(a.t-c.t)/1000; if(!(dt>0.8&&dt<=15)) return null;
-  var dh=a.h-c.h; if(dh>180) dh-=360; if(dh<-180) dh+=360; var w=dh/dt, d2=(a.t-b.t)/1000, acc=d2>0.5?(a.v-b.v)/d2:0; if(acc>8) acc=8; if(acc<-12) acc=-12;
+  var dh=a.h-c.h; if(dh>180) dh-=360; if(dh<-180) dh+=360; var w=dh/dt, d2=(a.t-b.t)/1000, acc=(typeof GL.av==='number'&&GL.avT===a.t)?GL.av:(d2>0.5?(a.v-b.v)/d2:0); if(acc>8) acc=8; if(acc<-12) acc=-12;
   var aw=Math.abs(w);
   if(a.v>=40&&aw<=1.5) return {ext:4500,w:w,acc:acc};
   if(a.v>=30&&aw<=6) return {ext:3000,w:w,acc:acc};
   return null; }
+/* ★[v110.39] 지금 속도 어림 : 받은 마지막 값은 '보고를 만든 순간' 의 속도라 화면에 뜰 때는 이미 2~7초 묵었다(가속·감속 중이면 시속 10~25km 차이).
+   그 사이의 변화를, 기기가 함께 보낸 속도 변화율로 메운다. 변화율은 오래 이어지지 않으므로 3초에 걸쳐 줄여 가며 더하고(더 오래 지나도 최대 3초치), 12초 넘게 소식이 없으면 받은 값 그대로 둔다 */
+function glAcc(){ var P=GL.pts, n=P.length; if(!n) return 0; var L=P[n-1];
+  if(typeof GL.av==='number'&&GL.avT===L.t) return GL.av;
+  for(var i=n-2;i>=0;i--){ var d=(L.t-P[i].t)/1000; if(d>=1.5) return d<=6?(L.v-P[i].v)/d:0; }
+  return 0; }
+function glSpdNow(now){ var P=GL.pts; if(!P.length) return null; var L=P[P.length-1], age=(now-(GL.skew||0)-L.t)/1000+1.2, a=glAcc();
+  if(!(age>0)) age=0; if(age>12||(L.v<3&&a<=0.5)) return L.v;
+  if(a>9) a=9; if(a<-14) a=-14; if(age>8) age=8;
+  var v=L.v+a*3*(1-Math.exp(-age/3)); return v<0?0:v; }
 function glTick(){
   var P=GL.pts; if(!P.length){ clearInterval(GL.timer); GL.timer=null; return; }
   var now=Date.now(), dt=now-GL.wall; GL.wall=now; if(dt<0||dt>2000) dt=100;
-  var L=P[P.length-1], end=L.t, E=glExt();
-  /* 다음 보고가 올 것으로 보이는 때에 맞춰 '받은 마지막 점(+더 나아가도 되는 만큼)' 에 닿도록 속도를 맞춘다 → 멈췄다 뛰었다 하지 않고 고르게 움직이면서 실제 차에 가장 가깝게 따라간다 */
-  var goal=end+(E?E.ext:0), left=(GL.ivl||5500)-(now-(GL.arr||now)); if(left<500) left=500;
-  if(goal-GL.play>30000) GL.play=goal-6000;                   /* 30초 넘게 밀렸으면(통신이 끊겼다 붙음) 건너뛴다 */
-  if(goal>GL.play){ var rate=(goal-GL.play)/left; if(rate<0.3) rate=0.3; if(rate>6) rate=6; GL.play=Math.min(goal,GL.play+dt*rate); }
-  else GL.play=goal;
+  var L=P[P.length-1], end=L.t, E=glExt(), ext=E?E.ext:0;
+  /* ★[v110.39] 마커가 실제 차와 같은 빠르기로 움직이게 한다.
+     전에는 '다음 보고가 올 때 받은 끝 점에 닿도록' 재생 빠르기를 0.3~6배로 바꿨다 → 일정하게 달리는 차의 마커가 시속 0~140km 로 달렸다 섰다 했다.
+     이제 마커는 '지금보다 D 만큼 앞선 때' 의 자리를 실제 빠르기 그대로(1배) 따라가고, 어긋난 만큼만 천천히(0.5~1.5배) 좁힌다.
+     D = 보고 간격 + 0.8초 − (곧게 달릴 때 더 나아가도 되는 시간) : 다음 보고가 올 때까지 받은 자료가 바닥나지 않는 가장 짧은 지연 */
+  var nowS=now-(GL.skew||0), Dw=Math.max(300,Math.max(5600,(GL.ivl||5500)*1.15)+800-ext);   /* 보고 간격은 일정하게 달릴 때의 5초 남짓을 바닥으로 본다(가속 중에는 더 자주 오지만 곧 다시 5초가 된다) */
+  GL.D=(GL.D==null)?Dw:GL.D+(Dw-GL.D)*Math.min(1,dt/2000);
+  var tgt=Math.min(nowS-GL.D,end+ext), gap=tgt-GL.play;
+  if(gap>30000){ GL.play=tgt-4000; gap=4000; }                 /* 30초 넘게 밀렸으면(통신이 끊겼다 붙음) 건너뛴다 */
+  var rate=1+gap/3000, hi=(gap>6000)?3:1.5; if(rate>hi) rate=hi; if(rate<0.5) rate=0.5;
+  GL.play+=dt*rate; if(GL.play>end+ext) GL.play=end+ext;
   var over=GL.play-end, pos;
-  if(over<=0||!E){ pos=glAt(GL.play); if(pos&&GL.v>=5) pos=snapProject(pos); }   /* 달리는 중에는 도로 선 위로 */
+  if(over<=0||!E){ pos=glAt(Math.min(GL.play,end)); if(pos&&GL.v>=5) pos=snapProject(pos); }   /* 달리는 중에는 도로 선 위로 */
   else { var tt=over/1000, N=Math.max(1,Math.ceil(tt/0.25)), ds=tt/N, x=0, y=0, vv=L.v, hh=L.h;      /* 받은 점보다 앞 : 마지막 움직임을 이어 간다 */
-    for(var q=0;q<N;q++){ var tm=(q+0.5)*ds; vv=Math.max(0,L.v+E.acc*tm); hh=L.h+E.w*tm; var dd=vv/3.6*ds*0.95; y+=dd*Math.cos(hh*0.0174532925); x+=dd*Math.sin(hh*0.0174532925); }
+    for(var q=0;q<N;q++){ var tm=(q+0.5)*ds; vv=Math.max(0,L.v+E.acc*3*(1-Math.exp(-tm/3))); hh=L.h+E.w*tm; var dd=vv/3.6*ds*0.95; y+=dd*Math.cos(hh*0.0174532925); x+=dd*Math.sin(hh*0.0174532925); }
     GL.v=vv; GL.h=hh; pos=[L.lat+y/111320, L.lng+x/(111320*Math.cos(L.lat*0.0174532925))]; }
-  if(pos){ if(GL.shown&&_m(GL.shown,pos)<120) pos=[GL.shown[0]+(pos[0]-GL.shown[0])*0.45, GL.shown[1]+(pos[1]-GL.shown[1])*0.45]; GL.shown=pos; }   /* 자리 바뀜을 부드럽게 */
+  if(pos&&GL.shown){ var mdx=(pos[1]-GL.shown[1])*111320*Math.cos(pos[0]*0.0174532925), mdy=(pos[0]-GL.shown[0])*111320, hr0=(GL.h||0)*0.0174532925,
+      al=mdx*Math.sin(hr0)+mdy*Math.cos(hr0), lt=Math.abs(mdx*Math.cos(hr0)-mdy*Math.sin(hr0));
+    if(al<0&&al>-80&&lt<6&&L.v>=3) pos=GL.shown;                /* 뒤로는 가지 않는다 : 앞질러 나가 있었으면(줄이는 중이었음) 차가 올 때까지 그 자리에서 기다린다 */
+    else if(_m(GL.shown,pos)<120) pos=[GL.shown[0]+(pos[0]-GL.shown[0])*0.45, GL.shown[1]+(pos[1]-GL.shown[1])*0.45]; }   /* 자리 바뀜을 부드럽게 */
+  if(pos) GL.shown=pos;
   GL.pos=pos;
-  try{ if(GL.pos&&GL.dev===devOf()&&!GL.tun){ var tv=L.v; GL.vShow=(GL.vShow==null||Math.abs(tv-GL.vShow)<0.6)?tv:GL.vShow+(tv-GL.vShow)*0.2;
-      var se=$('lv-spd'); if(se) se.textContent=Math.round(GL.vShow)+'㎞/h'; var sh=$('lv-spds'); if(sh&&typeof L.h==='number') sh.textContent='방위 '+Math.round(L.h)+'°'; } }catch(e){}   /* ★[v110.34] 가장 최근에 받은 속도 */
+  try{ if(GL.pos&&GL.dev===devOf()&&!GL.tun){ var tv=glSpdNow(now); if(tv==null) tv=L.v; GL.vShow=(GL.vShow==null||Math.abs(tv-GL.vShow)<0.6)?tv:GL.vShow+(tv-GL.vShow)*0.2;
+      var se=$('lv-spd'); if(se) se.textContent=Math.round(GL.vShow)+'㎞/h'; var sh=$('lv-spds'); if(sh&&typeof L.h==='number') sh.textContent='방위 '+Math.round(L.h)+'°'; } }catch(e){}   /* ★[v110.39] 가장 최근에 받은 속도에 그 뒤의 변화를 어림해 더한 값 */
   while(P.length>3&&P[1].t<GL.play) P.shift();
   if(GL.mk&&GL.pos){ try{
       if(mapKind==='kakao'){ var kp=new kakao.maps.LatLng(GL.pos[0],GL.pos[1]); GL.mk.setPosition(kp); if(followMode){ var c=kmap.getCenter(); if(Math.abs(c.getLat()-GL.pos[0])>1e-6||Math.abs(c.getLng()-GL.pos[1])>1e-6) kmap.setCenter(kp); } }
       else if(mapKind==='leaflet'){ GL.mk.setLatLng(GL.pos); if(followMode) lmap.panTo(GL.pos,{animate:false}); }
     }catch(e){} }
-  if(GL.play>=end&&now-end>20000){ GL.pts=[]; GL.pos=null; GL.shown=null; clearInterval(GL.timer); GL.timer=null; }   /* 다 따라갔고 20초 넘게 새 점이 없으면(정차) 재생 끝 — 그 뒤로는 보고 위치를 쓴다 */
+  if(GL.play>=end&&nowS-end>20000){ GL.pts=[]; GL.pos=null; GL.shown=null; clearInterval(GL.timer); GL.timer=null; }   /* 다 따라갔고 20초 넘게 새 점이 없으면(정차) 재생 끝 — 그 뒤로는 보고 위치를 쓴다 */
 }
 
 /* ═══════════ 지도 (카카오 → 실패 시 Leaflet) ═══════════ */
@@ -980,6 +1014,22 @@ function mstDur(v){ if(typeof v.mstateSec!=='number') return ''; var s=v.mstateS
   return s<60?(s+'초째'):(s<3600?(Math.floor(s/60)+'분째'):(Math.floor(s/3600)+'시간 '+Math.floor(s%3600/60)+'분째')); }
 function ago(t){ if(!t)return '—'; var s=Math.floor((Date.now()-t.getTime())/1000);
   if(s<5)return '방금'; if(s<60)return s+'초 전'; if(s<3600)return Math.floor(s/60)+'분 전'; return Math.floor(s/3600)+'시간 전'; }
+/* ★[v110.39] 진단 표 배치 : 한 칸(한 줄)에 들어가는 항목과 긴 항목을 나눈다. 글 너비는 한글 1, 그 밖의 글자 0.56 으로 어림한다 */
+var DIAG_LAST=null;
+function diagHtml(rows){
+  var t=$('diagt'), wide=t&&t.closest&&t.closest('.diagwide'), W=(t&&t.clientWidth)||0, ww=window.innerWidth||1600;
+  var plain=function(h){ return String(h).replace(/<[^>]*>/g,'').replace(/&[a-z#0-9]+;/gi,' ').replace(/\s+/g,' ').trim(); };
+  if(!wide) return rows.map(function(r){return '<tr><td>'+r[0]+'</td><td>'+r[1]+'</td></tr>';}).join('');
+  var cols=(ww>=1500)?3:(ww>700?2:1); if(!W) W=cols*400;
+  var unit=function(x){ var u=0; for(var i=0;i<x.length;i++){ var c=x.charCodeAt(i); u+=(c>=0x1100&&c<=0xD7A3)||(c>=0x3000&&c<=0x9FFF)?1:0.56; } return u; };
+  var cap=(W/cols-32-14)/12.6, S=[], L=[];
+  rows.forEach(function(r){ var a=plain(r[0]), b=plain(r[1]); ((unit(a)+unit(b)>cap)?L:S).push([r[0],r[1],b]); });
+  if(cols>1) while(S.length%cols) S.push(['','','']);
+  var h=S.map(function(r,i){ var end=(i%cols)===cols-1, last=(!L.length&&i>=S.length-cols); return '<tr class="'+(end?'ce':'')+(last?' lastrow':'')+'"><td>'+r[0]+'</td><td title="'+esc(r[2])+'">'+r[1]+'</td></tr>'; }).join('');
+  h+=L.map(function(r,i){ return '<tr class="wide'+(i===L.length-1?' lastrow':'')+'"><td>'+r[0]+'</td><td>'+r[1]+'</td></tr>'; }).join('');
+  return h;
+}
+window.addEventListener('resize',function(){ try{ if(DIAG_LAST) renderDiag(DIAG_LAST); }catch(e){} });
 function renderDiag(v){
   var rows=[
     ['통신 상태', v.online?(v.park?'<span class="g">● 온라인 (주차 절전 · 5분 보고)</span>':'<span class="g">● 온라인</span>'):'<span class="r">● 오프라인</span>'],
@@ -1052,7 +1102,7 @@ function renderDiag(v){
     + (v.hazUnknown?' · ⚠ 비상등 상태 모름 — 눈으로 확인 후 "비상등 꺼짐 확인"':'');
   var hab=$('hazackbtn'); if(hab) hab.style.display=v.hazUnknown?'':'none';   /* [v9.7] 단말이 비상등 상태를 모를 때만 확인 버튼 */
   (function(){ var t=$('diagt'), c=t&&t.closest('.card'), cc=document.querySelector('.ccol'); if(c&&cc&&!c.classList.contains('diagwide')){ c.classList.add('diagwide'); cc.appendChild(c); } })();   /* ★[v110.23] 진단 카드를 지도 아래로 */
-   $('diagt').innerHTML=rows.map(function(r){return '<tr><td>'+r[0]+'</td><td>'+r[1]+'</td></tr>';}).join('');
+   DIAG_LAST=v; $('diagt').innerHTML=diagHtml(rows);
 }
 
 /* ═══════════ ★[v110.13] 주차장 원기둥 ═══════════
@@ -1093,16 +1143,67 @@ function pkIngest(dev,d){
   if(!inside&&!o.end){ o.end=Date.now(); added=true; }
   if(added) pkSave(dev);
 }
+/* ★[v110.39] 날짜를 바꾸면 그날 측정한 주차장 기록을 원기둥에 그린다.
+   그날의 기록 문서(TELE)에서 주차장 안(ctx=park·cand) 보고를 모아 진입 회차(psess)별로 나눈다.
+   · 새 펌웨어(v9.9-precise47~)는 1초 간격 궤적(ptrk)도 기록 문서에 남기므로 그것을 쓰고, 그 전 기록은 보고 때마다의 위치(약 3초 간격)로 그린다
+   · 오늘 날짜에서는 지금까지처럼 실시간으로 그린다 */
+var PKH={key:'',list:[],idx:0};
+function pkHistOn(){ return !!(selDate&&selDate!==todayStr()); }
+function pkHistBuild(){
+  var dev=devOf(), key=(dev||'')+'|'+(selDate||'')+'|'+TELE.length+'|'+(TELE.length?(TELE[0]._id||''):'');
+  if(key===PKH.key) return; var keep=(PKH.key.split('|').slice(0,2).join('|')===key.split('|').slice(0,2).join('|'));
+  PKH.key=key; PKH.list=[]; if(!keep) PKH.idx=-1;
+  if(!pkHistOn()||!dev) return;
+  var D=TELE.map(function(x){ var t=(x.ts&&x.ts.toDate)?x.ts.toDate().getTime():0; return {x:x,t:t}; }).filter(function(q){ return q.t>0; }).sort(function(a,b){ return a.t-b.t; });
+  var cur=null, L=[];
+  var open=function(sess,t){ cur={sess:sess,fine:[],coarse:[],last:-1,relOk:false,t0:t,t1:t,floor:null,end:null,ft:{},lf:null}; L.push(cur); };
+  D.forEach(function(q){ var x=q.x, t=q.t, ctx=(typeof x.ctx==='string')?x.ctx:'', inside=(ctx==='park'||ctx==='cand');
+    var hasTrk=(typeof x.ptrk==='string'&&x.ptrk.length&&x.ptrk.length<4000); if(!inside&&!hasTrk) return;
+    var ps=(x.psess!=null&&isFinite(Number(x.psess)))?Number(x.psess):null;
+    if(!cur) open(ps,t);
+    else if(ps!=null&&cur.sess!=null&&ps!==cur.sess){ if(t-cur.t1<180000&&Math.floor(ps/1000)!==Math.floor(cur.sess/1000)){ cur.sess=ps; cur.last=-1; } else open(ps,t); }   /* 주차장 안에서 기기가 다시 켜지면 회차 번호(앞자리 = 부팅 번호)가 바뀐다 — 3분 안에 이어지면 같은 기록으로 본다. 같은 부팅에서 번호가 바뀐 것은 나갔다 다시 들어온 것이다 */
+    else if(ps!=null&&cur.sess==null){ if(t-cur.t1<300000) cur.sess=ps; else open(ps,t); }
+    else if(ps==null&&t-cur.t1>=300000) open(null,t);
+    if(cur.lf!=null) cur.ft[cur.lf]=(cur.ft[cur.lf]||0)+Math.min(t-cur.t1,600000);   /* 층마다 머문 시간 */
+    cur.t1=t; if(x.relOk===true) cur.relOk=true; if(inside&&typeof x.floor==='number') cur.lf=Math.round(x.floor*2)/2;
+    if(hasTrk){ var a=x.ptrk.split(';'), q0=parseInt(a[0],10);
+      if(isFinite(q0)) for(var i=1;i<a.length;i++){ var sq=q0+i-1; if(sq<=cur.last) continue; var f=a[i].split(','); if(f.length<4) continue;
+        var e=+f[0]/10,n=+f[1]/10,al=+f[2]/10,h=+f[3]; if(!isFinite(e)||!isFinite(n)||!isFinite(al)||!isFinite(h)) continue; cur.fine.push({e:e,n:n,a:al,h:h}); cur.last=sq; } }
+    if(inside&&typeof x.alt==='number'){ var lp=cur.coarse[cur.coarse.length-1], e2=(typeof x.relE==='number')?x.relE:0, n2=(typeof x.relN==='number')?x.relN:0, h2=(typeof x.heading==='number')?x.heading:0;
+      if(!lp||Math.abs(lp.a-x.alt)>=0.3||Math.abs(lp.e-e2)+Math.abs(lp.n-n2)>=1.5) cur.coarse.push({e:e2,n:n2,a:x.alt,h:h2});
+      } });
+  L.forEach(function(o){ o.pts=(o.fine.length>=5&&o.fine.length>=o.coarse.length)?o.fine:o.coarse; o.detail=(o.pts===o.fine); o.end=o.t1;
+    var bf=null, bt=-1; Object.keys(o.ft).forEach(function(k){ if(o.ft[k]>bt){ bt=o.ft[k]; bf=Number(k); } }); o.floor=(bf!=null)?bf:o.lf; });   /* 그 기록에서 가장 오래 머문 층 = 세워 둔 층 */
+  PKH.list=L.filter(function(o){ return o.pts.length>0; });
+  if(PKH.idx<0||PKH.idx>=PKH.list.length) PKH.idx=PKH.list.length-1;
+}
+function pkHistCur(){ return (pkHistOn()&&PKH.list.length)?PKH.list[Math.max(0,Math.min(PKH.idx,PKH.list.length-1))]:null; }
+function pkHistNav(d){ if(!PKH.list.length) return; PKH.idx=Math.max(0,Math.min(PKH.list.length-1,PKH.idx+d)); pkRender(); }
+function pkHm(t){ var d=new Date(t); return d.getHours()+':'+_pad(d.getMinutes()); }
 function pkRot(d){ pkAz+=d; pkDraw(); }
 function pkTilt(){ pkTop=!pkTop; var b=$('pktilt'); if(b) b.textContent=pkTop?'비스듬히':'위에서'; pkDraw(); }
-function pkClear(){ var dev=devOf(); if(!dev) return; PK[dev]={sess:null,pts:[],last:-1,relOk:false,end:null}; try{ localStorage.removeItem(pkKey(dev)); }catch(e){} pkRender(); }
+function pkClear(){ var dev=devOf(); if(!dev) return; if(pkHistOn()){ toast('지난 날짜의 기록은 지울 수 없습니다 (오늘 날짜에서만 화면 기록을 지웁니다)'); return; } PK[dev]={sess:null,pts:[],last:-1,relOk:false,end:null}; try{ localStorage.removeItem(pkKey(dev)); }catch(e){} pkRender(); }
 function pkRender(){
   var v=FLEET.find(function(x){return x.id===selId;}), set=function(id,t){ var e=$(id); if(e) e.textContent=t; };
   var chip=$('pkchip');
   if(chip){ var c=v?v.ctx:'', lab={park:'주차장 안',cand:'실내 확인중',out:'실외',tunnel:'터널·지하차도',unknown:'기준 없음'}[c]||'—';
     if(v&&v.lift) lab='주차장 안 · 승강기'; chip.textContent=lab; chip.className='pkchip '+(c||''); }
-  var live=!!(v&&v.online&&(v.ctx==='park'||v.ctx==='cand'));
-  if(live){
+  try{ pkHistBuild(); }catch(e){ console.warn('pkh',e); }
+  var hist=pkHistOn(), ho=hist?pkHistCur():null, nH=PKH.list.length;
+  { var b1=$('pkprev'), b2=$('pknext'), hl=$('pkhlab'), show=(hist&&nH>1);
+    if(b1){ b1.style.display=show?'':'none'; b1.disabled=!(PKH.idx>0); } if(b2){ b2.style.display=show?'':'none'; b2.disabled=!(PKH.idx<nH-1); }
+    if(hl){ hl.style.display=show?'':'none'; hl.textContent=show?((PKH.idx+1)+' / '+nH):''; } }
+  if(hist&&chip){ chip.textContent='지난 기록 · '+selDate.slice(5).replace('-','/'); chip.className='pkchip'; }
+  var live=!hist&&!!(v&&v.online&&(v.ctx==='park'||v.ctx==='cand'));
+  if(hist&&ho){ var lp=ho.pts[ho.pts.length-1], dur=Math.round((ho.t1-ho.t0)/1000), pm=0;
+    for(var pi=1;pi<ho.pts.length;pi++){ var pa=ho.pts[pi-1], pb=ho.pts[pi]; pm+=Math.sqrt((pb.e-pa.e)*(pb.e-pa.e)+(pb.n-pa.n)*(pb.n-pa.n)); }
+    set('pk-flr',ho.floor!=null?floorStr(ho.floor):'—'); set('pk-conf','가장 오래 머문 층');
+    set('pk-alt',(lp.a>=0?'+':'')+lp.a.toFixed(2)+' m'); set('pk-err',pkHm(ho.t0)+' ~ '+pkHm(ho.t1));
+    set('pk-vz','—'); set('pk-vzs',' ');
+    set('pk-pos',ho.relOk?((lp.e>=0?'동 ':'서 ')+Math.abs(lp.e).toFixed(0)+' · '+(lp.n>=0?'북 ':'남 ')+Math.abs(lp.n).toFixed(0)+' m'):'—'); set('pk-poss',ho.relOk?('직선 '+Math.round(Math.sqrt(lp.e*lp.e+lp.n*lp.n))+' m'):' ');
+    set('pk-path',ho.relOk?Math.round(pm)+' m':'—'); set('pk-turn','—'); set('pk-turns',' ');
+    set('pk-time',dur<60?dur+'초':Math.floor(dur/60)+'분 '+(dur%60)+'초');
+  } else if(live){
     set('pk-flr',floorStr(v.floor)); set('pk-conf',(v.ctx==='park'&&typeof v.floorConf==='number')?('신뢰도 '+v.floorConf+'%'):'경사로·주차 확인 전');
     set('pk-alt',(typeof v.alt==='number')?((v.alt>=0?'+':'')+v.alt.toFixed(2)+' m'):'—'); set('pk-err',(typeof v.altErr==='number')?('오차 ±'+v.altErr.toFixed(2)+' m'):' ');
     set('pk-vz',(typeof v.vz==='number')?((v.vz>0.05?'▲ ':(v.vz<-0.05?'▼ ':''))+Math.abs(v.vz).toFixed(2)+' m/s'):'—'); set('pk-vzs',(typeof v.vz==='number')?(Math.abs(v.vz)<0.05?'수평':(v.vz>0?'올라가는 중':'내려가는 중')):' ');
@@ -1112,7 +1213,7 @@ function pkRender(){
     set('pk-turn',(typeof v.turn==='number')?Math.round(v.turn)+'°':'—'); set('pk-turns',(typeof v.turn==='number')?((v.turn/360).toFixed(1)+' 바퀴'):' ');
     set('pk-time',(typeof v.inSec==='number')?(v.inSec<60?v.inSec+'초':Math.floor(v.inSec/60)+'분 '+(v.inSec%60)+'초'):'—');
   } else { ['pk-flr','pk-alt','pk-vz','pk-pos','pk-path','pk-turn','pk-time'].forEach(function(i){ set(i,'—'); }); ['pk-conf','pk-err','pk-vzs','pk-poss','pk-turns'].forEach(function(i){ set(i,' '); }); }
-  var dev=v?IDMAP[v.id]:null, o=dev?pkGet(dev):null;
+  var dev=v?IDMAP[v.id]:null, o=hist?ho:(dev?pkGet(dev):null);
   set('pk-n',o&&o.pts.length?o.pts.length+'개':'—');
   pkDraw();
 }
@@ -1129,7 +1230,8 @@ function pkDraw(){
   var v=FLEET.find(function(x){return x.id===selId;});
   if(!v){ msg('차량을 선택하세요'); return; }
   var dev=IDMAP[v.id]; if(!dev){ msg('이 차량에는 연결된 기기가 없습니다'); return; }
-  var o=pkGet(dev), live=!!(v.online&&(v.ctx==='park'||v.ctx==='cand'));
+  var hist=pkHistOn(), o=hist?pkHistCur():pkGet(dev), live=!hist&&!!(v.online&&(v.ctx==='park'||v.ctx==='cand'));
+  if(hist&&!o){ msg(selDate+' 에는 주차장 안에서 측정한 기록이 없습니다','날짜를 오늘로 돌리면 실시간 화면으로 돌아갑니다'); return; }
   if(!v.ctx&&!o.pts.length){ msg('정밀 측정 펌웨어(시험기 v45 · 기판 v9.9)를 올리면 표시됩니다','지금 기기 펌웨어 : '+(v.fw||'—')); return; }
   if(!o.pts.length){ msg(v.ctx==='tunnel'?'터널·지하차도 통과 중 — 층을 세지 않습니다':(v.ctx==='unknown'?'위성 수신 대기 중 (기준 없음)':'실외 — 주차장에 들어가면 자동으로 그려집니다'),'층은 주차장 안에서만 셉니다'); return; }
   var pts=o.pts, useRel=!!o.relOk, FH=(typeof v.floorH==='number'&&v.floorH>=2&&v.floorH<=6)?v.floorH:3.0, HR=14;
@@ -1153,7 +1255,7 @@ function pkDraw(){
     g.strokeStyle=col; g.lineWidth=lw;
     g.setLineDash([3,4]); g.beginPath(); g.ellipse(cxp,cy,R*s,ry,0,Math.PI,Math.PI*2); g.stroke();     /* 뒤쪽 반 */
     g.setLineDash([]);    g.beginPath(); g.ellipse(cxp,cy,R*s,ry,0,0,Math.PI); g.stroke(); return cy; } /* 앞쪽 반 */
-  var curF=(live&&typeof v.floor==='number')?v.floor:null, last=pts[pts.length-1];
+  var curF=(live&&typeof v.floor==='number')?v.floor:((hist&&typeof o.floor==='number')?o.floor:null), last=pts[pts.length-1];
   var cur=live?{e:(v.relOk?v.relE:last.e),n:(v.relOk?v.relN:last.n),a:(typeof v.alt==='number'?v.alt:last.a),h:(typeof v.heading==='number'?v.heading:last.h)}:last;
   /* 원기둥 옆선 + 층 원판 */
   if(!pkTop){ g.strokeStyle=LINE; g.lineWidth=1; g.beginPath(); g.moveTo(cxp-R*s,base-(zHi-zLo)*zs); g.lineTo(cxp-R*s,base); g.moveTo(cxp+R*s,base-(zHi-zLo)*zs); g.lineTo(cxp+R*s,base); g.stroke(); }
@@ -1189,14 +1291,15 @@ function pkDraw(){
   var hr=cur.h*Math.PI/180, hx=Math.sin(hr), hy=Math.cos(hr), ax=(hx*ca-hy*sa), ay=-(hx*sa+hy*ca)*el, al=Math.sqrt(ax*ax+ay*ay)||1;
   g.strokeStyle=col; g.lineWidth=2.4; g.lineCap='round'; g.beginPath(); g.moveTo(pc.x,pc.y); g.lineTo(pc.x+ax/al*17,pc.y+ay/al*17); g.stroke();
   g.font='700 12.5px '+NUM; g.textAlign=(pc.x>cxp)?'right':'left'; g.textBaseline='bottom'; g.fillStyle=col;
-  var lbT=(live?floorStr(v.floor):'마지막 위치')+'  '+(cur.a>=0?'+':'')+cur.a.toFixed(1)+'m'+((live&&typeof v.altErr==='number')?' ±'+v.altErr.toFixed(1):''), lbR=(pc.x>cxp), lbX=pc.x+(lbR?-12:22), lbY=pc.y-9, lbW=g.measureText(lbT).width;
+  var lbT=(live?floorStr(v.floor):(hist?'그 기록의 마지막 위치':'마지막 위치'))+'  '+(cur.a>=0?'+':'')+cur.a.toFixed(1)+'m'+((live&&typeof v.altErr==='number')?' ±'+v.altErr.toFixed(1):''), lbR=(pc.x>cxp), lbX=pc.x+(lbR?-12:22), lbY=pc.y-9, lbW=g.measureText(lbT).width;
   if(lbY-18<padT-14) lbY=pc.y+26;                                                   /* 위에 자리가 없으면 점 아래에 쓴다 */
   g.fillStyle='rgba(21,22,26,.82)'; g.fillRect((lbR?lbX-lbW:lbX)-4, lbY-17, lbW+8, 19);   /* ★[v110.27] 글자 뒤 바탕 — 층 선·경로와 겹쳐도 읽힌다 */
   g.fillStyle=col; g.fillText(lbT, lbX, lbY);
   /* 머리글 · 눈금 */
   g.textAlign='left'; g.textBaseline='top'; g.font='500 11.5px '+FONT; g.fillStyle=MUTED;
   g.fillText(useRel?('실제 위치(입구 기준) · 원기둥 반지름 '+R+' m'):'위치 신호 없음 — 방위(회전)로 감아 표시', 12, 8);
-  if(!live) { g.fillStyle=BAD; g.fillText(o.end?('지난 주차장 기록 · '+ago(new Date(o.end))+' 출차'):'지난 주차장 기록', 12, 24); }
+  if(hist){ g.fillStyle='#5b96e0'; g.fillText(selDate+' '+pkHm(o.t0)+' ~ '+pkHm(o.t1)+' 주차장 기록'+(PKH.list.length>1?(' ('+(PKH.idx+1)+'/'+PKH.list.length+')'):'')+(o.detail?'':' · 보고 간격(약 3초) 위치'), 12, 24); }
+  else if(!live) { g.fillStyle=BAD; g.fillText(o.end?('지난 주차장 기록 · '+ago(new Date(o.end))+' 출차'):'지난 주차장 기록', 12, 24); }
   if(useRel){ var bl=10*s; g.strokeStyle=MUTED; g.lineWidth=1.5; g.beginPath(); g.moveTo(12,H-14); g.lineTo(12+bl,H-14); g.moveTo(12,H-18); g.lineTo(12,H-10); g.moveTo(12+bl,H-18); g.lineTo(12+bl,H-10); g.stroke();
     g.font='500 10.5px '+NUM; g.textBaseline='bottom'; g.fillStyle=MUTED; g.fillText('10 m', 12+bl+6, H-8);
     /* 북쪽 화살표 */
@@ -1493,6 +1596,7 @@ function impactMode(e){
   return 'park';   /* 속도 0이거나 없음(실내 주차 등) → 주차중으로 추정 */
 }
 function drawLogs(){
+  try{ if(pkHistOn()||PKH.list.length||PKH.key) pkRender(); }catch(e){ console.warn('pkh',e); }   /* ★[v110.39] 날짜·기록이 바뀌면 원기둥도 그날 것으로 */
   var eh='', parkHits=0;
   EVTS.forEach(function(e){
     var row;
