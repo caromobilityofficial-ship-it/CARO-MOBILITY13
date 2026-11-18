@@ -486,7 +486,7 @@ body.ops .kpis, body.ops .main, body.ops .bottom{display:none!important;}
 <script>
 /* ★[v110.20] 화면 버전 자가 점검 — 태블릿 앱·브라우저가 옛 화면을 붙잡고 있으면(캐시) 켤 때·다시 볼 때 스스로 새로 받는다.
    로그인 전 화면에서도 동작한다(예전 자동 업데이트는 로그인 칸에 글자가 들어 있으면 '입력 중' 으로 보고 미뤘다). 같은 버전으로는 3번까지만 시도한다. */
-var CARO_PAGE_VER='110.39';
+var CARO_PAGE_VER='110.40';
 function caroSelfCheck(){
   try{
     fetch('version.txt?t='+Date.now(),{cache:'no-store'}).then(function(r){ return r.ok?r.text():''; }).then(function(t){
@@ -1589,6 +1589,9 @@ function fmtTs(t){ try{ var d=t&&t.toDate?t.toDate():null; if(!d)return '—';
   return (d.getMonth()+1)+'/'+d.getDate()+' '+d.toLocaleTimeString('ko-KR',{hour12:false}); }catch(e){ return '—'; } }
 /* 충격이 주행중이었는지 주차중이었는지 판별.
    1순위: 펌웨어가 기록한 moving 플래그(v41+). 2순위(구버전 폴백): 속도>2km/h면 주행, 아니면 주차 추정. */
+/* ★[v110.40] 주행 중 충격의 종류 (펌웨어 v9.9-precise52 부터 기기가 충격 모양을 보고 붙여 보낸다) */
+var IMP_KIND={bump:'과속방지턱',pothole:'포트홀',rough:'노면 불량',work:'공사·비포장 구간(추정)',drive:'급가속·급제동·급회전',etc:'기타 충격'};
+function impKind(e){ return (e&&typeof e.kind==='string'&&IMP_KIND[e.kind])?IMP_KIND[e.kind]:''; }
 function impactMode(e){
   if(e.moving===true) return 'drive';
   if(e.moving===false) return 'park';
@@ -1603,8 +1606,9 @@ function drawLogs(){
     if(e.event==='impact'){
       var mode=impactMode(e), park=(mode==='park'); if(park) parkHits++;
       var g=(e.shock!=null?Number(e.shock).toFixed(2):'?');
-      var tag='<span class="tag imp '+(park?'park':'drive')+'">'+(park?'주차중충격':'주행중충격')+'</span>';
-      var tx=park?('주차중 '+g+'g 충격 · 뺑소니 의심'):('주행중 '+g+'g 충격');
+      var kd=park?'':impKind(e), sp=(e.speed!=null&&Number(e.speed)>0)?(' · 시속 '+Math.round(Number(e.speed))+'km'):'';
+      var tag='<span class="tag imp '+(park?'park':'drive')+'">'+(park?'주차중충격':(kd?({bump:'방지턱',pothole:'포트홀',rough:'노면불량',work:'공사구간',drive:'운전조작',etc:'주행중충격'}[e.kind]):'주행중충격'))+'</span>';
+      var tx=park?('주차중 '+g+'g 충격 · 뺑소니 의심'):(kd?(kd+' · '+g+'g'+sp+((e.kind==='work'||e.kind==='rough')&&e.klen!=null?(' · '+Math.round(Number(e.klen))+'m 이어짐'):'')):('주행중 '+g+'g 충격'));
       row='<div class="ev'+(park?' danger':'')+'">'+tag+'<span>'+tx+'</span><span class="ts">'+fmtTs(e.ts)+'</span></div>';
     } else if(e.event==='overspeed'){
       row='<div class="ev"><span class="tag spd">과속</span><span>'+(Math.round(e.speed||0)+'km/h 과속')+'</span><span class="ts">'+fmtTs(e.ts)+'</span></div>';
@@ -2003,7 +2007,7 @@ function drawRoute(){
   /* ★[v110.37] 선을 비워 둔 곳(위성 점이 300m 넘게 없는 구간 = 터널·지하차도) 가운데에 작은 표시 */
   var tuns=[]; if(!ROUTE_RAW){ var tun=function(a,b){ if(a&&b&&b.t-a.t>0&&b.t-a.t<1800000&&snapIsGap(a,b)) tuns.push({pos:[(a.lat+b.lat)/2,(a.lng+b.lng)/2],m:Math.round(_hv(a,b))}); };
     res.segs.forEach(function(sg,si){ for(var q=1;q<sg.length;q++) tun(sg[q-1],sg[q]); if(si+1<res.segs.length) tun(sg[sg.length-1],res.segs[si+1][0]); }); }
-  var imps=EVTS.filter(function(e){return e.event==='impact'&&e.lat!=null;});
+  var imps=EVTS.filter(function(e){return e.event==='impact'&&e.lat!=null&&e.kind!=='drive';});   /* ★[v110.40] 급가속·급제동·급회전은 노면 충격이 아니므로 지도에 찍지 않는다(목록에는 남는다) */
   routeNote();
   if(!segs.length&&!imps.length&&!stay&&!tuns.length) return;
   var col=ROUTE_RAW?'#9aa3ad':'#c8a96e';
@@ -2021,7 +2025,7 @@ function drawRoute(){
       +'<span style="position:absolute;left:12px;top:-5px;background:rgba(255,255,255,.94);color:#3a3f47;font-size:10px;line-height:15px;font-weight:600;padding:0 5px;border-radius:4px;border:1px solid rgba(0,0,0,.14);white-space:nowrap">'+txt+'</span></div>'; };
     /* ★[v110.34] 주행 중 작은 충격(2.5g 미만 — 포트홀·요철)은 글자표 없이 점만 찍는다(펌웨어 v9.9-precise42 부터 주행 중 1.9g 이상을 기록해 개수가 많다). 주차 중 충격과 큰 충격은 글자표까지 */
     var impDot='<div style="width:7px;height:7px;box-sizing:border-box;border-radius:50%;background:#e9a23b;border:1.5px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.25);pointer-events:none"></div>';
-    imps.forEach(function(e){ var minor=(impactMode(e)!=='park'&&e.shock!=null&&Number(e.shock)<2.5); add([Number(e.lat),Number(e.lng)],minor?impDot:impTag('충격 '+(e.shock!=null?Number(e.shock).toFixed(1)+'g':'')),0.5); });
+    imps.forEach(function(e){ var minor=(impactMode(e)!=='park'&&e.shock!=null&&Number(e.shock)<2.5); var kd=(impactMode(e)!=='park')?impKind(e):''; if(e.kind==='pothole'||e.kind==='work') minor=false; add([Number(e.lat),Number(e.lng)],minor?impDot:impTag((kd||'충격')+' '+(e.shock!=null?Number(e.shock).toFixed(1)+'g':'')),0.5); });
   } else {
     parts.forEach(function(pt){ routeObjs.push(L.polyline(pt.line,{color:col,weight:pt.raw?2:((pt.est||pt.pend)?4:5),opacity:pt.pend?0.5:(pt.est?0.8:0.9),dashArray:pt.est?'7 7':null}).addTo(lmap)); });
     gapsL.forEach(function(sg){ routeObjs.push(L.polyline(sg,{color:'#8a93a0',weight:3,opacity:0.8,dashArray:'6 8'}).addTo(lmap)); });
@@ -2029,14 +2033,15 @@ function drawRoute(){
     if(s0&&!ROUTE_RAW) mk(s0,'출발','#2e9e5b');
     if(stay) mk(stay,'머문 위치 (이동 없음)','#5a6270');
     tuns.forEach(function(t){ routeObjs.push(L.circleMarker(t.pos,{radius:2,color:'#5a6270',fillColor:'#5a6270',fillOpacity:0.9}).bindTooltip('터널·지하 '+(t.m>=1000?(t.m/1000).toFixed(1)+'km':t.m+'m')+' · 위성 없음',{permanent:true,direction:'top'}).addTo(lmap)); });
-    imps.forEach(function(e){ var minor=(impactMode(e)!=='park'&&e.shock!=null&&Number(e.shock)<2.5); routeObjs.push(L.circleMarker([Number(e.lat),Number(e.lng)],{radius:minor?3:4,color:'#ffffff',weight:1.5,fillColor:minor?'#e9a23b':'#e0705e',fillOpacity:1}).bindTooltip('충격 '+(e.shock!=null?Number(e.shock).toFixed(1)+'g':'')).addTo(lmap)); });
+    imps.forEach(function(e){ var minor=(impactMode(e)!=='park'&&e.shock!=null&&Number(e.shock)<2.5); routeObjs.push(L.circleMarker([Number(e.lat),Number(e.lng)],{radius:minor?3:4,color:'#ffffff',weight:1.5,fillColor:minor?'#e9a23b':'#e0705e',fillOpacity:1}).bindTooltip(((impactMode(e)!=='park'&&impKind(e))||'충격')+' '+(e.shock!=null?Number(e.shock).toFixed(1)+'g':'')).addTo(lmap)); });
   }
 }
 function csvExport(){
-  var rows=[['시각','종류','충격구분','층','고도(m)','방향(deg)','속도(km/h)','충격(g)','위도','경도','위성수','GPS종류','수평오차(m)','상태','부팅원인','경로점수','기압(hPa)','온도(C)']];
+  var rows=[['시각','종류','충격구분','층','고도(m)','방향(deg)','속도(km/h)','충격(g)','위도','경도','위성수','GPS종류','수평오차(m)','상태','부팅원인','경로점수','기압(hPa)','온도(C)','충격종류','이어진시간(ms)','위(g)','아래(g)','회전(deg/s)','앞선떨림(g)','뒤집힘','채움']];
+  var kx=function(v){ return v!=null?v:''; };
   EVTS.forEach(function(e){ var cls=e.event==='impact'?(impactMode(e)==='park'?'주차중':'주행중'):'';
-    rows.push([fmtTs(e.ts),e.event||'',cls,floorStr(num(e.floor)),e.alt!=null?e.alt:'',e.heading!=null?Math.round(e.heading):'',e.speed!=null?e.speed:'',e.shock!=null?e.shock:'',e.lat!=null?e.lat:'',e.lng!=null?e.lng:'','','','','',e.rst||'','','','']); });
-  TELE.forEach(function(t){ rows.push([fmtTs(t.ts),'주기','',flrOf(t),t.alt!=null?t.alt:'',t.heading!=null?Math.round(t.heading):'',t.speed!=null?t.speed:'',t.shock!=null?t.shock:'',t.lat!=null?t.lat:'',t.lng!=null?t.lng:'',t.sats!=null?t.sats:'',t.gfix!=null?t.gfix:'',t.hacc!=null?t.hacc:'',t.mstate||'','',(typeof t.rt==='string'&&t.rt)?(t.rt.split('|').length-4):'',t.hpa!=null?t.hpa:'',t.temp!=null?t.temp:'']); });
+    rows.push([fmtTs(e.ts),e.event||'',cls,floorStr(num(e.floor)),e.alt!=null?e.alt:'',e.heading!=null?Math.round(e.heading):'',e.speed!=null?e.speed:'',e.shock!=null?e.shock:'',e.lat!=null?e.lat:'',e.lng!=null?e.lng:'','','','','',e.rst||'','','','',(e.event==='impact'&&impactMode(e)!=='park')?impKind(e):'',kx(e.kdur),kx(e.kup),kx(e.kdn),kx(e.krot),kx(e.krough),kx(e.knx),kx(e.kduty)]); });
+  TELE.forEach(function(t){ rows.push([fmtTs(t.ts),'주기','',flrOf(t),t.alt!=null?t.alt:'',t.heading!=null?Math.round(t.heading):'',t.speed!=null?t.speed:'',t.shock!=null?t.shock:'',t.lat!=null?t.lat:'',t.lng!=null?t.lng:'',t.sats!=null?t.sats:'',t.gfix!=null?t.gfix:'',t.hacc!=null?t.hacc:'',t.mstate||'','',(typeof t.rt==='string'&&t.rt)?(t.rt.split('|').length-4):'',t.hpa!=null?t.hpa:'',t.temp!=null?t.temp:'','','','','','','','','']); });
   var csv='﻿'+rows.map(function(r){return r.map(function(c){ var t=String(c==null?'':c); if(/^[=+\-@]/.test(t)) t="'"+t; return /[",\n]/.test(t)?('"'+t.replace(/"/g,'""')+'"'):t; }).join(',');}).join('\n');   /* ★[v108] 엑셀 수식 주입 방지·쉼표 처리 */
   var a=document.createElement('a');
   a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
