@@ -237,7 +237,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(
 .mapc{background:transparent!important;pointer-events:none;box-shadow:none;} .mapc>*{pointer-events:auto;}
 #mapbox{position:absolute;z-index:1;overflow:hidden;background:var(--land);}
 #map{position:absolute;inset:0;}
-html[data-theme="dark"] #map img[src*="daumcdn.net/map"],html[data-theme="dark"] #map .leaflet-tile{filter:invert(1) hue-rotate(180deg) brightness(.92) contrast(.86) saturate(.55);}   /* 밝은 지도를 어둡게 */
+html[data-theme="dark"] #map img[src*="daumcdn.net"]:not([src*="mapjsapi"]):not([src*="/images/"]),html[data-theme="dark"] #map img[src*="kakaocdn.net"]:not([src*="mapjsapi"]),html[data-theme="dark"] #map .leaflet-tile{filter:invert(1) hue-rotate(180deg) brightness(.92) contrast(.86) saturate(.55);}   /* 밝은 지도를 어둡게 */
 .leaflet-container{background:var(--land)!important;font-family:inherit;}
 .pinw{position:relative;width:0;height:0;transform:scale(var(--s,1));transform-origin:0 0;}
 .pinw .pin{position:absolute;left:0;top:0;}
@@ -245,6 +245,7 @@ html[data-theme="dark"] #map img[src*="daumcdn.net/map"],html[data-theme="dark"]
 .mapmsg{position:absolute;left:14px;right:14px;top:66px;z-index:5;font-size:15px;line-height:1.5;color:var(--muted);background:var(--chip);border:1px solid var(--border2);border-radius:12px;padding:9px 14px;display:none;}
 .mapmsg.on{display:block;}
 #mapbox.focus .pin{opacity:.28;} #mapbox.focus .pin.cur{opacity:1;} #mapbox.focus .hub{opacity:.4;}
+.kpi .s{overflow:hidden;text-overflow:ellipsis;}
 .tr{flex:0 0 10%;} .tr .st b{overflow:hidden;text-overflow:ellipsis;}
 .sc{grid-template-columns:74px 48px minmax(0,1fr) auto;gap:9px;} .sc b,.sc span{overflow:hidden;text-overflow:ellipsis;} .sc .tg{width:48px;} .sc .in{font-size:14.500px;}
 .live.warn{color:var(--warn);background:color-mix(in srgb,var(--warn) 12%,transparent);border-color:color-mix(in srgb,var(--warn) 40%,transparent);} .live.warn i{background:var(--warn);animation:none;}
@@ -254,6 +255,28 @@ html[data-theme="dark"] #map img[src*="daumcdn.net/map"],html[data-theme="dark"]
 .att.calm{border-color:var(--border);} .att.calm .h{color:var(--txt);} .att.calm .h::before{background:var(--ok);}
 .kpi.alert.calm{border-color:var(--border);background:var(--panel);} .kpi.alert.calm .l{color:var(--muted);} .kpi.alert.calm .v{color:var(--txt);}
 .dload{flex:1 1 auto;display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--muted);}
+/* ★[v110.46] 긴급 띠 — 달리던 차의 신호가 끊기거나 주행 중 큰 충격이 나면 요약 칸 자리를 덮고 경보음을 낸다 */
+.stage>.hd{grid-row:1;grid-column:1;} .stage>.kpis{grid-row:2;grid-column:1;} .stage>.alarm{grid-row:2;grid-column:1;} .stage>.body{grid-row:3;grid-column:1;} .stage>.ft{grid-row:4;grid-column:1;}
+.alarm{display:none;z-index:8;align-items:stretch;border-radius:18px;overflow:hidden;background:#3a0f0a;border:3px solid #ff5a44;color:#fff;box-shadow:0 0 0 0 rgba(255,90,68,.6);}
+.alarm.on{display:flex;}
+.alarm.new{animation:alm 1s steps(2,jump-none) infinite;}
+@keyframes alm{0%{background:#c0281a;border-color:#fff;}100%{background:#5a140d;border-color:#ff5a44;}}
+.alarm .tg{flex:0 0 auto;width:190px;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,.28);font-size:54px;font-weight:900;letter-spacing:4px;line-height:1;}
+.alarm .tg small{font-size:17px;font-weight:700;letter-spacing:0;margin-top:10px;opacity:.9;}
+.alarm .mid{flex:1 1 auto;min-width:0;padding:8px 26px;display:flex;flex-direction:column;justify-content:center;gap:2px;}
+.alarm .mid b{font-size:36px;font-weight:900;letter-spacing:-.8px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.alarm .mid span{font-size:23px;line-height:1.35;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.alarm .mid em{font-style:normal;font-size:19px;line-height:1.35;opacity:.92;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.alarm .el{flex:0 0 auto;padding:0 22px;display:flex;flex-direction:column;align-items:flex-end;justify-content:center;white-space:nowrap;}
+.alarm .el b{font-size:46px;font-weight:600;line-height:1;} .alarm .el small{font-size:17px;opacity:.9;margin-top:8px;}
+.alarm .bt{flex:0 0 auto;display:flex;flex-direction:column;justify-content:center;gap:9px;padding:0 20px 0 4px;}
+.alarm .bt button{font-family:inherit;height:48px;min-width:150px;border-radius:12px;border:2px solid #fff;background:transparent;color:#fff;font-size:19px;font-weight:800;cursor:pointer;white-space:nowrap;padding:0 16px;}
+.alarm .bt button.ok{background:#fff;color:#8f1c10;}
+#snd{font-family:inherit;font-size:14.500px;font-weight:700;color:var(--muted);background:none;border:1px solid var(--border2);border-radius:8px;padding:6px 12px;cursor:pointer;white-space:nowrap;}
+#snd.wait{color:var(--warn);border-color:var(--warn);} #snd.off{color:var(--bad);border-color:var(--bad);}
+.dhm{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:3px;} .dh1{display:flex;align-items:center;gap:14px;min-width:0;} .dh2{display:flex;align-items:center;gap:14px;min-width:0;font-size:16.500px;color:var(--muted);white-space:nowrap;}
+.dh .nm{font-size:28px;} .dh .stc{font-size:17px;padding:4px 12px;} .dh .who{font-size:16.500px;flex:0 0 auto;} .dh .addr{font-size:16.500px;color:var(--muted);white-space:nowrap;min-width:0;flex:0 1 auto;}
+.dh .cd{margin-left:0;flex:0 0 auto;}
 /* 연결 화면 */
 .pair{position:fixed;inset:0;z-index:50;background:var(--bg);display:none;align-items:center;justify-content:center;}
 .pair.on{display:flex;}
@@ -293,9 +316,11 @@ html[data-theme="dark"] #map img[src*="daumcdn.net/map"],html[data-theme="dark"]
     <div class="ttl">운영 현황판</div>
     <div class="live warn" id="livep"><i></i><span id="live">서버에 연결하는 중</span></div>
     <button id="thb" title="키보드 T 로도 바뀝니다">라이트 모드</button>
+    <button id="snd" class="wait">경보음 준비 중</button>
     <div class="when"><span class="d" id="date"></span><span class="t num" id="clock"></span></div>
   </div>
   <div class="kpis" id="kpis"></div>
+  <div class="alarm" id="alarm"><div class="tg">긴급<small id="al-n"></small></div><div class="mid"><b id="al-t"></b><span id="al-x"></span><em id="al-a"></em></div><div class="el"><b class="num" id="al-e"></b><small id="al-s"></small></div><div class="bt"><button id="al-go">차량 보기</button><button class="ok" id="al-ok">확인했음</button></div></div>
   <div class="body">
     <div class="card mapc" id="mapc">
       <div class="mapt">차량 위치</div>
@@ -308,7 +333,7 @@ html[data-theme="dark"] #map img[src*="daumcdn.net/map"],html[data-theme="dark"]
       <div class="rows" id="rows"><div class="empty">차량 정보를 받는 중입니다</div></div>
     </div>
     <div class="card detail" id="detail">
-      <div class="dh"><button class="bk" id="dclose">전체 현황으로</button><span class="nm" id="d-nm"></span><span class="pl num" id="d-pl"></span><span class="stc" id="d-st"></span><span class="who" id="d-who"></span><span class="cd" id="d-cd"></span></div>
+      <div class="dh"><button class="bk" id="dclose">전체 현황으로</button><div class="dhm"><div class="dh1"><span class="nm" id="d-nm"></span><span class="pl num" id="d-pl"></span><span class="stc" id="d-st"></span></div><div class="dh2"><span class="who" id="d-who"></span><span class="addr" id="d-addr"></span></div></div><span class="cd" id="d-cd"></span></div>
       <div class="dstat" id="d-stat"></div>
       <div class="dbody">
         <div class="dl"><div class="dt">층 이동 기록<small><span class="lg"><i style="background:color-mix(in srgb,var(--use) 30%,transparent)"></i>대여 중</span><span class="lg"><i style="background:var(--gold);height:4px;border-radius:2px"></i>차가 있던 층</span><span id="d-fc"></span></small></div>
@@ -356,10 +381,10 @@ html[data-theme="dark"] #map img[src*="daumcdn.net/map"],html[data-theme="dark"]
 </div></div>
 
 <script src="lib/leaflet/leaflet.js"></script>
-<script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=932e79971e43cfe8bab8710f6190897b&autoload=false" onerror="window.__kakaoSdkErr=1" async></script>
+<script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=932e79971e43cfe8bab8710f6190897b&autoload=false&libraries=services" onerror="window.__kakaoSdkErr=1" async></script>
 <script>
 /* ═══════════ CARO 운영 현황판 v110.45 ═══════════ */
-var BOARD_VER='110.45', POLL_MS=10000, PAGE_ROWS=10, KEY_NAME='caro_board_key', NAME_NAME='caro_board_name';
+var BOARD_VER='110.46', POLL_MS=3000,   /* ★[v110.46] 3초마다 새로 받는다 (전에는 10초) — 사고 · 신호 끊김을 바로 보이게 */ PAGE_ROWS=10, KEY_NAME='caro_board_key', NAME_NAME='caro_board_name';
 var $=function(i){return document.getElementById(i);};
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
 function p2(n){ return (n<10?'0':'')+n; }
@@ -370,7 +395,7 @@ function nowMs(){ return Date.now()+OFFSET; }
 function kst(ms){ return new Date(ms+9*3600000); }                                  /* 기기의 시간대와 상관없이 한국 시간으로 표시 */
 function hmOf(ms){ var k=kst(ms); return p2(k.getUTCHours())+':'+p2(k.getUTCMinutes()); }
 function hmH(h){ var m=Math.round(h*60); return p2(Math.floor(m/60)%24)+':'+p2(m%60); }
-function durMin(m){ m=Math.max(0,Math.round(m)); if(m<60) return m+'분'; var h=Math.floor(m/60); return h+'시간'+(m%60?' '+(m%60)+'분':''); }
+function durMin(m){ m=Math.max(0,Math.round(m)); if(m<60) return m+'분'; var h=Math.floor(m/60); if(h>=48) return Math.floor(h/24)+'일'; if(h>=24) return '1일 '+(h-24)+'시간'; return h+'시간'+(m%60?' '+(m%60)+'분':''); }
 function fs(f){ return f>=1?f+'F':'B'+(1-f); }                                       /* 1=1층 · 0=지하 1층 · -1=지하 2층 (관제와 같은 규칙) */
 function fko(f){ return f>=1?('지상 '+f+'층'):('지하 '+(1-f)+'층'); }
 
@@ -426,9 +451,9 @@ var MAP={kind:null,k:null,l:null,objs:{},hubs:[],circles:[],sig:'',lastFit:0,use
       try{ if(MAP.kind==='kakao'){ var ci=new kakao.maps.Circle({center:new kakao.maps.LatLng(s.lat,s.lng),radius:s.r,strokeWeight:2,strokeColor:'#b08a3e',strokeOpacity:.9,strokeStyle:'dash',fillColor:'#c8a96e',fillOpacity:.14}); ci.setMap(MAP.k); MAP.circles.push(ci); }
         else MAP.circles.push(L.circle([s.lat,s.lng],{radius:s.r,color:'#b08a3e',weight:2,dashArray:'7 6',fillColor:'#c8a96e',fillOpacity:.14,interactive:false}).addTo(MAP.l)); }catch(e){}
       if(hubN[i]){ var h=document.createElement('div'); h.className='hubw'; h.innerHTML='<div class="hub" style="transform:translate(-50%,0)">'+esc(s.name)+' · <b>대기 '+hubN[i]+'대</b></div>'; MAP.hubs.push(MAP.add(s.lat,s.lng,h,1)); } });
-    cars.forEach(function(c){ var small=(c._hub>=0), left=(c.lng>cx), big=(c.need>0||c.st==='drive'||c.st==='off'||c.c!=='idle');
+    cars.forEach(function(c){ var small=(c._hub>=0), left=(c.lng>cx), big=(c.need>0||c.st==='drive'||c.st==='off'||c.c!=='idle');   /* 직원 이동(금색)도 이름표를 붙인다 */
       var at=(FEED.att||[]).filter(function(a){ return a.k===c.k; })[0];
-      var sub=c.st==='drive'?(c.spd+'km/h'):(c.st==='off'?'통신 끊김':(at?at.tag:''));
+      var sub=(at&&at.s>=4)?'긴급':(c.staff?(c.staff==='clean'?'세차':'정비'):(c.st==='drive'&&!at?(c.spd+'km/h'):(c.st==='off'?'통신 끊김':(at?at.tag:''))));
       var el=document.createElement('div'); el.className='pinw';
       el.innerHTML='<div data-k="'+esc(c.k)+'" class="pin'+(big?'':' sm')+(small?' hubp':'')+(left?' l':'')+(c.need>=3||c.st==='off'?' pulse':'')+(SEL===c.k?' cur':'')+'" style="--c:'+cv(c.c)+'">'
         +(c.st==='drive'&&typeof c.hd==='number'?'<div class="arr" style="transform:rotate('+Math.round(c.hd)+'deg)"><svg viewBox="-18 -18 36 36"><path d="M0 -17 L6.500 -9 L-6.500 -9Z" style="fill:var(--c)"/></svg></div>':'')
@@ -441,7 +466,7 @@ var MAP={kind:null,k:null,l:null,objs:{},hubs:[],circles:[],sig:'',lastFit:0,use
   fit:function(cars){ if(!cars.length) return; var cur=SEL?cars.filter(function(c){ return c.k===SEL; })[0]:null;
     try{ if(MAP.kind==='kakao'){ if(cur){ MAP.k.setLevel(4); MAP.k.setCenter(new kakao.maps.LatLng(cur.lat,cur.lng)); return; }
         if(cars.length===1){ MAP.k.setLevel(5); MAP.k.setCenter(new kakao.maps.LatLng(cars[0].lat,cars[0].lng)); return; }
-        var b=new kakao.maps.LatLngBounds(); cars.forEach(function(c){ b.extend(new kakao.maps.LatLng(c.lat,c.lng)); }); var p=Math.round(90*S); MAP.k.setBounds(b,p+Math.round(40*S),p,p+Math.round(30*S),p); }
+        var b=new kakao.maps.LatLngBounds(); cars.forEach(function(c){ b.extend(new kakao.maps.LatLng(c.lat,c.lng)); }); var p=Math.round(90*S); MAP.k.setBounds(b,p+Math.round(40*S),p,p+Math.round(30*S),p); try{ if(MAP.k.getLevel()<4) MAP.k.setLevel(4); }catch(e){} }
       else if(MAP.kind==='leaflet'){ if(cur){ MAP.l.setView([cur.lat,cur.lng],16,{animate:false}); return; }
         if(cars.length===1){ MAP.l.setView([cars[0].lat,cars[0].lng],15,{animate:false}); return; }
         MAP.l.fitBounds(cars.map(function(c){ return [c.lat,c.lng]; }),{padding:[Math.round(90*S),Math.round(100*S)],animate:false,maxZoom:16}); } }catch(e){ console.warn('map fit',e); } }
@@ -456,7 +481,7 @@ function kpiDraw(){ var k=FEED.kpi, kinds=Object.keys(k.needKinds||{}).sort(func
     ['운영 차량',k.total,'대','txt','','기기 연결 <b>'+k.linked+'</b> / '+k.total],
     ['대여 중',k.rented,'대','use','','주행 <b>'+k.rentedMoving+'</b> · 정차 <b>'+(k.rented-k.rentedMoving)+'</b>'],
     ['주행 중',k.moving,'대','ok','',k.moving?('가장 빠른 차 <b>'+k.maxSpd+'</b>km/h'):'달리는 차 없음'],
-    ['대기 중',k.idle,'대','txt','','거점 <b>'+k.idleHub+'</b> · 외부 <b>'+k.idleOut+'</b>'],
+    ['대기 중',k.idle,'대','txt','','거점 <b>'+k.idleHub+'</b> · 외부 <b>'+k.idleOut+'</b>'+(k.staff?' · 직원 <b>'+k.staff+'</b>':'')],
     ['가동률',k.util,'%','gold','ring','대여 <b>'+k.rented+'</b> / 운영 <b>'+k.total+'</b>'],
     ['오늘 예약',k.resvDone+k.resvAct+k.resvNext,'건','txt','','완료 <b>'+k.resvDone+'</b> · 진행 <b>'+k.resvAct+'</b> · 예정 <b>'+k.resvNext+'</b>'],
     ['통신 끊김',k.off,'대','bad',k.off?'alert':'alert calm',k.off?(k.offName?(esc(k.offName)+' · <b>'+durMin(k.offSec/60)+'째</b>'):'표에서 빨간 줄 확인'):'없음'],
@@ -475,7 +500,7 @@ function rowsDraw(){ var all=carsSorted(), pages=Math.max(1,Math.ceil(all.length
   $('axis').innerHTML=[0,6,12,18,24].map(function(h){ return (Math.abs(h-nh)<3.3)?'':'<span style="left:'+hp(h)+'">'+p2(h)+'</span>'; }).join('')+'<span class="nowt" style="left:'+hp(nh)+'">'+hmOf(nowMs())+'</span>'; }
 function attDraw(){ var a=FEED.att||[], per=3, pages=Math.max(1,Math.ceil(a.length/per)); if(APAGE>=pages) APAGE=0;
   $('attc').classList.toggle('calm',!a.length); $('attn').textContent=a.length?(a.length+'건'+(pages>1?(' · '+(APAGE+1)+'/'+pages):'')):'';
-  $('att').innerHTML=a.length?a.slice(APAGE*per,APAGE*per+per).map(function(x){ return '<div class="ai" data-k="'+esc(x.k)+'" style="--c:'+cv(x.c)+';cursor:pointer"><div class="ib">'+esc(x.tag)+'</div><div class="tx"><b>'+esc(x.title)+'</b><span>'+esc(x.text)+'</span></div><div class="m num">'+esc(x.metric)+'</div></div>'; }).join(''):'<div class="empty good">지금은 확인할 것이 없습니다</div>'; }
+  $('att').innerHTML=a.length?a.slice(APAGE*per,APAGE*per+per).map(function(x){ return '<div class="ai" data-k="'+esc(x.k)+'" style="--c:'+cv(x.c)+';cursor:pointer"><div class="ib">'+esc(x.tag)+'</div><div class="tx"><b>'+esc(x.title)+'</b><span>'+esc(x.tag==='이탈'?String(x.text).replace(/^예약 없이 거점 밖 · /,'예약 없음 · '):x.text)+'</span></div><div class="m num">'+esc(x.metric)+'</div></div>'; }).join(''):'<div class="empty good">지금은 확인할 것이 없습니다</div>'; }
 function nextDraw(){ var n=(FEED.next||[]).slice(0,4), t=nowMs();
   $('nextn').textContent=FEED.nextLeft?('오늘 남은 일정 '+FEED.nextLeft+'건'):'';
   $('next').innerHTML=n.length?n.map(function(s,i){ var m=Math.round((s.t-t)/60000), inx=s.late?'지연':(m<=0?'지금':durMin(m)+' 뒤');
@@ -486,9 +511,10 @@ var TK='';
 function tickDraw(){ var e=FEED.ev||[], h=e.map(function(x){ return '<div class="ev" style="--c:'+cv(x.c)+'"><i></i><span class="num">'+hmOf(x.t)+'</span>'+esc(x.text)+'</div>'; }).join('');
   if(h!==TK){ TK=h; var r=$('run'); r.innerHTML=h?(h+h):'<div class="ev" style="--c:var(--muted)">오늘은 아직 알릴 이벤트가 없습니다</div>'; r.style.animation=h?'':'none'; r.style.animationDuration=Math.max(30,e.length*7)+'s'; }
   var s=FEED.sum||{}; $('sum').innerHTML='<span>오늘 예약<b class="num">'+(s.resvToday||0)+'건</b></span><span>충격<b class="num">'+(s.impacts||0)+'건</b></span><span>과속<b class="num">'+(s.overs||0)+'건</b></span>'; }
-function legDraw(){ var n={ok:0,use:0,idle:0,bad:0}; FEED.cars.forEach(function(c){ if(typeof c.lat!=='number') return; if(c.c==='ok') n.ok++; else if(c.c==='use') n.use++; else if(c.c==='idle') n.idle++; else n.bad++; });   /* 지도 점의 색과 같은 기준 */
-  $('leg').innerHTML='<span><i style="background:var(--ok)"></i>주행 '+n.ok+'</span><span><i style="background:var(--use)"></i>대여 정차 '+n.use+'</span><span><i style="background:var(--idle)"></i>대기 '+n.idle+'</span><span><i style="background:var(--bad)"></i>확인 필요 '+n.bad+'</span>'; }
-function drawAll(){ if(!FEED) return; kpiDraw(); rowsDraw(); attDraw(); nextDraw(); inboxDraw(); tickDraw(); legDraw(); MAP.draw(false); if(SEL) detDraw(); }
+function legDraw(){ var n={ok:0,use:0,idle:0,gold:0,bad:0}; FEED.cars.forEach(function(c){ if(typeof c.lat!=='number') return; if(c.c==='ok') n.ok++; else if(c.c==='use') n.use++; else if(c.c==='idle') n.idle++; else if(c.c==='gold') n.gold++; else n.bad++; });   /* 지도 점의 색과 같은 기준 */
+  $('leg').style.fontSize=n.gold?'14px':''; $('leg').style.padding=n.gold?'9px 11px':'';
+  $('leg').innerHTML='<span><i style="background:var(--ok)"></i>주행 '+n.ok+'</span><span><i style="background:var(--use)"></i>대여 정차 '+n.use+'</span><span><i style="background:var(--idle)"></i>대기 '+n.idle+'</span>'+(n.gold?'<span><i style="background:var(--gold-soft)"></i>직원 이동 '+n.gold+'</span>':'')+'<span><i style="background:var(--bad)"></i>확인 필요 '+n.bad+'</span>'; }
+function drawAll(){ if(!FEED) return; alarmDraw(); kpiDraw(); rowsDraw(); attDraw(); nextDraw(); inboxDraw(); tickDraw(); legDraw(); MAP.draw(false); if(SEL) detDraw(); }
 
 /* ═══ 차량 상세 ═══ */
 function carOf(k){ return FEED?FEED.cars.filter(function(c){ return c.k===k; })[0]:null; }
@@ -509,6 +535,7 @@ function chartDraw(c,d){ var nh=nowH(), W=858, H=326, L=74, R=18, T=34, B=36, fl
   $('fchart').innerHTML=s; }
 function detDraw(){ var c=carOf(SEL); if(!c){ closeDet(); return; } var d=(DETAIL&&DETAIL.k===SEL)?DETAIL:null;
   $('d-nm').textContent=c.name; $('d-pl').textContent=c.plate; $('d-st').textContent=c.main; $('d-st').style.setProperty('--c',cv(c.c)); $('d-who').textContent=c.sub;
+  if(typeof c.lat==='number') addrOf(c.lat,c.lng,function(t){ if(SEL===c.k) $('d-addr').textContent=t?('위치 '+t):''; }); else $('d-addr').textContent='';
   var under=(c.inPark||(typeof c.floor==='number'&&c.floor<1)), flr=(typeof c.floor==='number')?(under?fko(c.floor):(c.st==='drive'?'지상 · 실외':fko(c.floor))):'—';
   $('d-stat').innerHTML=[['지금 있는 층',flr,c.st==='off'?'마지막 기록':''],['지금 속도',(c.st==='drive'?c.spd:(c.st==='off'||c.st==='none'?'—':'0')),(c.st==='off'||c.st==='none')?'':'km/h'],['오늘 주행 거리',d?('약 '+d.km.toFixed(1)):'…',d?'km':''],['오늘 주행 시간',d?durMin(d.driveMin):'…',''],['오늘 최고 속도',d?d.maxSpd:'…',d?'km/h':''],['배터리 · 통신',(typeof c.vbat==='number'?c.vbat.toFixed(1)+'V':'—'),(c.st==='off'?'통신 끊김':(c.sig>=0?'통신 '+c.sig+'/4':''))]]
     .map(function(x){ return '<div><span>'+x[0]+'</span><b class="num">'+esc(x[1])+(x[2]?'<small>'+x[2]+'</small>':'')+'</b></div>'; }).join('');
@@ -528,7 +555,7 @@ function swDraw(){ var all=carsSorted(), i=0, n=5; all.forEach(function(c,k){ if
     +(all.length>1?'<span style="margin-left:auto;display:flex;gap:8px;flex:0 0 auto"><span class="t" style="align-self:center;margin:0 4px 0 0">'+(i+1)+' / '+all.length+'</span><button class="sw" data-k="'+esc(pv.k)+'">이전 차</button><button class="sw" data-k="'+esc(nx.k)+'">다음 차</button></span>':''); }
 function openDet(k){ if(!carOf(k)) return; if(SEL!==k) DETAIL=null; SEL=k; CLOSE_AT=Date.now()+60000; $('detail').classList.add('on'); rowsDraw(); detDraw(); swDraw(); cdDraw(); MAP.draw(true); pollNow(); }
 function closeDet(){ if(!SEL) return; SEL=null; DETAIL=null; $('detail').classList.remove('on'); rowsDraw(); MAP.draw(true); }
-function cdDraw(){ if(!SEL) return; var n=Math.ceil((CLOSE_AT-Date.now())/1000); if(n<=0){ closeDet(); return; } $('d-cd').textContent=n+'초 뒤 전체 현황으로 돌아감'; }
+function cdDraw(){ if(!SEL) return; var n=Math.ceil((CLOSE_AT-Date.now())/1000); if(n<=0){ closeDet(); return; } $('d-cd').textContent=n+'초 뒤 닫힘'; }
 $('rows').onclick=function(e){ var r=e.target.closest('.tr'); if(!r) return; var k=r.getAttribute('data-k'); if(SEL===k) closeDet(); else openDet(k); };
 $('att').onclick=function(e){ var r=e.target.closest('.ai'); if(r) openDet(r.getAttribute('data-k')); };
 $('dclose').onclick=closeDet;
@@ -537,7 +564,37 @@ $('d-sw').onclick=function(e){ var b=e.target.closest('.sw'); if(b) openDet(b.ge
 $('detail').addEventListener('pointerdown',function(){ CLOSE_AT=Date.now()+60000; cdDraw(); });
 window.addEventListener('keydown',function(e){ if(e.key==='Escape') closeDet(); });
 
-/* ═══ 서버에서 받아 오기 (10초마다 · 보기 전용) ═══ */
+/* ═══ ★[v110.46] 긴급 : 띠 + 경보음 + 주소 ═══ */
+var ACK={}, AC=null, SND=true, SIREN=null, ADDR={}, ALCUR=null;
+try{ var _a=JSON.parse(localStorage.getItem('caro_board_ack')||'{}'), _n=Date.now(); Object.keys(_a).forEach(function(k){ if(_n-_a[k]<86400000) ACK[k]=_a[k]; }); }catch(e){}
+try{ SND=localStorage.getItem('caro_board_snd')!=='0'; }catch(e){}
+function acGet(){ try{ if(!AC){ var C=window.AudioContext||window.webkitAudioContext; if(C) AC=new C(); } if(AC&&AC.state==='suspended') AC.resume(); }catch(e){} return AC; }
+function sirenOnce(){ var a=acGet(); if(!a||a.state!=='running') return false; try{ var t=a.currentTime+0.02; [880,660,880,660].forEach(function(f,i){ var o=a.createOscillator(), g=a.createGain(), s=t+i*0.3; o.type='square'; o.frequency.value=f;
+      g.gain.setValueAtTime(0.0001,s); g.gain.exponentialRampToValueAtTime(0.3,s+0.02); g.gain.exponentialRampToValueAtTime(0.0001,s+0.28); o.connect(g); g.connect(a.destination); o.start(s); o.stop(s+0.29); }); }catch(e){ return false; } return true; }
+function sndDraw(){ var b=$('snd'), a=AC, run=!!(a&&a.state==='running'); b.className=!SND?'off':(run?'':'wait'); b.textContent=!SND?'경보음 꺼짐':(run?'경보음 켜짐':'경보음 대기 · 화면을 한 번 누르세요'); }
+$('snd').onclick=function(){ acGet(); if(AC&&AC.state==='running'){ SND=!SND; try{ localStorage.setItem('caro_board_snd',SND?'1':'0'); }catch(e){} if(SND) sirenOnce(); } setTimeout(sndDraw,200); };
+['pointerdown','keydown'].forEach(function(ev){ window.addEventListener(ev,function(){ acGet(); setTimeout(sndDraw,200); },{passive:true}); });
+function addrOf(lat,lng,cb){ if(typeof lat!=='number'||typeof lng!=='number'){ cb(''); return; } var k=lat.toFixed(4)+','+lng.toFixed(4), raw=lat.toFixed(5)+', '+lng.toFixed(5);
+  if(ADDR[k]){ cb(ADDR[k]); return; } if(ADDR[k]===null){ cb(raw); return; } ADDR[k]=null;
+  try{ if(window.kakao&&kakao.maps&&kakao.maps.services&&kakao.maps.services.Geocoder){ new kakao.maps.services.Geocoder().coord2Address(lng,lat,function(res,st){ var t=''; try{ if(st===kakao.maps.services.Status.OK&&res&&res[0]) t=(res[0].road_address&&res[0].road_address.address_name)||(res[0].address&&res[0].address.address_name)||''; }catch(e){}
+      ADDR[k]=t?(t+' · '+raw):raw; cb(ADDR[k]); }); cb(raw); return; } }catch(e){}
+  ADDR[k]=raw; cb(raw); }
+function durSec(s){ s=Math.max(0,Math.round(s)); if(s<60) return s+'초'; var m=Math.floor(s/60); if(m<60) return m+'분 '+p2(s%60)+'초'; return Math.floor(m/60)+'시간 '+(m%60)+'분'; }
+function alarmDraw(){ var al=(FEED&&FEED.alarm)||[], un=al.filter(function(a){ return !ACK[a.id]; }), el=$('alarm');
+  el.classList.toggle('on',al.length>0); el.classList.toggle('new',un.length>0);
+  if(!al.length){ ALCUR=null; sirenStop(); return; }
+  var a=un[0]||al[0], chg=(!ALCUR||ALCUR.id!==a.id); ALCUR=a;
+  $('al-n').textContent=al.length>1?('모두 '+al.length+'건'):(un.length?'확인 필요':'확인함');
+  $('al-t').textContent=a.title; $('al-x').textContent=a.text+' · 사고 여부를 확인하세요';
+  if(chg){ $('al-a').textContent=''; addrOf(a.lat,a.lng,function(t){ if(ALCUR&&ALCUR.id===a.id) $('al-a').textContent=t?('마지막 위치 · '+t):'위치 기록 없음'; }); }
+  $('al-ok').style.display=un.length?'':'none'; alarmTick();
+  if(un.length&&SND){ if(!SIREN){ sirenOnce(); SIREN=setInterval(function(){ if(SND) sirenOnce(); },2600); } } else sirenStop(); }
+function sirenStop(){ if(SIREN){ clearInterval(SIREN); SIREN=null; } }
+function alarmTick(){ if(!ALCUR) return; $('al-e').textContent=durSec((nowMs()-ALCUR.t)/1000)+' 전'; $('al-s').textContent=hmOf(ALCUR.t)+' 마지막 보고'; }
+$('al-ok').onclick=function(){ ((FEED&&FEED.alarm)||[]).forEach(function(a){ ACK[a.id]=Date.now(); }); try{ var o={}; Object.keys(ACK).forEach(function(k){ if(!/:pending$/.test(k)) o[k]=ACK[k]; }); localStorage.setItem('caro_board_ack',JSON.stringify(o)); }catch(e){} alarmDraw(); };
+$('al-go').onclick=function(){ if(ALCUR) openDet(ALCUR.k); };
+
+/* ═══ 서버에서 받아 오기 (3초마다 · 보기 전용) ═══ */
 var POLLING=false, AGAIN=false, PTIMER=null;
 function fbReady(){ return window.FB_READY&&typeof window.FB_CALL==='function'; }
 function errCode(e){ var c=String((e&&e.code)||''); return c.replace(/^functions\//,''); }
@@ -555,13 +612,13 @@ function poll(){ if(!KEY||POLLING){ AGAIN=POLLING; return; }
     if(c==='permission-denied'){ unpair('연결이 끊겼습니다. 운영 관리에서 새 연결 코드를 만들어 다시 연결해 주세요.'); return; }
     ERRMSG=(c==='unauthenticated'||c==='failed-precondition')?'앱 확인(App Check)에 실패했습니다 — 이 기기의 인터넷·시간 설정을 확인해 주세요':'서버에 연결하지 못했습니다 — 인터넷을 확인해 주세요';
     console.warn('boardFeed',c,e&&e.message); liveDraw();
-  }).then(function(){ POLLING=false; if(!KEY) return; var d=AGAIN?200:(ERRN?Math.min(30000,3000*ERRN):POLL_MS); AGAIN=false; PTIMER=setTimeout(poll,d); }); }
+  }).then(function(){ POLLING=false; if(!KEY) return; var d=AGAIN?200:(ERRN?Math.min(15000,2000*ERRN):POLL_MS); AGAIN=false; PTIMER=setTimeout(poll,d); }); }
 function pollNow(){ if(POLLING){ AGAIN=true; return; } clearTimeout(PTIMER); poll(); }
 function liveDraw(){ var p=$('livep'), el=$('live'); if(!KEY){ return; }
   if(!LAST_OK){ p.className='live '+(ERRN>=2?'bad':'warn'); el.textContent=ERRN>=2?(ERRMSG||'서버에 연결하지 못했습니다'):'서버에 연결하는 중'; return; }
   var age=Math.round((Date.now()-LAST_OK)/1000);
-  if(age<25){ p.className='live'; el.textContent='실시간 · '+(age<2?'방금 갱신':age+'초 전 갱신'); }
-  else if(age<90){ p.className='live warn'; el.textContent='연결 확인 중 · '+age+'초 전 내용'; }
+  if(age<10){ p.className='live'; el.textContent='실시간 · '+(age<2?'방금 갱신':age+'초 전 갱신'); }
+  else if(age<40){ p.className='live warn'; el.textContent='연결 확인 중 · '+age+'초 전 내용'; }
   else { p.className='live bad'; el.textContent='서버 연결 끊김 · '+hmOf(LAST_OK+OFFSET)+' 기준 내용입니다'; } }
 
 /* ═══ 연결(처음 한 번) ═══ */
@@ -589,7 +646,7 @@ var WD=['일','월','화','수','목','금','토'];
 function tick(){ var k=kst(nowMs());
   $('clock').innerHTML=p2(k.getUTCHours())+':'+p2(k.getUTCMinutes())+'<small>:'+p2(k.getUTCSeconds())+'</small>';
   $('date').textContent=k.getUTCFullYear()+'년 '+(k.getUTCMonth()+1)+'월 '+k.getUTCDate()+'일 '+WD[k.getUTCDay()]+'요일';
-  liveDraw(); cdDraw(); }
+  liveDraw(); cdDraw(); alarmTick(); }
 setInterval(tick,1000);
 setInterval(function(){ if(!FEED||SEL) return; var pages=Math.ceil(FEED.cars.length/PAGE_ROWS); if(pages>1){ PAGE=(PAGE+1)%pages; rowsDraw(); } },12000);   /* 차가 10대를 넘으면 12초마다 다음 쪽 */
 setInterval(function(){ if(!FEED) return; var pages=Math.ceil((FEED.att||[]).length/3); if(pages>1){ APAGE=(APAGE+1)%pages; attDraw(); } },8000);
@@ -604,7 +661,7 @@ document.addEventListener('visibilitychange',function(){ wake(); if(document.vis
 
 function start(){ $('livep').className='live warn'; $('live').textContent='서버에 연결하는 중'; fit(); tick(); wake(); poll(); }
 (function(){ try{ KEY=localStorage.getItem(KEY_NAME)||null; BNAME=localStorage.getItem(NAME_NAME)||''; }catch(e){ KEY=null; }
-  fit(); tick(); if(KEY) start(); else pairShow(); setTimeout(selfCheck,20000); })();
+  fit(); tick(); sndDraw(); acGet(); setTimeout(sndDraw,600); if(KEY) start(); else pairShow(); setTimeout(selfCheck,20000); })();
 </script>
 </body>
 </html>
