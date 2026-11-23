@@ -2,6 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8" />
+<script>/* ★[v110.44] 화면 모드(다크/라이트)를 그리기 전에 먼저 적용 — 관제 안에 들어 있으면 관제 화면을 따라간다 */(function(){try{var t=null;try{if(window.self!==window.top&&typeof window.parent.themeToggle==="function")t=window.parent.document.documentElement.getAttribute("data-theme");}catch(e){}if(t!=="light"&&t!=="dark"){t=localStorage.getItem("caro_theme")||localStorage.getItem("caro_admin_theme");}if(t==="dark"||t==="light")document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>CARO MOBILITY · 통합 관제 대시보드</title>
 <link rel="manifest" href="admin-manifest.json" />
@@ -106,16 +107,16 @@
   }
   html[data-theme="dark"]{
     /* ── 다크 ── */
-    --bg:#141518; --panel:#1b1d21; --panel2:#1f2228; --row:#212429;
-    --border:#2b2e34; --border2:#34383f;
+    --bg:#101114; --panel:#181a1e; --panel2:#1e2126; --row:#22252b;   /* ★[v110.44] 관제 화면과 같은 색 */
+    --border:#2a2d34; --border2:#353941;
     --accent:#c8a96e; --on-accent:#141518;
     --gold:#c8a96e; --gold-soft:#dcc28f; --gold-dim:#7e6c49;
     --grade-black-fg:#dcc28f;
-    --txt:#e9eaed; --muted:#868b94; --muted2:#5e636b;
-    --ok:#7bb89a; --use:#74a0d4; --warn:#e0a86c; --bad:#d57a68;
+    --txt:#e8eaee; --muted:#8b919c; --muted2:#5d636e;
+    --ok:#4db183; --use:#5b96e0; --warn:#e0a260; --bad:#e0705e;
     --s-rent:#6aa6db; --s-done:#8c929b; --s-cancel:#b78f68; --s-fault:#d9c24a;
     --s-booked:#eef0f3; --s-late:#e8675d; --s-avail:#7bb89a; --s-maint:#e0a86c;
-    --topbar-bg:linear-gradient(180deg,#1d1f24,#191b1f); --track:#2a2d33; --halo:rgba(200,169,110,.05);
+    --topbar-bg:#181a1e; --track:#2a2d33; --halo:rgba(200,169,110,.05);
     --sel-bg:rgba(200,169,110,.08); --shadow:none; --card-shadow:none;
     --modal-ov:rgba(8,9,11,.72);
   }
@@ -140,9 +141,12 @@
   .conn{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--muted);font-family:'Saira','Noto Sans KR',system-ui,'Malgun Gothic','Apple SD Gothic Neo',sans-serif;letter-spacing:.06em;}
   .dot{width:7px;height:7px;border-radius:50%;background:var(--ok);box-shadow:0 0 8px var(--ok);animation:pulse 1.6s ease-in-out infinite;}
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
-  .theme-btn{width:34px;height:34px;border-radius:10px;border:1px solid var(--border2);background:var(--panel2);color:var(--txt);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.13s;}
+  .theme-btn{min-width:34px;height:34px;padding:0 12px;gap:6px;font-family:inherit;font-size:12.5px;font-weight:700;white-space:nowrap;border-radius:10px;border:1px solid var(--border2);background:var(--panel2);color:var(--txt);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.13s;}
   .theme-btn svg{width:17px;height:17px;stroke:currentColor;fill:none;}
   .theme-btn:hover{border-color:var(--accent);}
+  .theme-btn svg{flex:0 0 auto;}
+  html.byparent #themeBtn{display:none!important;}   /* ★[v110.44] 관제 안에서는 관제 상단의 [라이트 모드/다크 모드] 단추를 쓴다 */
+  @media(max-width:640px){ .theme-btn span{display:none;} .theme-btn{padding:0;width:34px;} }
   .admin{display:flex;align-items:center;gap:9px;padding:6px 12px;border-radius:10px;background:var(--panel2);border:1px solid var(--border);}
   .admin .av{width:26px;height:26px;border-radius:7px;background:var(--accent);display:flex;align-items:center;justify-content:center;color:var(--on-accent);font-weight:700;font-size:13px;}
   .admin .nm{font-size:12px;}.admin .nm small{display:block;color:var(--muted2);font-size:10px;}
@@ -702,17 +706,25 @@
   </div>
 </div>
 <script>
-/* ── 라이트/다크 테마 토글 (기본: 라이트, 선택 저장) ── */
+/* ── 라이트/다크 화면 모드 ──
+   ★[v110.44] 관제와 같은 저장값(caro_theme)을 쓴다 → 한쪽에서 바꾸면 다른 쪽도 같은 모드.
+   · 관제 안(iframe)에 들어 있으면 관제 화면을 그대로 따라가고, 이쪽 단추는 숨긴다
+   · 따로 열었을 때 : 저장한 적이 없으면 지금까지처럼 라이트 */
 (function(){
-  var KEY='caro_admin_theme';
+  var KEY='caro_theme', OLD='caro_admin_theme';
   var _MOON='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13.5A8 8 0 1 1 10.5 4a6.3 6.3 0 0 0 9.5 9.5Z"/></svg>';
   var _SUN='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M18.4 5.6 17 7M7 17l-1.4 1.4"/></svg>';
-  function getTheme(){ try{ return localStorage.getItem(KEY)||'light'; }catch(e){ return 'light'; } }
-  function saveTheme(t){ try{ localStorage.setItem(KEY,t); }catch(e){} }
+  function byParent(){ try{ return !!window.__CARO_INFRAME && typeof window.parent.themeToggle==='function'; }catch(e){ return false; } }
+  function getTheme(){
+    try{ if(byParent()){ var p=window.parent.document.documentElement.getAttribute('data-theme'); if(p==='light'||p==='dark') return p; } }catch(e){}
+    try{ var t=localStorage.getItem(KEY)||localStorage.getItem(OLD); if(t==='dark'||t==='light') return t; }catch(e){}
+    return 'light'; }
+  function saveTheme(t){ try{ localStorage.setItem(KEY,t); localStorage.setItem(OLD,t); }catch(e){} }
   function applyTheme(t){
     t=(t==='dark')?'dark':'light';
     document.documentElement.setAttribute('data-theme', t);
-    var b=document.getElementById('themeBtn'); if(b){ b.innerHTML=(t==='dark')?_SUN:_MOON; b.title=(t==='dark')?'라이트 모드로':'다크 모드로'; }
+    try{ document.documentElement.classList.toggle('byparent', byParent()); }catch(e){}
+    var b=document.getElementById('themeBtn'); if(b){ b.innerHTML=((t==='dark')?_SUN:_MOON)+'<span>'+((t==='dark')?'라이트 모드':'다크 모드')+'</span>'; b.title=(t==='dark')?'밝은 화면으로 바꾸기':'어두운 화면으로 바꾸기'; }
     var mt=document.querySelector('meta[name="theme-color"]'); if(mt) mt.setAttribute('content', t==='dark'?'#141518':'#eef1f5');
     try{ if(window.caroRedrawChart) window.caroRedrawChart(); }catch(e){}
   }
@@ -722,10 +734,12 @@
     applyTheme(getTheme());
     var b=document.getElementById('themeBtn');
     if(b && !b._caroBound){ b._caroBound=1;
-      b.addEventListener('click', function(){ var n=(getTheme()==='dark')?'light':'dark'; saveTheme(n); applyTheme(n); });
+      b.addEventListener('click', function(){ var n=(document.documentElement.getAttribute('data-theme')==='dark')?'light':'dark'; saveTheme(n); applyTheme(n); });
     }
   }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', bind); else bind();
+  /* 같은 PC 의 다른 창(관제·현황판)에서 바꾸면 따라 바뀐다 */
+  window.addEventListener('storage', function(e){ try{ if(e.key===KEY && (e.newValue==='light'||e.newValue==='dark') && !byParent()) applyTheme(e.newValue); }catch(x){} });
   window.caroApplyTheme=applyTheme;
 })();
 
