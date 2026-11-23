@@ -371,6 +371,20 @@
   }
 </style>
 <script type="module" src="firebase-config.js?v=7"></script>
+<style id="v47gap">
+/* ★[v110.47] 칸 간격 통일 : 덩어리 사이 16px · 숫자 칸 사이 12px · 작은 제목과 그 아래 칸 사이 10px · 칸 둥글기 16px */
+@media (min-width:900px){
+  #tab-dash .kpis{margin-bottom:16px!important;}
+  .kpis,.mr-stats,.mb-kpis,#tab-debt .db-kpis{gap:12px!important;}
+  .ratebar,.mb-empty{border-radius:16px!important;}
+  .ratebar{margin-bottom:16px!important;}
+  #tab-members .mb-head{margin-bottom:16px!important;} #tab-members .mb-kpis{margin-bottom:16px!important;}
+  #tab-debt .db-kpis{margin-bottom:0!important;} #tab-debt .db-h{margin:16px 2px 10px!important;}
+  #tab-inbox .ib-head{margin-bottom:16px!important;} #tab-inbox .ib-alerts{margin:0 0 16px!important;}
+  #tab-chat #rpRoot{margin-top:16px!important;}
+  #tab-set .grid{align-items:stretch!important;} #tab-set .grid>.card{margin:0!important;} #tab-set #piiLogCard{grid-column:1/-1;}
+}
+</style>
 </head>
 <body>
 <!-- 관리자 로그인 -->

@@ -573,6 +573,21 @@ html[data-theme="light"] .mappill,html[data-theme="light"] .mtb,html[data-theme=
 .mvb .cb.mvon{background:var(--gold);color:#15161a;border-color:var(--gold);font-weight:900;}
 .mvb .cb:disabled{opacity:.4;cursor:default;}
 .mvb.act{border-color:var(--gold);background:rgba(200,169,110,.08);}
+/* ═══ ★[v110.47] 칸 줄맞춤 · 표식 위치 ═══ */
+/* 세 기둥(왼쪽 목록 · 가운데 지도 · 오른쪽 제어)의 아래 끝을 맞춘다. 전에는 기둥마다 끝나는 높이가 달라 아래에 빈 자리가 생겼다.
+   가장 긴 기둥에 맞춰 차량 목록 · 지도 · 이벤트 목록이 남는 높이를 채운다. 목록 두 개는 줄어들 수 있게 해서(안에서 스크롤) 지도와 타임라인이 한 화면에 들어오던 것을 지킨다 */
+@media (min-width:1101px){
+  .main{align-items:stretch;}
+  .lcol>.card:last-child{flex:1 1 auto;display:flex;flex-direction:column;min-height:0;}
+  .lcol .flist{flex:1 1 0;max-height:none;min-height:230px;}
+  .ccol>.maprow{flex:1 1 auto;}
+  .maprow>.mapcard{display:flex;flex-direction:column;}
+  .maprow>.mapcard .mapbox{flex:1 1 auto;}
+  .rcol>.card:last-child{flex:1 1 auto;display:flex;flex-direction:column;min-height:0;}
+  .rcol>.card:last-child .loglist{flex:1 1 0;max-height:none;min-height:120px;}
+}
+/* 표식의 뾰족한 끝이 차의 좌표에 정확히 오게 (그림 안에서 끝이 바닥보다 4px 위에 있었다) */
+.ward svg{margin-top:4px;} .ward .lb{margin-top:6px;}
 </style>
 </head>
 <body>
@@ -594,7 +609,7 @@ html[data-theme="light"] .mappill,html[data-theme="light"] .mtb,html[data-theme=
     <button class="ntab on" id="nt-live" onclick="switchView('live')">실시간 관제</button>
     <button class="ntab" id="nt-ops" onclick="switchView('ops')">운영 관리</button>
   </div>
-  <span class="sync off" id="sync">CONNECTING…</span><span id="pver" title="이 화면의 버전" style="font-size:11px;color:var(--muted);letter-spacing:.5px;white-space:nowrap;">v110.46</span>
+  <span class="sync off" id="sync">CONNECTING…</span><span id="pver" title="이 화면의 버전" style="font-size:11px;color:var(--muted);letter-spacing:.5px;white-space:nowrap;">v110.48</span>
   <button class="lgout" id="thbtn" onclick="themeToggle()" title="밝은 화면으로 바꾸기">라이트 모드</button>
   <span class="clock" id="clock">--:--:--</span>
   <span class="adm" id="adm">—</span>
@@ -778,7 +793,7 @@ html[data-theme="light"] .mappill,html[data-theme="light"] .mtb,html[data-theme=
 <script>
 /* ★[v110.20] 화면 버전 자가 점검 — 태블릿 앱·브라우저가 옛 화면을 붙잡고 있으면(캐시) 켤 때·다시 볼 때 스스로 새로 받는다.
    로그인 전 화면에서도 동작한다(예전 자동 업데이트는 로그인 칸에 글자가 들어 있으면 '입력 중' 으로 보고 미뤘다). 같은 버전으로는 3번까지만 시도한다. */
-var CARO_PAGE_VER='110.46';
+var CARO_PAGE_VER='110.48';
 function caroSelfCheck(){
   try{
     fetch('version.txt?t='+Date.now(),{cache:'no-store'}).then(function(r){ return r.ok?r.text():''; }).then(function(t){
@@ -1035,6 +1050,7 @@ function glExt(){ var P=GL.pts, n=P.length; if(n<3) return null; var a=P[n-1], b
   var aw=Math.abs(w);
   if(a.v>=40&&aw<=1.5) return {ext:4500,w:w,acc:acc};
   if(a.v>=30&&aw<=6) return {ext:3000,w:w,acc:acc};
+  if(a.v>=12&&aw<=4) return {ext:2500,w:w,acc:acc};   /* ★[v110.47] 시내 속도(시속 12km 이상 · 거의 곧게)에서도 2.5초 앞까지 이어 간다 — 전에는 시속 30km 아래에서는 표식이 6초 남짓 늦었다 */
   return null; }
 /* ★[v110.39] 지금 속도 어림 : 받은 마지막 값은 '보고를 만든 순간' 의 속도라 화면에 뜰 때는 이미 2~7초 묵었다(가속·감속 중이면 시속 10~25km 차이).
    그 사이의 변화를, 기기가 함께 보낸 속도 변화율로 메운다. 변화율은 오래 이어지지 않으므로 3초에 걸쳐 줄여 가며 더하고(더 오래 지나도 최대 3초치), 12초 넘게 소식이 없으면 받은 값 그대로 둔다 */
@@ -1183,7 +1199,8 @@ function mapDraw(){
     var p=stopOnRoad(v,smoothPos(v));                                                 /* ★[v110.32] 서 있는 차 : 달려온 도로에서 12m 안이면 도로 위에 */
     /* ★[v110.34] 터널·지하차도 안(위성 없이 추정한 위치, 오차 30m 초과) : 추정 위치는 도로에서 벗어나므로 쓰지 않고 '들어간 자리' 에 세워 둔다. 나오면 그 자리로 옮기고 지나온 길은 도로를 따라 점선으로 잇는다 */
     v._tun=tunOf(v); GL.tun=v._tun;
-    if(v._tun){ if(v._gPos) p=v._gPos; } else if(p&&(v.gsrc==='gnss'||v.gsrc==='gnss+dr'||v.gsrc==='dr')) v._gPos=p;
+    if(v._tun){ if(v._gPos) p=v._gPos; var tp48=tunPlay(v); v._tunEst=!!tp48; if(tp48) p=tp48; }   /* ★[v110.48] 전에 지나간 터널이면 그 길을 따라 옮긴다 */
+    else { if(TUNRUN[v.id]) delete TUNRUN[v.id]; v._tunEst=false; if(p&&(v.gsrc==='gnss'||v.gsrc==='gnss+dr'||v.gsrc==='dr')) v._gPos=p; }
     var gdev=IDMAP[v.id]||null; if(gdev!==GL.dev) glReset(gdev);                      /* ★[v110.17] 차량을 바꾸면 재생을 새로 시작 */
     if(GL.pos&&GL.pts.length&&v.online&&!v._tun) p=GL.pos;                                     /* 경로 재생 중이면 그 위치(미끄러지듯 이동) */
     GL.mk=null;
@@ -1207,7 +1224,7 @@ function mapDraw(){
   var pill='차량 선택';
   if(v){
     if(v.ctx==='park'||v.ctx==='cand') pill=v.name+' · '+(v.ctx==='park'?('주차장 안 · '+floorStr(v.floor)):'실내 확인중')+(v.gsrc==='dr'?' (추측항법 위치)':' (입구 위치 표시)');   /* ★[v110.13] */
-    else if(v._tun) pill=v.name+' · 터널·지하차도 통과 중 — 들어간 자리에 표시 (나오면 이어집니다)';
+    else if(v._tun) pill=v.name+' · 터널·지하차도 통과 중'+(tunDepStr(v)?(' · '+tunDepStr(v)):'')+(v._tunEst?' — 전에 지나간 길로 어림한 위치':' — 들어간 자리에 표시 (나오면 이어집니다)');
     else if(v.gsrc==='dr') pill=v.name+' · 지하/터널 — 추측항법 위치'+(v.posAcc?(' (약 ±'+Math.round(v.posAcc)+'m)'):'');
     else if(live&&v.gsrc==='wifi') pill=v.name+' · 실내 — 주변 공유기로 잰 위치'+(v.wfAcc?(' (약 ±'+Math.round(v.wfAcc)+'m)'):'');   /* ★[v110.26] */
     else if(live&&v.gaHeld) pill=v.name+' · 실내·지하 — 들어와 선 자리에 고정 (약 ±12m)';   /* ★[v110.27] 기기가 '달려와 선 자리' 에 임시로 고정해 둔 상태 */
@@ -1277,7 +1294,7 @@ function render(){
     sub('lv-bats', (typeof v.vbat==='number')?(v.vbat<5?'측정 안 됨':(v.vbat<11.6?'방전 주의':(v.vbat>13.2?'충전 중':'정상'))):''); sub('lv-accs', (typeof v.accOffSec==='number'&&!v.acc&&v.accOffSec>0)?('끈 지 '+(v.accOffSec<3600?Math.floor(v.accOffSec/60)+'분':Math.floor(v.accOffSec/3600)+'시간')):'');
     if(v.ctx){
       if(v.ctx==='park'){ sub('lv-flrs','주차장'+(v.lift?' · 승강기':'')+(typeof v.floorConf==='number'?' · 신뢰 '+v.floorConf+'%':'')); $('lv-flr').textContent=floorStr(v.floor); }
-      else { $('lv-flr').textContent='—'; sub('lv-flrs',{out:'실외 · 층 없음',cand:'실내 확인중',tunnel:'터널·지하차도 · 층 없음',unknown:'기준 없음'}[v.ctx]||''); }
+      else { var td48=(v.ctx==='tunnel')?tunDepStr(v):''; $('lv-flr').textContent=td48?('-'+v.tunDep+'m'):'—'; sub('lv-flrs',td48?('터널·지하차도 · '+td48):({out:'실외 · 층 없음',cand:'실내 확인중',tunnel:'터널·지하차도 · 층 없음',unknown:'기준 없음'}[v.ctx]||'')); }
     } else sub('lv-flrs','');
     $('lv-alt').textContent=(typeof v.alt==='number')?((v.alt>=0?'+':'')+v.alt.toFixed(1)+'m'+((typeof v.altErr==='number'&&v.altErr>0)?' ±'+v.altErr.toFixed(1):'')):'—';
     if(v.ctx==='park'||v.ctx==='cand'){ $('lv-altk').textContent='입구 대비 높이'; sub('lv-alts',(typeof v.vz==='number'&&Math.abs(v.vz)>=0.05)?((v.vz>0?'올라가는 중 ':'내려가는 중 ')+Math.abs(v.vz).toFixed(2)+'m/s'):'주차장 안'); }
@@ -1990,6 +2007,61 @@ function staffMoveGo(mode){ var v=selV(); if(!v){ toast('차량을 먼저 선택
   caroConfirm(v.name+' 차량을 '+MOVE_NM[mode]+'하러 옮깁니까?\n· ['+MOVE_NM[mode]+' 완료] 를 누를 때까지 도난 · 무단 이동 경보가 뜨지 않습니다\n· 그동안 고객은 이 차를 예약할 수 없습니다').then(function(ok){ if(ok) moveCall(v,mode); }); }
 setInterval(function(){ try{ var v=selV(); if(v&&smoveOf(v)) moveDraw(v); }catch(e){} },30000);
 
+/* ★[v110.47] 지도 칸의 크기가 바뀌면(오른쪽 탭을 바꾸면 기둥 높이가 달라진다) 보던 자리를 그대로 두고 지도를 다시 맞춘다 */
+(function(){ try{ var mb=document.querySelector('.mapbox'), tm=null, lw=0, lh=0; if(!mb||!window.ResizeObserver) return;
+  new ResizeObserver(function(){ var w=mb.clientWidth, h=mb.clientHeight; if(Math.abs(w-lw)<2&&Math.abs(h-lh)<2) return; lw=w; lh=h; clearTimeout(tm);
+    tm=setTimeout(function(){ try{ if(mapKind==='kakao'&&kmap){ var c=kmap.getCenter(); kmap.relayout(); kmap.setCenter(c); } else if(mapKind==='leaflet'&&lmap){ lmap.invalidateSize(); } }catch(e){} try{ fitPill(); }catch(e){} },80); }).observe(mb); }catch(e){} })();
+
+/* ═══ ★[v110.48] 터널·지하차도 (11/23 신월여의지하도로 주행 기록에서) ═══
+   · 깊이 : 들어가기 직전(실외)의 주행 고도 − 지금 주행 고도. 기기가 기압으로 재는 값이라 위성이 없어도 나온다 (그날은 77m)
+   · 위치 : 기기가 위성 없이 어림한 위치는 도로에서 수백 m~1km 벗어난다 → 전에는 6분 내내 '들어간 자리' 에 세워 뒀다.
+           한 번 지나간 터널은 들어간 곳 · 나온 곳 · 걸린 시간 · (끝을 맞춰 고친) 지나간 모양을 이 PC 에 기억해 두고,
+           다음에 같은 터널에 들어가면 그 길을 따라 걸린 시간에 맞춰 표식을 옮긴다(어림한 위치라고 적는다). 나오면 실제 위치로 붙는다 */
+var TUNREF={}, TUNRUN={}, TUNS=[], TUN_LT=0;
+try{ TUNS=JSON.parse(localStorage.getItem('caro_tunnels')||'[]')||[]; if(!Array.isArray(TUNS)) TUNS=[]; }catch(e){ TUNS=[]; }
+function tunM(a,b){ var y=(b[0]-a[0])*111320, x=(b[1]-a[1])*111320*Math.cos(a[0]*Math.PI/180); return Math.sqrt(x*x+y*y); }
+function tunTs(x){ try{ return (x&&x.ts&&x.ts.toDate)?x.ts.toDate().getTime():0; }catch(e){ return 0; } }
+function tunTrack(v){ var r=TUNREF[v.id]||(TUNREF[v.id]={out:null,ref:null});
+  if(v.ctx==='tunnel'){ if(r.ref==null) r.ref=r.out; v.tunDep=(r.ref!=null&&typeof v.roadAlt==='number')?Math.round(r.ref-v.roadAlt):null; }
+  else { r.ref=null; v.tunDep=null; if(v.ctx==='out'&&typeof v.roadAlt==='number') r.out=v.roadAlt; } }
+function tunDepStr(v){ return (v&&typeof v.tunDep==='number'&&v.tunDep>=3)?('지하 약 '+v.tunDep+' m'):''; }
+/* 그날 기록에서 '달리며 들어갔다 나온 곳' 을 찾아 터널로 기억한다 */
+function tunLearn(){ var ev=[], chg=false;
+  EVTS.forEach(function(e){ if((e.event==='indoor_in'||e.event==='indoor_out')&&e.lat!=null&&e.lng!=null){ var t=tunTs(e); if(t) ev.push({k:e.event,t:t,p:[Number(e.lat),Number(e.lng)],v:Number(e.speed)||0}); } });
+  ev.sort(function(a,b){ return a.t-b.t; });
+  for(var i=0;i+1<ev.length;i++){ var a=ev[i], b=ev[i+1]; if(a.k!=='indoor_in'||b.k!=='indoor_out') continue;
+    var sec=(b.t-a.t)/1000, len=tunM(a.p,b.p); if(sec<25||sec>1500||len<400||a.v<30) continue;          /* 시속 30km 넘게 달리며 들어가 400m 넘게 떨어진 곳으로 나온 것만(주차장 제외) */
+    var hit=null; TUNS.forEach(function(t){ if((tunM(t.a,a.p)<400&&tunM(t.b,b.p)<400)||(tunM(t.a,b.p)<400&&tunM(t.b,a.p)<400)) hit=t; });
+    if(hit&&(hit.seen||[]).indexOf(a.t)>=0) continue;
+    var dr=[]; TELE.forEach(function(t){ var m=tunTs(t); if(m>a.t&&m<b.t&&t.lat!=null&&t.lng!=null&&Number(t.gfix)===1) dr.push({t:m,p:[Number(t.lat),Number(t.lng)]}); });
+    dr.sort(function(x,y){ return x.t-y.t; });
+    var pts=[a.p], q=1;
+    if(dr.length>=3){ var L=dr[dr.length-1], T=(L.t-a.t)||1, ex=[b.p[0]-L.p[0],b.p[1]-L.p[1]]; q=tunM(L.p,b.p)/len;
+      if(q<=0.35) dr.forEach(function(d){ var f=(d.t-a.t)/T; pts.push([d.p[0]+ex[0]*f,d.p[1]+ex[1]*f]); }); }   /* 끝이 어긋난 만큼을 처음부터 끝까지 고르게 나눠 고친다. 너무 많이 어긋난 기록(길이의 35% 넘게)은 모양을 쓰지 않고 곧은 선으로 */
+    pts.push(b.p);
+    if(pts.length>40){ var st=(pts.length-1)/39, o=[]; for(var k=0;k<40;k++) o.push(pts[Math.round(k*st)]); pts=o; }
+    pts=pts.map(function(p){ return [Math.round(p[0]*1e6)/1e6,Math.round(p[1]*1e6)/1e6]; });
+    if(hit){ hit.seen=(hit.seen||[]).concat([a.t]).slice(-20); hit.sec=Math.round((hit.sec*hit.n+sec)/(hit.n+1)); hit.n++;
+      if(q<hit.q){ hit.pts=(tunM(hit.a,a.p)<400)?pts:pts.slice().reverse(); hit.q=q; } }
+    else TUNS.push({a:a.p,b:b.p,sec:Math.round(sec),pts:pts,q:q,n:1,seen:[a.t]});
+    chg=true; }
+  if(chg){ if(TUNS.length>80) TUNS=TUNS.slice(-80); try{ localStorage.setItem('caro_tunnels',JSON.stringify(TUNS)); }catch(e){} } }
+/* 터널 안 : 기억해 둔 길 위에서 지금쯤 있을 자리. 모르는 터널이면 null */
+function tunPlay(v){ var r=TUNRUN[v.id];
+  if(!r){ var e=v._gPos; if(!e) return null; var best=null, bd=500, rev=false;
+    TUNS.forEach(function(t){ var da=tunM(t.a,e), db=tunM(t.b,e); if(da<bd){ bd=da; best=t; rev=false; } if(db<bd){ bd=db; best=t; rev=true; } });
+    var t0=Date.now()-4000, lin=0, lout=0; EVTS.forEach(function(x){ var m=tunTs(x); if(x.event==='indoor_in'&&m>lin) lin=m; if(x.event==='indoor_out'&&m>lout) lout=m; });
+    if(lin>lout&&Date.now()-lin<1500000&&Date.now()-lin>=0) t0=lin;                                    /* 들어간 시각을 알면 그때부터 센다(관제를 도중에 열어도 맞게) */
+    r=TUNRUN[v.id]={t0:t0,tn:best,P:null,S:null,tot:0};
+    if(best){ r.P=rev?best.pts.slice().reverse():best.pts; r.S=[]; for(var i=1;i<r.P.length;i++){ var d=tunM(r.P[i-1],r.P[i]); r.S.push(d); r.tot+=d; } } }
+  if(!r.tn||!r.P||r.P.length<2) return null;
+  var f=(Date.now()-r.t0)/(r.tn.sec*1000); if(f<0) f=0; if(f>0.97) f=0.97; var want=r.tot*f, acc=0;
+  for(var j=1;j<r.P.length;j++){ var s=r.S[j-1]; if(acc+s>=want){ var k2=s?(want-acc)/s:0; return [r.P[j-1][0]+(r.P[j][0]-r.P[j-1][0])*k2, r.P[j-1][1]+(r.P[j][1]-r.P[j-1][1])*k2]; } acc+=s; }
+  return r.P[r.P.length-1]; }
+setInterval(function(){ try{ var v=FLEET.find(function(x){ return x.id===selId; }); if(!v||!v._tun||!v._tunEst||!GL.mk) return; var p=tunPlay(v); if(!p) return;
+    if(mapKind==='kakao') GL.mk.setPosition(new kakao.maps.LatLng(p[0],p[1])); else if(mapKind==='leaflet') GL.mk.setLatLng(p); }catch(e){} },500);
+(function(){ var r0=render; render=function(){ r0.apply(this,arguments); try{ if(Date.now()-TUN_LT>20000){ TUN_LT=Date.now(); tunLearn(); } }catch(e){} }; })();
+
 /* 차량 선택 */
 $('flist').onclick=function(e){
   var c=e.target.closest('.vcard'); if(!c) return;
@@ -2166,7 +2238,7 @@ function remap(){
     v.drOk=(d.drOk===true); v.drMode=num(d.drMode); v.drAlign=num(d.drAlign);
     v.gfix=num(d.gfix); v.gWd=num(d.gWd); v.gAgc=num(d.gAgc); v.rtPend=num(d.rtPend); v.gCfg=num(d.gCfg); v.gSky=num(d.gSky); v.wfN=num(d.wfN); v.wfSeen=num(d.wfSeen); v.wfAcc=num(d.wfAcc); v.wfUsed=num(d.wfUsed); v.gWeak=(d.gWeak===true); v.gaHeld=(d.gaHeld===true); v.ota=(typeof d.ota==='string')?d.ota:''; v.gDiff=(typeof d.gDiff==='boolean')?d.gDiff:null; v.gaOn=(typeof d.gaOn==='boolean')?d.gaOn:null; v.gaN=num(d.gaN); v.gaRel=num(d.gaRel); v.gaWhy=num(d.gaWhy); v.gaFix=num(d.gaFix); v.gaD=num(d.gaD);   /* ★[v110.21] */ v.gFusion=(d.gFusion===false)?false:(d.gFusion===true?true:null);
     v.lift=(d.lift===true); v.posAcc=num(d.posAcc); v.hdop=num(d.hdop); v.floorH=num(d.floorH);
-    v.roadAlt=num(d.roadAlt); v.grade=num(d.grade); v.elev=num(d.elev);   /* 주행 고도(출발점 대비 m)·경사(%)·해발(m) — 층과 별개 */
+    v.roadAlt=num(d.roadAlt); tunTrack(v); v.grade=num(d.grade); v.elev=num(d.elev);   /* 주행 고도(출발점 대비 m)·경사(%)·해발(m) — 층과 별개 */
     v.heading=num(d.heading); v.speed=num(d.speed); v.shock=num(d.shock);
     v.impact=(d.impact===true); v.over=(d.over===true); v.moving=(d.moving===true);
     /* ★[v110.14] 움직임 상태 7가지 (v9.9-precise11 부터 보냄) — 없으면(옛 펌웨어) 빈값 → 예전처럼 주행중/정지 두 가지 */
@@ -2735,11 +2807,11 @@ function drawRoute(){
   }
 }
 function csvExport(){
-  var rows=[['시각','종류','충격구분','층','고도(m)','방향(deg)','속도(km/h)','충격(g)','위도','경도','위성수','GPS종류','수평오차(m)','상태','부팅원인','경로점수','기압(hPa)','온도(C)','충격종류','이어진시간(ms)','위(g)','아래(g)','회전(deg/s)','앞선떨림(g)','뒤집힘','채움','보고걸린시간(ms)','접속횟수','응답없음횟수']];   /* ★[v110.41] 뒤 3칸 : 통신 지연 진단(펌웨어 v9.9-precise53 부터) — 앞 보고 한 번에 걸린 시간 · 보안 접속을 새로 연 누적 횟수 · 15초 동안 응답이 없던 누적 횟수 */
+  var rows=[['시각','종류','충격구분','층','고도(m)','방향(deg)','속도(km/h)','충격(g)','위도','경도','위성수','GPS종류','수평오차(m)','상태','부팅원인','경로점수','기압(hPa)','온도(C)','충격종류','이어진시간(ms)','위(g)','아래(g)','회전(deg/s)','앞선떨림(g)','뒤집힘','채움','보고걸린시간(ms)','접속횟수','응답없음횟수','상황','주행고도(m)','경사(%)']];   /* ★[v110.48] 끝 3칸 : 기기가 판단한 상황(out 실외 · cand 실내 확인중 · park 주차장 · tunnel 터널) · 출발점 대비 높이 · 경사 — 층 · 터널 판정을 기록으로 가려내기 위함 */   /* ★[v110.41] 뒤 3칸 : 통신 지연 진단(펌웨어 v9.9-precise53 부터) — 앞 보고 한 번에 걸린 시간 · 보안 접속을 새로 연 누적 횟수 · 15초 동안 응답이 없던 누적 횟수 */
   var kx=function(v){ return v!=null?v:''; };
   EVTS.forEach(function(e){ var cls=e.event==='impact'?(impactMode(e)==='park'?'주차중':'주행중'):'';
-    rows.push([fmtTs(e.ts),e.event||'',cls,floorStr(num(e.floor)),e.alt!=null?e.alt:'',e.heading!=null?Math.round(e.heading):'',e.speed!=null?e.speed:'',e.shock!=null?e.shock:'',e.lat!=null?e.lat:'',e.lng!=null?e.lng:'','','','','',e.rst||'','','','',(e.event==='impact'&&impactMode(e)!=='park')?impKind(e):'',kx(e.kdur),kx(e.kup),kx(e.kdn),kx(e.krot),kx(e.krough),kx(e.knx),kx(e.kduty),'','','']); });
-  TELE.forEach(function(t){ rows.push([fmtTs(t.ts),'주기','',flrOf(t),t.alt!=null?t.alt:'',t.heading!=null?Math.round(t.heading):'',t.speed!=null?t.speed:'',t.shock!=null?t.shock:'',t.lat!=null?t.lat:'',t.lng!=null?t.lng:'',t.sats!=null?t.sats:'',t.gfix!=null?t.gfix:'',t.hacc!=null?t.hacc:'',t.mstate||'','',(typeof t.rt==='string'&&t.rt)?(t.rt.split('|').length-4):'',t.hpa!=null?t.hpa:'',t.temp!=null?t.temp:'','','','','','','','','',kx(t.rq),kx(t.rd),kx(t.ns)]); });
+    rows.push([fmtTs(e.ts),e.event||'',cls,floorStr(num(e.floor)),e.alt!=null?e.alt:'',e.heading!=null?Math.round(e.heading):'',e.speed!=null?e.speed:'',e.shock!=null?e.shock:'',e.lat!=null?e.lat:'',e.lng!=null?e.lng:'','','','','',e.rst||'','','','',(e.event==='impact'&&impactMode(e)!=='park')?impKind(e):'',kx(e.kdur),kx(e.kup),kx(e.kdn),kx(e.krot),kx(e.krough),kx(e.knx),kx(e.kduty),'','','','','','']); });
+  TELE.forEach(function(t){ rows.push([fmtTs(t.ts),'주기','',flrOf(t),t.alt!=null?t.alt:'',t.heading!=null?Math.round(t.heading):'',t.speed!=null?t.speed:'',t.shock!=null?t.shock:'',t.lat!=null?t.lat:'',t.lng!=null?t.lng:'',t.sats!=null?t.sats:'',t.gfix!=null?t.gfix:'',t.hacc!=null?t.hacc:'',t.mstate||'','',(typeof t.rt==='string'&&t.rt)?(t.rt.split('|').length-4):'',t.hpa!=null?t.hpa:'',t.temp!=null?t.temp:'','','','','','','','','',kx(t.rq),kx(t.rd),kx(t.ns),kx(t.ctx),kx(t.roadAlt),kx(t.grade)]); });
   var csv='﻿'+rows.map(function(r){return r.map(function(c){ var t=String(c==null?'':c); if(/^[=+\-@]/.test(t)) t="'"+t; return /[",\n]/.test(t)?('"'+t.replace(/"/g,'""')+'"'):t; }).join(',');}).join('\n');   /* ★[v108] 엑셀 수식 주입 방지·쉼표 처리 */
   var a=document.createElement('a');
   a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
