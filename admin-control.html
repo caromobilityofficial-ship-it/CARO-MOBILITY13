@@ -588,6 +588,15 @@ html[data-theme="light"] .mappill,html[data-theme="light"] .mtb,html[data-theme=
 }
 /* 표식의 뾰족한 끝이 차의 좌표에 정확히 오게 (그림 안에서 끝이 바닥보다 4px 위에 있었다) */
 .ward svg{margin-top:4px;} .ward .lb{margin-top:6px;}
+/* ═══ ★[v110.49] 프로그램 안 알림 — 윈도우(브라우저) 알림 상자 대신 관제 화면 오른쪽 아래에 띄운다 ═══ */
+#alstack{position:fixed;right:18px;bottom:18px;z-index:100500;display:flex;flex-direction:column-reverse;gap:10px;width:390px;max-width:calc(100vw - 36px);pointer-events:none;}
+.alc{pointer-events:auto;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:5px 12px;align-items:start;background:var(--panel);border:1px solid var(--border2);border-left:4px solid var(--c,var(--warn));border-radius:12px;padding:12px 12px 12px 15px;box-shadow:0 16px 36px -14px rgba(0,0,0,.65);animation:alcin .18s ease-out;cursor:pointer;}
+.alc .h{grid-column:1;font-size:11.5px;font-weight:700;color:var(--c,var(--warn));letter-spacing:.2px;white-space:nowrap;}
+.alc .t{grid-column:1;font-size:13.5px;font-weight:700;color:var(--txt);line-height:1.45;word-break:keep-all;overflow-wrap:anywhere;}
+.alc .go{grid-column:1;font-size:11.5px;color:var(--muted);}
+.alc .x{grid-row:1 / span 2;grid-column:2;background:none;border:1px solid var(--border2);color:var(--muted);border-radius:8px;width:28px;height:28px;font-size:15px;line-height:1;cursor:pointer;font-family:inherit;}
+.alc .x:hover{color:var(--txt);border-color:var(--muted);}
+@keyframes alcin{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:none;}}
 </style>
 </head>
 <body>
@@ -609,7 +618,7 @@ html[data-theme="light"] .mappill,html[data-theme="light"] .mtb,html[data-theme=
     <button class="ntab on" id="nt-live" onclick="switchView('live')">실시간 관제</button>
     <button class="ntab" id="nt-ops" onclick="switchView('ops')">운영 관리</button>
   </div>
-  <span class="sync off" id="sync">CONNECTING…</span><span id="pver" title="이 화면의 버전" style="font-size:11px;color:var(--muted);letter-spacing:.5px;white-space:nowrap;">v110.48</span>
+  <span class="sync off" id="sync">CONNECTING…</span><span id="pver" title="이 화면의 버전" style="font-size:11px;color:var(--muted);letter-spacing:.5px;white-space:nowrap;">v110.49</span>
   <button class="lgout" id="thbtn" onclick="themeToggle()" title="밝은 화면으로 바꾸기">라이트 모드</button>
   <span class="clock" id="clock">--:--:--</span>
   <span class="adm" id="adm">—</span>
@@ -793,7 +802,7 @@ html[data-theme="light"] .mappill,html[data-theme="light"] .mtb,html[data-theme=
 <script>
 /* ★[v110.20] 화면 버전 자가 점검 — 태블릿 앱·브라우저가 옛 화면을 붙잡고 있으면(캐시) 켤 때·다시 볼 때 스스로 새로 받는다.
    로그인 전 화면에서도 동작한다(예전 자동 업데이트는 로그인 칸에 글자가 들어 있으면 '입력 중' 으로 보고 미뤘다). 같은 버전으로는 3번까지만 시도한다. */
-var CARO_PAGE_VER='110.48';
+var CARO_PAGE_VER='110.49';
 function caroSelfCheck(){
   try{
     fetch('version.txt?t='+Date.now(),{cache:'no-store'}).then(function(r){ return r.ok?r.text():''; }).then(function(t){
@@ -2062,6 +2071,22 @@ setInterval(function(){ try{ var v=FLEET.find(function(x){ return x.id===selId; 
     if(mapKind==='kakao') GL.mk.setPosition(new kakao.maps.LatLng(p[0],p[1])); else if(mapKind==='leaflet') GL.mk.setLatLng(p); }catch(e){} },500);
 (function(){ var r0=render; render=function(){ r0.apply(this,arguments); try{ if(Date.now()-TUN_LT>20000){ TUN_LT=Date.now(); tunLearn(); } }catch(e){} }; })();
 
+/* ═══ ★[v110.49] 프로그램 안 알림 ═══
+   전에는 경보마다 윈도우(브라우저) 알림 상자가 화면 구석에 떴다(운영 관리까지 따로 띄워 같은 사건이 두 개씩). 이제 관제 화면 안 오른쪽 아래에 카드로 쌓인다.
+   · 빨간 줄 = 경보(충격 · 도난 의심 · 통신 끊김 등) 20초, 주황 줄 = 알림 12초. 최대 4장. 카드를 누르면 그 차량을 연다
+   · 관제 창을 내려 두었거나 다른 창 뒤에 있을 때만(화면에 안 보일 때만) 윈도우 알림을 같이 띄운다 — 안 그러면 경보를 못 본다 */
+function caroAlertCard(msg,id,lvl){ try{ var st=$('alstack'); if(!st){ st=document.createElement('div'); st.id='alstack'; document.body.appendChild(st); }
+  var bad=(lvl==='bad')||/충격|도난|무단|끊김|차단|긴급|문 열림|방전/.test(msg), has=!!id&&FLEET.some(function(v){ return v.id===id; }), el=document.createElement('div');
+  el.className='alc'; el.style.setProperty('--c',bad?'var(--bad)':'var(--warn)');
+  el.innerHTML='<div class="h">'+(bad?'경보':'알림')+' · '+hms(Date.now(),true)+'</div><button class="x" title="닫기">×</button><div class="t"></div>'+(has?'<div class="go">누르면 이 차량을 엽니다</div>':'');
+  el.querySelector('.t').textContent=msg;
+  var kill=function(){ if(el.parentNode) el.parentNode.removeChild(el); };
+  el.querySelector('.x').onclick=function(e){ e.stopPropagation(); kill(); };
+  el.onclick=function(){ if(has){ try{ switchView('live'); selCar(id); }catch(e){} } kill(); };
+  st.appendChild(el); while(st.children.length>4) st.removeChild(st.firstChild);
+  setTimeout(kill,bad?20000:12000); }catch(e){} }
+window.caroAlertCard=caroAlertCard;
+
 /* 차량 선택 */
 $('flist').onclick=function(e){
   var c=e.target.closest('.vcard'); if(!c) return;
@@ -2192,7 +2217,7 @@ function applyResvSnap(s){
 function resvOf(v){ return RESV[String(v.docId)]||null; }
 /* ═══════════ [v9.2] 경보: 배터리·오프라인·거점이탈·미예약 이동·반납지연 ═══════════ */
 var alertState={};
-function alertOnce(key,ok,msg,sound){ var was=alertState[key]||false; if(ok&&!was){ alertsToday++; if(sound!==false) beep(); toast(msg); notify(msg); } alertState[key]=ok; }
+function alertOnce(key,ok,msg,sound){ var was=alertState[key]||false; if(ok&&!was){ alertsToday++; if(sound!==false) beep(); notify(msg,String(key).split('-').slice(1).join('-')); } alertState[key]=ok; }
 // 원격 펌웨어 업데이트(OTA)는 지원하지 않음 — 펌웨어는 설치자가 USB 로만 갱신 (보안: 원격으로 동작이 바뀌지 않게)
 
 /* ═══════════ Firestore 실시간 구독 ═══════════ */
@@ -2277,8 +2302,8 @@ function remap(){
 function checkAlerts(){
   FLEET.forEach(function(v){
     var p=evPrev[v.id]||{};
-    if(v.impact&&!p.impact){ alertsToday++; beep(); toast(''+v.name+' 충격 감지!'); notify(v.name+' 충격 감지'); }
-    if(v.over&&!p.over){ alertsToday++; beep(); toast(''+v.name+' 과속!'); notify(v.name+' 과속 감지'); }
+    if(v.impact&&!p.impact){ alertsToday++; beep(); notify(v.name+' 충격 감지'+(typeof v.shock==='number'?(' · '+v.shock.toFixed(1)+'g'):''),v.id); }
+    if(v.over&&!p.over){ alertsToday++; beep(); notify(v.name+' 과속'+(typeof v.speed==='number'?(' · '+Math.round(v.speed)+'km/h'):''),v.id); }
     evPrev[v.id]={impact:v.impact,over:v.over};
     /* [v9.2] */
     var r=resvOf(v);
@@ -2294,10 +2319,9 @@ function checkAlerts(){
     alertOnce('door-'+v.id, !!(v.doorOpen&&!v.acc&&!r&&!smoveOf(v)), ''+v.name+' 예약 없이 문 열림 감지');
   });
 }
-function notify(msg){
-  if(!('Notification' in window)) return;
-  if(Notification.permission==='granted') new Notification('CARO 관제',{body:msg});
-  else if(Notification.permission!=='denied') Notification.requestPermission();
+function notify(msg,id){
+  caroAlertCard(msg,id);   /* ★[v110.49] 프로그램 안 카드 */
+  try{ if(document.hidden&&('Notification' in window)&&Notification.permission==='granted') new Notification('CARO 관제',{body:msg}); }catch(e){}   /* 관제 창이 화면에 안 보일 때만 윈도우 알림 */
 }
 
 /* ── 선택 차량 기록 구독 (telemetry + events) ── */
