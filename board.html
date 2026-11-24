@@ -390,7 +390,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(
 <script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=932e79971e43cfe8bab8710f6190897b&autoload=false&libraries=services" onerror="window.__kakaoSdkErr=1" async></script>
 <script>
 /* ═══════════ CARO 운영 현황판 v110.45 ═══════════ */
-var BOARD_VER='110.50', POLL_DRIVE_MS=2000,   /* ★[v110.47] 달리는 차가 있는 동안은 2초마다 */ POLL_MS=3000,   /* ★[v110.46] 3초마다 새로 받는다 (전에는 10초) — 사고 · 신호 끊김을 바로 보이게 */ PAGE_ROWS=10, KEY_NAME='caro_board_key', NAME_NAME='caro_board_name';
+var BOARD_VER='110.51', POLL_DRIVE_MS=2000,   /* ★[v110.47] 달리는 차가 있는 동안은 2초마다 */ POLL_MS=3000,   /* ★[v110.46] 3초마다 새로 받는다 (전에는 10초) — 사고 · 신호 끊김을 바로 보이게 */ PAGE_ROWS=10, KEY_NAME='caro_board_key', NAME_NAME='caro_board_name';
 var $=function(i){return document.getElementById(i);};
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
 function p2(n){ return (n<10?'0':'')+n; }
@@ -535,7 +535,7 @@ var GLD={}, GL_PAN=0, GL_SPD=0, GL_LAT=1000;   /* GL_LAT = 기기가 잰 때부�
 function gAng(a,b){ var d=a-b; while(d>180) d-=360; while(d<-180) d+=360; return d; }
 function gldFeed(){ if(!FEED) return; var seen={};
   FEED.cars.forEach(function(c){ var g=GLD[c.k];
-    if(!(c.st==='drive'&&c.c==='ok'&&!c.tun&&typeof c.lat==='number'&&typeof c.lng==='number'&&typeof c.age==='number'&&c.age<20)) return;   /* ★[v110.48] 터널 안(c.tun)은 서버가 들어간 자리에 세워 둔다 — 이어 가지 않는다 */
+    if(!(c.st==='drive'&&c.c==='ok'&&!c.tun&&typeof c.lat==='number'&&typeof c.lng==='number'&&typeof c.age==='number'&&c.age<32)) return;   /* ★[v110.48] 터널 안(c.tun)은 서버가 들어간 자리에 세워 둔다 — 이어 가지 않는다 */
     seen[c.k]=1; var t=FEED.now-c.age*1000, v=Number(c.spd)||0, h=(typeof c.hd==='number')?c.hd:null;
     if(!g){ GLD[c.k]={lat:c.lat,lng:c.lng,t:t,v:v,h:h,a:0,w:0,dl:c.lat,dg:c.lng,vs:v,c:c}; return; }
     g.c=c;
@@ -548,7 +548,8 @@ function gldFeed(){ if(!FEED) return; var seen={};
     c.spd=g.vs; c.main='주행 '+g.vs+'km/h'; });                                   /* 방금 받은 내용에도 어림한 속도를 적는다(표 · 점 · 상세가 같은 숫자를 보이게) */
   Object.keys(GLD).forEach(function(k){ if(!seen[k]) delete GLD[k]; }); }
 /* 마지막 보고 뒤 tau 초가 지난 지금의 자리와 속도 */
-function gldAt(g,tau){ var aw=Math.abs(g.w), ext=(g.h==null||g.v<5)?0:(aw>10?3:(aw>2.5||g.v<30?6:10)); if(tau>ext) tau=ext; if(tau<0) tau=0;
+/* ★[v110.51] 이어 가는 한도를 시간이 아니라 거리로 : 곧은 길 400m · 완만한 굽이 150m · 급한 굽이 40m (최대 25초) — 보고가 늦어도 표식이 서 있지 않게 */
+function gldAt(g,tau){ var aw=Math.abs(g.w), ext=(g.h==null||g.v<4)?0:Math.min(25,((aw<=2.5)?400:(aw<=10?150:40))/(g.v/3.6)); if(tau>ext) tau=ext; if(tau<0) tau=0;
   var la=g.lat, lo=g.lng, cs=Math.cos(g.lat*Math.PI/180)||1, n=Math.ceil(tau/0.25), dt=n?tau/n:0, v=g.v;
   for(var i=0;i<n;i++){ var tm=(i+0.5)*dt; v=g.v+g.a*3*(1-Math.exp(-tm/3)); if(v<0) v=0;
     var hd=(g.h+g.w*Math.min(tm,3))*Math.PI/180, d=v/3.6*dt; la+=d*Math.cos(hd)/111320; lo+=d*Math.sin(hd)/(111320*cs); }
