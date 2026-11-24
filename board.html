@@ -390,7 +390,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(
 <script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=932e79971e43cfe8bab8710f6190897b&autoload=false&libraries=services" onerror="window.__kakaoSdkErr=1" async></script>
 <script>
 /* ═══════════ CARO 운영 현황판 v110.45 ═══════════ */
-var BOARD_VER='110.53', POLL_DRIVE_MS=2000,   /* ★[v110.47] 달리는 차가 있는 동안은 2초마다 */ POLL_MS=3000,   /* ★[v110.46] 3초마다 새로 받는다 (전에는 10초) — 사고 · 신호 끊김을 바로 보이게 */ PAGE_ROWS=10, KEY_NAME='caro_board_key', NAME_NAME='caro_board_name';
+var BOARD_VER='110.54', POLL_DRIVE_MS=2000,   /* ★[v110.47] 달리는 차가 있는 동안은 2초마다 */ POLL_MS=3000,   /* ★[v110.46] 3초마다 새로 받는다 (전에는 10초) — 사고 · 신호 끊김을 바로 보이게 */ PAGE_ROWS=10, KEY_NAME='caro_board_key', NAME_NAME='caro_board_name';
 var $=function(i){return document.getElementById(i);};
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
 function p2(n){ return (n<10?'0':'')+n; }
@@ -533,6 +533,21 @@ var MAP={kind:null,k:null,l:null,objs:{},hubs:[],circles:[],hubSig:null,sig:'',b
    · 속도 숫자도 같은 방법으로 지금 값을 어림해 1초마다 고친다 */
 var GLD={}, GL_PAN=0, GL_SPD=0, GL_LAT=1000;   /* GL_LAT = 기기가 잰 때부터 서버에 적힐 때까지 걸리는 시간(어림, ms) */
 function gAng(a,b){ var d=a-b; while(d>180) d-=360; while(d<-180) d+=360; return d; }
+/* ★[v110.53] 늦게 도착한 옛 보고 거르기 — 응답을 못 받은 보고가 1~2분 뒤 서버에 닿으면 차가 0.4~3km 뒤로 튀었다가 돌아온다(11/24 밤 실차 4번).
+   보고 시각 사이에 갈 수 없는 거리(초속 70m 넘게, 250m 넘게)로 옮겨 가면 한 번은 그 자리를 믿지 않고, 다음 받기에서도 그 근처면 그때 옮긴다(최대 2번 미룸) */
+var JG={};
+function jumpGuard(f){ var srv=f.now||Date.now();
+  (f.cars||[]).forEach(function(c){ if(typeof c.lat!=='number'||typeof c.lng!=='number'||typeof c.age!=='number') return;
+    var ls=srv-c.age*1000, p=JG[c.k], R=6371000, q=Math.PI/180;
+    if(!p||c.tun){ JG[c.k]={lat:c.lat,lng:c.lng,ls:ls}; return; }
+    var dd=function(a,b,x,y){ var dx=(x-a)*q, dy=(y-b)*q, h=Math.sin(dx/2)*Math.sin(dx/2)+Math.cos(a*q)*Math.cos(x*q)*Math.sin(dy/2)*Math.sin(dy/2); return 2*R*Math.asin(Math.sqrt(h)); };
+    var d=dd(p.lat,p.lng,c.lat,c.lng), dt=Math.max(1,(ls-p.ls)/1000);
+    if(d>250&&d/dt>70){
+      if(p.pl!=null&&dd(p.pl,p.pg,c.lat,c.lng)<150&&p.pn>=1){ JG[c.k]={lat:c.lat,lng:c.lng,ls:ls}; return; }   /* 두 번 이어 그 자리 → 진짜로 옮겨 간 것 */
+      p.pn=(p.pn||0)+1; p.pl=c.lat; p.pg=c.lng; if(p.pn>2){ JG[c.k]={lat:c.lat,lng:c.lng,ls:ls}; return; }
+      c.lat=p.lat; c.lng=p.lng; c.jumpHeld=true; return; }
+    JG[c.k]={lat:c.lat,lng:c.lng,ls:ls}; });
+}
 function gldFeed(){ if(!FEED) return; var seen={};
   FEED.cars.forEach(function(c){ var g=GLD[c.k];
     if(!(c.st==='drive'&&c.c==='ok'&&!c.tun&&typeof c.lat==='number'&&typeof c.lng==='number'&&typeof c.age==='number'&&c.age<20)) return;   /* ★[v110.48] 터널 안(c.tun)은 서버가 들어간 자리에 세워 둔다 — 이어 가지 않는다 */
@@ -704,6 +719,7 @@ function poll(){ if(!KEY||POLLING){ AGAIN=POLLING; return; }
   POLLING=true; clearTimeout(PTIMER); var want=SEL, t0=Date.now();
   window.FB_CALL('boardFeed',want?{key:KEY,car:want}:{key:KEY}).then(function(f){
     if(!f||f.v!==1||!f.cars) throw new Error('bad feed');
+    try{ jumpGuard(f); }catch(e){}
     FEED=f; OFFSET=f.now-Date.now()+Math.round((Date.now()-t0)/2); LAST_OK=Date.now(); ERRN=0; ERRMSG='';
     if(f.detail&&f.detail.k===SEL) DETAIL=f.detail;
     if(!MAP.kind) MAP.init();

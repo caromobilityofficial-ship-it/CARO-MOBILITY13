@@ -802,7 +802,7 @@ html[data-theme="light"] .mappill,html[data-theme="light"] .mtb,html[data-theme=
 <script>
 /* ★[v110.20] 화면 버전 자가 점검 — 태블릿 앱·브라우저가 옛 화면을 붙잡고 있으면(캐시) 켤 때·다시 볼 때 스스로 새로 받는다.
    로그인 전 화면에서도 동작한다(예전 자동 업데이트는 로그인 칸에 글자가 들어 있으면 '입력 중' 으로 보고 미뤘다). 같은 버전으로는 3번까지만 시도한다. */
-var CARO_PAGE_VER='110.53';
+var CARO_PAGE_VER='110.54';
 function caroSelfCheck(){
   try{
     fetch('version.txt?t='+Date.now(),{cache:'no-store'}).then(function(r){ return r.ok?r.text():''; }).then(function(t){
@@ -976,6 +976,26 @@ function rtDecode(str, tsMs){
    11/17 14:04 — 지하 주차장에 서 있는 채 기기가 다시 켜진 직후 '시속 129~235km · 오차 최대 120m' 인 위치가 30초 동안 올라와 지도에 300m 짜리 대각선이 그려졌다
    (펌웨어 v9.9-precise44 부터는 기기가 이런 값을 처음부터 버린다. 이 검사는 이미 쌓인 기록과 옛 펌웨어용) */
 function rtBogus(d){ return (typeof d.speed==='number'&&d.speed>=200)||(typeof d.hacc==='number'&&d.hacc>30); }
+var DEVSEQ={};
+/* ★[v110.53] 늦게 도착한 옛 보고 거르기 — 응답을 못 받아 기기가 포기한 보고가 통신망에 남아 있다가 1~2분 뒤 서버에 닿으면
+   서버는 그때 시각으로 적는다 → 지도 위 차가 0.4~3km 뒤로 튀었다가 돌아왔다 (11/24 밤 실차 4번 : 21:08 · 21:54 · 22:36 · 22:55).
+   보고마다 기기가 매긴 순번(sq, v9.9-precise56 부터) 또는 경로 묶음의 기기 시각(rtm)으로 순서를 보고, 앞서 받은 것보다 옛것이면 위치를 바꾸지 않는다. */
+function devSeqKey(d){ if(typeof d.sq==='number'&&d.bs!=null) return [Number(d.bs),d.sq,'s']; if(typeof d.rtm==='number'&&d.rtm>0&&d.rtb!=null) return [Number(d.rtb),d.rtm*100,'r']; return null; }
+function devStaleFix(id,d){
+  var k=devSeqKey(d), p=DEVSEQ[id], now=Date.now(); if(!k) return d;
+  if(p&&p.k[2]===k[2]&&(k[0]<p.k[0]||(k[0]===p.k[0]&&k[1]<p.k[1]))){
+    if(!p.st) p.st=now;
+    if(now-p.st<60000){ var o={}, f; for(f in d) o[f]=d[f]; for(f in p.pos) o[f]=p.pos[f]; o._stale=true; return o; }   /* 1분 넘게 계속 옛것이면(기기 기억이 지워져 순번이 처음부터) 받아들인다 */
+  }
+  DEVSEQ[id]={k:k,st:0,pos:{lat:d.lat,lng:d.lng,speed:d.speed,heading:d.heading,gsrc:d.gsrc,posAcc:d.posAcc,fix:d.fix,moving:d.moving,mstate:d.mstate,sats:d.sats,rt:d.rt,rtm:d.rtm,rtb:d.rtb,av:d.av}};
+  return d;
+}
+/* 하루치 기록에서 늦게 도착한 옛 보고 : 문서 이름의 기기 시계가 서버 시각 순서로 앞선 기록보다 1초 넘게 이르면 옛것 */
+function teleStaleSet(rows){
+  var ord=rows.slice().sort(function(a,b){ return toMs(a.ts)-toMs(b.ts); }), mx={}, bad={};
+  ord.forEach(function(d){ var k=rtIdMs(d._id); if(!k) return; if(mx[k.b]!=null&&k.ms<mx[k.b]-1000) bad[d._id]=1; else if(mx[k.b]==null||k.ms>mx[k.b]) mx[k.b]=k.ms; });
+  return bad;
+}
 function rtIdMs(id){ if(typeof id!=='string') return null; var m=/^(\d+)-(\d+)-\d+-/.exec(id); if(!m) return null; var ms=Number(m[2]); return isFinite(ms)?{b:m[1],ms:ms}:null; }
 /* 위성 없이 추정한 위치(터널 안 등)인가 : 모듈이 밝힌 오차가 30m 를 넘는 추측항법·추정 위치는 도로에서 벗어나 있으므로 경로에 쓰지 않는다 */
 /* 차가 터널·지하차도 안에 있어 위치가 추정값인가 (기기 문서 기준) */
@@ -987,8 +1007,9 @@ function routeRows(rows){
   var out=[], seen={}, off={};
   rows.forEach(function(d){ var k=rtIdMs(d._id), ms=toMs(d.ts); if(!k||!ms) return; var o=ms-k.ms; if(off[k.b]==null||o<off[k.b]) off[k.b]=o; });
   /* ★[v110.36] 터널을 막 나온 뒤의 첫 묶음에는 터널 안에서 추정한 점들이 섞여 있다(묶음마다 '보고할 때의 상태' 만 알 수 있다) → 그 묶음은 가장 최근 점 하나만 쓴다 */
-  var ord=rows.slice().sort(function(a,b){ return toMs(a.ts)-toMs(b.ts); }), prevEst=false;
+  var ord=rows.slice().sort(function(a,b){ return toMs(a.ts)-toMs(b.ts); }), prevEst=false, stale=teleStaleSet(rows);
   ord.forEach(function(d){
+    if(stale[d._id]&&!ROUTE_RAW) return;   /* ★[v110.53] 늦게 도착한 옛 보고는 경로에 쓰지 않는다 (그 경로 점은 다음 보고에 다시 실려 온다) */
     var ms=toMs(d.ts), est=rtEst(d), afterEst=prevEst&&!est; prevEst=est;
     if(!ROUTE_RAW&&(d.ctx==='park'||d.ctx==='cand')) return;   /* ★[v110.29] 도로가 아닌 곳(주차장 안·실내 확인중)의 점은 지도 경로에 그리지 않는다 */
     if(!ROUTE_RAW&&(rtEst(d)||rtBogus(d))) return;                             /* ★[v110.34] 터널 안 추정 위치는 그리지 않는다 — 그 구간은 도로 지도를 따라 점선으로 잇는다 */
@@ -2239,7 +2260,7 @@ function startFS(){
   try{ FN.onSnapshot(FN.collection(db,'reservations'),function(s){ applyResvSnap(s); },function(e){ console.warn('resv',e); }); }catch(e){}
   FN.onSnapshot(FN.collection(db,'devices'),function(s){
     DEV={};
-    s.forEach(function(doc){ DEV[doc.id]=doc.data()||{}; try{ pkIngest(doc.id, DEV[doc.id]); }catch(e){ console.warn('pk',e); } try{ glFeed(doc.id, DEV[doc.id]); }catch(e){ console.warn('gl',e); } });
+    s.forEach(function(doc){ DEV[doc.id]=devStaleFix(doc.id,doc.data()||{}); try{ pkIngest(doc.id, DEV[doc.id]); }catch(e){ console.warn('pk',e); } try{ glFeed(doc.id, DEV[doc.id]); }catch(e){ console.warn('gl',e); } });
     remap(); checkAlerts(); render();
     var n=Object.keys(IDMAP).length;
     var sy=$('sync');
@@ -3026,8 +3047,9 @@ function glLive(dev,m){
 }
 function udpBadge(){ try{ var el=document.getElementById('udpchip'); if(!CARO_RELAY_URL){ if(el) el.remove(); return; }
   var dev=(typeof devOf==='function')?devOf():null, L=dev&&UDPL.last[dev], ok=!!(L&&Date.now()-L.at<4000), host=document.getElementById('vh-age'); host=host&&host.parentElement; if(!host) return;
-  if(!el||el.parentElement!==host){ if(el) el.remove(); el=document.createElement('span'); el.id='udpchip'; el.style.cssText='margin-left:10px;padding:2px 8px;border-radius:6px;font-weight:700;font-size:12px;border:1px solid'; host.appendChild(el); }
-  el.textContent=ok?'실시간 1초':(UDPL.on?'실시간 · 신호 없음':'실시간 · 연결 안 됨');
+  if(window.innerWidth<700){ if(el) el.remove(); return; }   /* 휴대폰 폭에서는 머리줄이 넘치므로 표시하지 않는다 */
+  if(!el||el.parentElement!==host){ if(el) el.remove(); el=document.createElement('span'); el.id='udpchip'; el.style.cssText='margin-left:10px;padding:2px 8px;border-radius:6px;font-weight:700;font-size:12px;border:1px solid;white-space:nowrap;flex:none'; host.appendChild(el); }
+  el.textContent=ok?'실시간 1초':'실시간 끊김';
   el.title=ok?('빠른 길로 1초마다 받는 중 (마지막 '+Math.max(0,Math.round((Date.now()-L.at)/1000))+'초 전)'):'빠른 길이 조용해서 기존 방식으로 보여 줍니다';
   el.style.color=ok?'#3ddc84':'#9aa0a6'; el.style.borderColor=ok?'rgba(61,220,132,.6)':'rgba(154,160,166,.5)'; }catch(e){} }
 setInterval(udpBadge,1000); setTimeout(udpCfg,1500);

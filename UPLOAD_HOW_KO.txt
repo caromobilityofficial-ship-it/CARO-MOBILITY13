@@ -1,14 +1,7 @@
-깃허브에 올릴 파일 4개 (CARO-MOBILITY13 저장소 맨 위 폴더)
+깃허브에 올릴 파일 3개 (CARO-MOBILITY13 저장소 맨 위 폴더)
 
-1. github.com/caromobilityofficial-ship-it/CARO-MOBILITY13 열기
-2. [Add file] -> [Upload files]
-3. 이 폴더의 4개를 한 번에 끌어다 놓기
-     admin-control.html
-     board.html
-     version.txt
-     relay.json
-4. 맨 아래 [Commit changes]
-5. 2~3분 뒤 관제 새로고침 -> 오른쪽 위 v110.53 확인
-
-relay.json 은 지금 비어 있음(빠른 길 꺼짐 = 지금과 똑같이 동작).
-중계 서버를 만든 뒤 서버가 알려 준 한 줄로 relay.json 내용을 바꿔 다시 올리면 켜집니다.
+1. [Add file] -> [Upload files]
+2. admin-control.html, board.html, version.txt 3개를 끌어다 놓기
+3. [Commit changes]
+4. 2~3분 뒤 관제 새로고침 -> 오른쪽 위 v110.54
+(relay.json 은 이미 올라가 있으니 다시 올리지 않아도 됨)
