@@ -787,7 +787,7 @@ html[data-theme="light"] .mappill,html[data-theme="light"] .mtb,html[data-theme=
 
 <div class="bottom">
   <div class="card">
-    <h3>주행 기록 <em>선택한 날짜</em><button class="csvbtn" onclick="csvExport()">CSV 내보내기</button></h3>
+    <h3>주행 기록 <em>선택한 날짜</em><button class="csvbtn" onclick="csvExport()">CSV 내보내기</button><button class="csvbtn" onclick="ckOpen()" style="margin-left:8px">자동 확인</button></h3>
     <div class="tscroll"><table class="tlog" id="tlog">
       <thead><tr><th>시각</th><th>층</th><th>고도</th><th>속도</th><th>방향</th><th>충격</th><th>위치</th></tr></thead>
       <tbody id="tbody"></tbody>
@@ -802,7 +802,7 @@ html[data-theme="light"] .mappill,html[data-theme="light"] .mtb,html[data-theme=
 <script>
 /* ★[v110.20] 화면 버전 자가 점검 — 태블릿 앱·브라우저가 옛 화면을 붙잡고 있으면(캐시) 켤 때·다시 볼 때 스스로 새로 받는다.
    로그인 전 화면에서도 동작한다(예전 자동 업데이트는 로그인 칸에 글자가 들어 있으면 '입력 중' 으로 보고 미뤘다). 같은 버전으로는 3번까지만 시도한다. */
-var CARO_PAGE_VER='110.52';
+var CARO_PAGE_VER='110.53';
 function caroSelfCheck(){
   try{
     fetch('version.txt?t='+Date.now(),{cache:'no-store'}).then(function(r){ return r.ok?r.text():''; }).then(function(t){
@@ -1010,7 +1010,7 @@ function routeRows(rows){
               ④ 속도 칸에는 가장 최근에 받은 속도를 적는다(예전에는 마커가 있는 '몇 초 전' 자리의 속도였다) */
 var GL={dev:null,pts:[],play:0,wall:0,pos:null,lastT:0,timer:null,mk:null,offB:null,offV:0,rtStr:'',shown:null,vShow:null,arr:0,ivl:0};
 /* ★[v110.41] 보고가 몰려서 올 때(통신이 10~30초씩 막혔다 풀림)의 마커 : 최근 보고 간격 가운데 긴 쪽을 보고 그만큼 여유를 두고 따라간다(멈췄다 내달리는 대신 조금 늦게·고르게) */
-var GL_DMAX=18000, GL_JMIN=7000, GL_JM=2500, GL_TUP=6000, GL_TDN=10000, GL_RB=1500, GL_RBK=0.30, GL_RMIN=0.25, GL_BASE=800;
+var GL_DMAX=18000, GL_JMIN=7000, GL_JM=2500, GL_TUP=6000, GL_TDN=10000, GL_RB=1500, GL_RBK=0.30, GL_RMIN=0.25, GL_BASE=800;   var GL_UDB=1000;   /* ★[v110.53] 빠른 길(1초마다)로 받는 동안 표식이 뒤에서 따라가는 시간(ms) */
 function glJit(){ var a=(GL.iv||[]).slice().sort(function(x,y){ return x-y; }); return a.length<3?0:a[a.length-2]; }   /* 최근 10번 가운데 두 번째로 긴 간격 — 한 번만 늦은 것으로는 바꾸지 않는다 */
 function glReset(dev){ GL.dev=dev; GL.pts=[]; GL.play=0; GL.wall=0; GL.pos=null; GL.lastT=0; GL.offB=null; GL.offV=0; GL.rtStr=''; GL.shown=null; GL.vShow=null; GL.arr=0; GL.ivl=0; GL.afterEst=false; GL.D=null; GL.skew=null; GL.av=null; GL.avT=0; GL.cutT=0; GL.trail=[]; GL.iv=[]; GL.lastV=0; GL.X=null; GL.D0=null; GL.lagS=0; try{ glTrailDraw(); }catch(e){} }
 function glFeed(dev,d){
@@ -1089,11 +1089,11 @@ function glTick(){
      전에는 '다음 보고가 올 때 받은 끝 점에 닿도록' 재생 빠르기를 0.3~6배로 바꿨다 → 일정하게 달리는 차의 마커가 시속 0~140km 로 달렸다 섰다 했다.
      이제 마커는 '지금보다 D 만큼 앞선 때' 의 자리를 실제 빠르기 그대로(1배) 따라가고, 어긋난 만큼만 천천히(0.5~1.5배) 좁힌다.
      D = 보고 간격 + 0.8초 − (곧게 달릴 때 더 나아가도 되는 시간) : 다음 보고가 올 때까지 받은 자료가 바닥나지 않는 가장 짧은 지연 */
-  var nowS=now-(GL.skew||0), Db=Math.max(GL.fast?2300:5600,(GL.ivl||(GL.fast?2500:5500))*1.15)+GL_BASE, J=glJit();   /* 보고 간격은 일정하게 달릴 때의 5초 남짓을 바닥으로 본다(가속 중에는 더 자주 오지만 곧 다시 5초가 된다) */
+  var nowS=now-(GL.skew||0), Db=(GL.udpAt&&now-GL.udpAt<4000)?GL_UDB:(Math.max(GL.fast?2300:5600,(GL.ivl||(GL.fast?2500:5500))*1.15)+GL_BASE), J=glJit();   /* 보고 간격은 일정하게 달릴 때의 5초 남짓을 바닥으로 본다(가속 중에는 더 자주 오지만 곧 다시 5초가 된다) */
   /* ★[v110.41] 실차(11/18)에서는 보고가 5초마다 고르게 오지 않고 달리는 시간의 절반이 '12초 넘게 비었다가 한꺼번에' 였다 → 5초 간격에 맞춘 지연으로는 마커가 달리는 시간의 4분의 1을 서 있었다(1분에 3번).
      ① 최근 보고 10번의 간격 가운데 긴 쪽(위에서 20%째)+2.5초만큼 뒤에서 따라간다(최대 18초). 통신이 고르면 다시 6초 남짓으로 돌아온다
      ② 지연을 늘릴 때는 6초, 줄일 때는 10초에 걸쳐 천천히 바꾼다 ③ 그래도 밀리면 빨리 따라잡고(5초 넘게 밀리면 3.5배, 12초 넘게 밀리면 6배까지), 받은 자료가 바닥나 가면 뚝 멈추지 않고 미리 줄인다 */
-  var Xw=(J>=GL_JMIN&&J+GL_JM>Db)?(Math.min(GL_DMAX,J+GL_JM)-Db):0; if(E) Xw=0;   /* ★[v110.51] 이어 갈 수 있을 때는 일부러 늦추지 않는다 */   /* 통신이 고를 때(간격 7초 미만)는 0 = 전과 같다 */
+  var Xw=(J>=GL_JMIN&&J+GL_JM>Db)?(Math.min(GL_DMAX,J+GL_JM)-Db):0; if(E) Xw=0; if(GL.udpAt&&now-GL.udpAt<4000) Xw=0;   /* ★[v110.53] 빠른 길로 받는 동안은 통신 지연 여유를 두지 않는다 */   /* ★[v110.51] 이어 갈 수 있을 때는 일부러 늦추지 않는다 */   /* 통신이 고를 때(간격 7초 미만)는 0 = 전과 같다 */
   GL.X=(GL.X==null)?Xw:GL.X+(Xw-GL.X)*Math.min(1,dt/(Xw>GL.X?GL_TUP:GL_TDN));
   var Dw=Math.max(300,Db-ext);
   GL.D0=(GL.D0==null)?Dw:GL.D0+(Dw-GL.D0)*Math.min(1,dt/2000);
@@ -1101,7 +1101,7 @@ function glTick(){
   var tgt=Math.min(nowS-GL.D,end+ext), gap=tgt-GL.play;
   if(gap>30000){ GL.play=tgt-4000; gap=4000; }                 /* 30초 넘게 밀렸으면(통신이 끊겼다 붙음) 건너뛴다 */
   var rate=1+gap/2500, hi=(gap>12000)?6:((gap>5000)?3.5:1.6); if(rate>hi) rate=hi; if(rate<0.5) rate=0.5;
-  { var run=end+ext-GL.play, RB=Math.max(GL_RB,Math.min(6000,GL.D*GL_RBK)); if(run<RB){ var lim=Math.max(GL_RMIN,run/RB+GL_RMIN); if(rate>lim) rate=lim; } }   /* 여유를 길게 잡고 있을 때는 그만큼 일찍부터 줄인다 */
+  { var run=end+ext-GL.play, RB=(GL.udpAt&&now-GL.udpAt<4000)?Math.min(GL_RB,GL.D*0.6):Math.max(GL_RB,Math.min(6000,GL.D*GL_RBK)); if(run<RB){ var lim=Math.max(GL_RMIN,run/RB+GL_RMIN); if(rate>lim) rate=lim; } }   /* 여유를 길게 잡고 있을 때는 그만큼 일찍부터 줄인다 */
   GL.play+=dt*rate; if(GL.play>end+ext) GL.play=end+ext;
   var over=GL.play-end, pos;
   if(over<=0||!E){ pos=glAt(Math.min(GL.play,end)); if(pos&&GL.v>=5) pos=snapProject(pos); }   /* 달리는 중에는 도로 선 위로 */
@@ -2830,13 +2830,18 @@ function drawRoute(){
     ovs.forEach(function(e){ routeObjs.push(L.circleMarker([Number(e.lat),Number(e.lng)],{radius:4,color:'#ffffff',weight:1.5,fillColor:'#e0a260',fillOpacity:1}).bindTooltip('과속 '+Math.round(Number(e.speed)||0)+'km/h').addTo(lmap)); });
   }
 }
-function csvExport(){
+function csvCell(c){ var t=String(c==null?'':c); if(/^[=+\-@]/.test(t)) t="'"+t; return t; }   /* ★[v108] 엑셀 수식 주입 방지 */
+function csvRows(){   /* ★[v110.53] CSV 내보내기와 [자동 확인] 이 같은 줄을 쓴다 */
   var rows=[['시각','종류','충격구분','층','고도(m)','방향(deg)','속도(km/h)','충격(g)','위도','경도','위성수','GPS종류','수평오차(m)','상태','부팅원인','경로점수','기압(hPa)','온도(C)','충격종류','이어진시간(ms)','위(g)','아래(g)','회전(deg/s)','앞선떨림(g)','뒤집힘','채움','보고걸린시간(ms)','접속횟수','응답없음횟수','상황','주행고도(m)','경사(%)']];   /* ★[v110.48] 끝 3칸 : 기기가 판단한 상황(out 실외 · cand 실내 확인중 · park 주차장 · tunnel 터널) · 출발점 대비 높이 · 경사 — 층 · 터널 판정을 기록으로 가려내기 위함 */   /* ★[v110.41] 뒤 3칸 : 통신 지연 진단(펌웨어 v9.9-precise53 부터) — 앞 보고 한 번에 걸린 시간 · 보안 접속을 새로 연 누적 횟수 · 15초 동안 응답이 없던 누적 횟수 */
   var kx=function(v){ return v!=null?v:''; };
   EVTS.forEach(function(e){ var cls=e.event==='impact'?(impactMode(e)==='park'?'주차중':'주행중'):'';
     rows.push([fmtTs(e.ts),e.event||'',cls,floorStr(num(e.floor)),e.alt!=null?e.alt:'',e.heading!=null?Math.round(e.heading):'',e.speed!=null?e.speed:'',e.shock!=null?e.shock:'',e.lat!=null?e.lat:'',e.lng!=null?e.lng:'','','','','',e.rst||'','','','',(e.event==='impact'&&impactMode(e)!=='park')?impKind(e):'',kx(e.kdur),kx(e.kup),kx(e.kdn),kx(e.krot),kx(e.krough),kx(e.knx),kx(e.kduty),'','','','','','']); });
   TELE.forEach(function(t){ rows.push([fmtTs(t.ts),'주기','',flrOf(t),t.alt!=null?t.alt:'',t.heading!=null?Math.round(t.heading):'',t.speed!=null?t.speed:'',t.shock!=null?t.shock:'',t.lat!=null?t.lat:'',t.lng!=null?t.lng:'',t.sats!=null?t.sats:'',t.gfix!=null?t.gfix:'',t.hacc!=null?t.hacc:'',t.mstate||'','',(typeof t.rt==='string'&&t.rt)?(t.rt.split('|').length-4):'',t.hpa!=null?t.hpa:'',t.temp!=null?t.temp:'','','','','','','','','',kx(t.rq),kx(t.rd),kx(t.ns),kx(t.ctx),kx(t.roadAlt),kx(t.grade)]); });
-  var csv='﻿'+rows.map(function(r){return r.map(function(c){ var t=String(c==null?'':c); if(/^[=+\-@]/.test(t)) t="'"+t; return /[",\n]/.test(t)?('"'+t.replace(/"/g,'""')+'"'):t; }).join(',');}).join('\n');   /* ★[v108] 엑셀 수식 주입 방지·쉼표 처리 */
+  return rows;
+}
+function csvExport(){
+  var rows=csvRows();
+  var csv='﻿'+rows.map(function(r){return r.map(function(c){ var t=csvCell(c); return /[",\n]/.test(t)?('"'+t.replace(/"/g,'""')+'"'):t; }).join(',');}).join('\n');   /* ★[v108] 쉼표 처리 */
   var a=document.createElement('a');
   a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
   a.download=(devOf()||'CARO')+'_'+(selDate||todayStr()).replace(/-/g,'')+'.csv';
@@ -2973,6 +2978,154 @@ function waitAuth(n){
   });
 }
 waitAuth();
+
+/* ═══ ★[v110.53] 위치 빠른 길 (기기 → UDP 중계 서버 → 웹소켓 → 관제) ═══
+   사이트의 relay.json 에 중계 서버 주소가 있으면 켜진다. 파일이 없거나 비어 있으면 아무것도 하지 않는다 = v110.52 와 같다.
+   켜지면 : 기기가 새 위치를 잡는 즉시(1초마다) 받아 표식을 GL_UDB 만큼 뒤에서 따라간다.
+   묶음마다 앞 위치 2개가 함께 오므로 묶음이 하나 빠져도 그 자리가 메워진다. 중계가 4초 넘게 조용하면 지금 방식(Firestore)으로 저절로 돌아간다. */
+var CARO_RELAY_URL='';
+var UDPL={ws:null,on:false,last:{},retry:2000,tm:null,n:0,cfg:false,gap:0};
+function udpCfg(){
+  if(UDPL.cfg) return; UDPL.cfg=true;
+  try{ fetch('relay.json?t='+Date.now(),{cache:'no-store'}).then(function(r){ return r.ok?r.json():null; }).then(function(j){
+      var u=j&&typeof j.url==='string'?j.url.trim():'', loc=/^(localhost|127\.0\.0\.1)$/.test(location.hostname);
+      if(/^wss:\/\/[a-z0-9.\-]+(:\d+)?\/live$/i.test(u)||(loc&&/^ws:\/\/127\.0\.0\.1:\d+\/live$/.test(u))){ CARO_RELAY_URL=u; udpStart(); }
+    }).catch(function(){}); }catch(e){}
+}
+function udpStart(){ if(!CARO_RELAY_URL||UDPL.ws) return; var u=window.FB_AUTH&&window.FB_AUTH.currentUser; if(!u){ clearTimeout(UDPL.tm); UDPL.tm=setTimeout(udpStart,3000); return; }
+  var ws; try{ ws=new WebSocket(CARO_RELAY_URL); }catch(e){ udpLater(); return; }
+  UDPL.ws=ws;
+  ws.onopen=function(){ (u.getIdToken?u.getIdToken():Promise.resolve('')).then(function(t){ try{ ws.send(JSON.stringify({type:'auth',token:t})); }catch(e){} }); };
+  ws.onmessage=function(ev){ var m; try{ m=JSON.parse(ev.data); }catch(e){ return; } if(m.type==='hello'){ UDPL.on=true; UDPL.retry=2000; return; } if(m.type==='pos') udpPos(m); };
+  ws.onclose=function(ev){ if(UDPL.ws===ws){ var quick=UDPL.on&&ev&&ev.code===4001; UDPL.ws=null; UDPL.on=false; if(quick) UDPL.retry=300; udpLater(); } };   /* 로그인 표(1시간)가 끝나 닫힌 것이면 곧바로 새 표로 다시 잇는다 */
+  ws.onerror=function(){ try{ ws.close(); }catch(e){} };
+}
+function udpLater(){ clearTimeout(UDPL.tm); UDPL.tm=setTimeout(udpStart,UDPL.retry); UDPL.retry=Math.min(30000,UDPL.retry*2); }
+/* 탭을 다시 보거나 인터넷이 다시 붙으면 기다리지 않고 바로 다시 잇는다 */
+try{ document.addEventListener('visibilitychange',function(){ if(!document.hidden&&CARO_RELAY_URL&&!UDPL.ws){ UDPL.retry=2000; clearTimeout(UDPL.tm); udpStart(); } });
+  window.addEventListener('online',function(){ if(CARO_RELAY_URL&&!UDPL.ws){ UDPL.retry=2000; clearTimeout(UDPL.tm); udpStart(); } }); }catch(e){}
+function udpPos(m){ if(typeof m.lat!=='number'||typeof m.lng!=='number'||!m.fix) return; UDPL.last[m.dev]={at:Date.now(),m:m}; UDPL.n++; try{ glLive(m.dev,m); }catch(e){ console.warn('udp',e); } }
+function glLive(dev,m){
+  var did=(typeof devOf==='function')?devOf():null; if(!did||did!==dev||GL.dev!==dev) return;
+  if(m.dr||m.tun) return;                                         /* 터널 안 추정 위치는 그리지 않는다 (지금 방식과 같게) */
+  if(typeof selDate!=='undefined'&&selDate&&typeof todayStr==='function'&&selDate!==todayStr()) return;   /* 지난 날짜를 보는 중에는 그리지 않는다 */
+  var b=String(m.boot), o=m.rx-m.ms;
+  { var sk=Date.now()-m.rx; if(GL.skew==null||sk<GL.skew) GL.skew=sk; }
+  if(GL.offB!==b||o>GL.offV+900000||o<GL.offV-900000){ GL.offB=b; GL.offV=o; GL.pts=[]; GL.lastT=0; }
+  else if(o<GL.offV){ var sh=GL.offV-o; GL.offV=o; GL.pts.forEach(function(q){ q.t-=sh; }); GL.play-=sh; GL.lastT-=sh; }
+  var L=(m.pts&&m.pts.length)?m.pts:[{ms:m.ms,lat:m.lat,lng:m.lng,spd:m.spd,hdg:m.hdg}], added=0;
+  for(var i=0;i<L.length;i++){ var p=L[i]; if(typeof p.lat!=='number'||typeof p.lng!=='number'||typeof p.ms!=='number') continue;
+    var t=p.ms+GL.offV; if(t<=GL.lastT+200) continue;             /* 이미 받은 것(앞 묶음 · Firestore)은 건너뛴다 */
+    if(!GL.pts.length||t-GL.pts[GL.pts.length-1].t>30000){ GL.pts=[]; GL.play=t-GL_UDB; GL.wall=Date.now(); GL.shown=null; GL.D=null; GL.D0=null; }
+    if(i<L.length-1) UDPL.gap++;                                   /* 빠진 묶음을 앞 위치로 메운 횟수 */
+    GL.pts.push({lat:p.lat,lng:p.lng,t:t,v:p.spd,h:p.hdg}); GL.lastT=t; added++; }
+  if(!added) return;
+  GL.udpAt=Date.now(); GL.av=null;
+  if(GL.pts.length>400) GL.pts.splice(0,GL.pts.length-400);
+  if(!GL.timer) GL.timer=setInterval(glTick,100);
+}
+function udpBadge(){ try{ var el=document.getElementById('udpchip'); if(!CARO_RELAY_URL){ if(el) el.remove(); return; }
+  var dev=(typeof devOf==='function')?devOf():null, L=dev&&UDPL.last[dev], ok=!!(L&&Date.now()-L.at<4000), host=document.getElementById('vh-age'); host=host&&host.parentElement; if(!host) return;
+  if(!el||el.parentElement!==host){ if(el) el.remove(); el=document.createElement('span'); el.id='udpchip'; el.style.cssText='margin-left:10px;padding:2px 8px;border-radius:6px;font-weight:700;font-size:12px;border:1px solid'; host.appendChild(el); }
+  el.textContent=ok?'실시간 1초':(UDPL.on?'실시간 · 신호 없음':'실시간 · 연결 안 됨');
+  el.title=ok?('빠른 길로 1초마다 받는 중 (마지막 '+Math.max(0,Math.round((Date.now()-L.at)/1000))+'초 전)'):'빠른 길이 조용해서 기존 방식으로 보여 줍니다';
+  el.style.color=ok?'#3ddc84':'#9aa0a6'; el.style.borderColor=ok?'rgba(61,220,132,.6)':'rgba(154,160,166,.5)'; }catch(e){} }
+setInterval(udpBadge,1000); setTimeout(udpCfg,1500);
+
+/* ═══ ★[v110.53] 실차 기록 자동 확인 — 계산 부분 (관제 화면의 [자동 확인] 과 PC 도구 caro_check.js 가 이 코드를 똑같이 쓴다) ═══
+   R : 기록 줄 목록 (CSV 의 머리 이름이 열쇠, t = 시각 ms) · truth : [{t,place,floor}] · C : 합격 기준 */
+var CC_DEF={ rqMedianMax:3.0, rqMaxMax:15.0, gapsMax:10, noRespMax:5, dialMax:5, staleShareMax:20, floorWithinSec:120, floorChangesMax:0, satsMin:10, haccMax:5.0 };
+function ccNum(s){ if(s==null) return NaN; var v=parseFloat(String(s).replace(/^'/,'')); return isFinite(v)?v:NaN; }
+function ccPct(a,p){ if(!a.length) return NaN; var s=a.slice().sort(function(x,y){return x-y;}); var k=(s.length-1)*p, lo=Math.floor(k), hi=Math.ceil(k); return s[lo]+(s[hi]-s[lo])*(k-lo); }
+function ccZ(n){ return (n<10?'0':'')+n; }
+function ccFmtT(ms){ var d=new Date(ms); return ccZ(d.getUTCMonth()+1)+'/'+ccZ(d.getUTCDate())+' '+ccZ(d.getUTCHours())+':'+ccZ(d.getUTCMinutes()); }
+function ccMax(a){ var m=-Infinity; for(var i=0;i<a.length;i++) if(a[i]>m) m=a[i]; return m; }
+function ccMin(a){ var m=Infinity; for(var i=0;i<a.length;i++) if(a[i]<m) m=a[i]; return m; }
+/* 기록 시각 '11/24 12:42:05' (월·일이 한 자리여도 됨) → ms. 연도는 파일 이름 · 고른 날짜에서 */
+function ccTime(s,year){ var m=/(\d{1,2})\/(\d{1,2}) (\d{1,2}):(\d\d):(\d\d)/.exec(s||''); return m?Date.UTC(year,+m[1]-1,+m[2],+m[3],+m[4],+m[5]):NaN; }
+/* 정답 줄 '2026-11-24 12:42,공영주차장 옥상,3F' */
+function ccTruth(list){ var out=[]; (list||[]).forEach(function(r){ var m=/(\d{4})-(\d{1,2})-(\d{1,2})[ T](\d{1,2}):(\d\d)/.exec(r['시각']||''); var t=m?Date.UTC(+m[1],+m[2]-1,+m[3],+m[4],+m[5]):NaN; if(isFinite(t)) out.push({t:t,place:String(r['장소']||'').trim(),floor:String(r['층']||'').trim().toUpperCase()}); }); return out; }
+function ccRun(rows,truth,Cin){
+  var C={}, k; for(k in CC_DEF) C[k]=CC_DEF[k]; if(Cin) for(k in Cin) C[k]=Cin[k];
+  var R=rows.filter(function(r){ return isFinite(r.t); }).sort(function(x,y){ return x.t-y.t; });
+  var P=R.filter(function(r){ return r['종류']==='주기'; }); if(!P.length) return {err:'주기 보고가 없는 기록입니다.'};
+  /* 운전 구간 : 시속 3km 이상인 보고들을 2분 안쪽 간격으로 이은 구간(1분 이상) */
+  var segs=[], s=null; P.forEach(function(r){ var v=ccNum(r['속도(km/h)']); if(v>=3){ if(s&&r.t-s.b<=120000) s.b=r.t; else { if(s) segs.push(s); s={a:r.t,b:r.t}; } } });
+  if(s) segs.push(s); var S=segs.filter(function(x){ return x.b-x.a>=60000; });
+  var inDrive=function(t){ return S.some(function(x){ return t>=x.a&&t<=x.b; }); };
+  var DP=P.filter(function(r){ return inDrive(r.t); }), driveSec=S.reduce(function(n,x){ return n+(x.b-x.a)/1000; },0);
+  var rq=DP.map(function(r){ return ccNum(r['보고걸린시간(ms)'])/1000; }).filter(isFinite);
+  var gaps=0; S.forEach(function(x){ var q=P.filter(function(r){ return r.t>=x.a&&r.t<=x.b; }); for(var i=1;i<q.length;i++) if(q[i].t-q[i-1].t>15000) gaps++; });
+  var span=function(key){ var v=DP.map(function(r){ return ccNum(r[key]); }).filter(isFinite); return v.length?ccMax(v)-ccMin(v):NaN; };
+  var noResp=span('응답없음횟수'), dial=span('접속횟수');
+  /* 화면 위치가 묵은 시간 (도착 = 기기 시각 + 그 보고를 보내는 데 걸린 시간 + 0.3초) */
+  var arr=P.map(function(r,i){ var nx=P[i+1], d=nx?ccNum(nx['보고걸린시간(ms)'])/1000:NaN; return {g:r.t, at:r.t+((isFinite(d)?d:1.7)+0.3)*1000}; }).sort(function(x,y){ return x.at-y.at; });
+  var stale=0, tot=0; S.forEach(function(x){ var kk=0, last=null; for(var t=x.a;t<=x.b;t+=500){ while(kk<arr.length&&arr[kk].at<=t){ last=last==null?arr[kk].g:Math.max(last,arr[kk].g); kk++; } if(last!=null){ tot++; if(t-last>5000) stale++; } } });
+  var staleShare=tot?stale/tot*100:NaN;
+  var sats=DP.map(function(r){ return ccNum(r['위성수']); }).filter(isFinite), hacc=DP.map(function(r){ return ccNum(r['수평오차(m)']); }).filter(isFinite);
+  var tunnels=R.filter(function(r){ return r['상황']==='tunnel'||r['층']==='터널'; }).length;
+  var items=[], add=function(name,got,want,ok){ items.push({name:name,got:got,want:want,ok:ok}); };
+  add('보고 한 번에 걸린 시간', rq.length?('가운데 '+ccPct(rq,.5).toFixed(1)+'초 · 10번 중 1번 '+ccPct(rq,.9).toFixed(1)+'초 · 최대 '+ccMax(rq).toFixed(1)+'초'):'기록 없음', '가운데 '+C.rqMedianMax+'초 이하 · 최대 '+C.rqMaxMax+'초 이하', rq.length?(ccPct(rq,.5)<=C.rqMedianMax&&ccMax(rq)<=C.rqMaxMax):null);
+  add('보고 사이가 15초 넘게 빈 곳', gaps+'곳 (운전 중)', C.gapsMax+'곳 이하', gaps<=C.gapsMax);
+  add('응답 없음 · 연결 다시 걸기', (isFinite(noResp)?noResp:'—')+'번 · '+(isFinite(dial)?dial:'—')+'번', '각 '+C.noRespMax+'번 이하', (isFinite(noResp)&&isFinite(dial))?(noResp<=C.noRespMax&&dial<=C.dialMax):null);
+  add('화면 위치가 5초 넘게 묵은 시간', isFinite(staleShare)?(staleShare.toFixed(1)+'% (운전 시간 중)'):'계산 불가', C.staleShareMax+'% 이하', isFinite(staleShare)?staleShare<=C.staleShareMax:null);
+  var FL=R.filter(function(r){ return r['층']&&r['층']!=='—'&&r['층']!=='확인중'; });
+  (truth||[]).forEach(function(tr){
+    var inWin=function(r){ return r.t>=tr.t-60000&&r.t<=tr.t+C.floorWithinSec*1000; };
+    var hit=null; for(var i=0;i<FL.length;i++){ if(inWin(FL[i])&&String(FL[i]['층']).toUpperCase()===tr.floor){ hit=FL[i]; break; } }
+    var near=FL.filter(inWin).map(function(r){ return r['층']; }), uniq=near.filter(function(v,i){ return near.indexOf(v)===i; });
+    var got=hit?(hit['층']+' ('+ccFmtT(hit.t)+')'):(near.length?('"'+uniq.join(' · ')+'"'):'그 시각 기록 없음');
+    if(!hit){ var later=null; for(var j=0;j<FL.length;j++){ if(FL[j].t>tr.t&&String(FL[j]['층']).toUpperCase()===tr.floor){ later=FL[j]; break; } } if(later) got+=' — '+Math.round((later.t-tr.t)/60000)+'분 뒤 '+ccFmtT(later.t)+' 에야 '+tr.floor; }
+    add('층 · '+tr.place+' ('+ccFmtT(tr.t)+')', got, Math.round(C.floorWithinSec/60)+'분 안에 '+tr.floor, !!hit);
+    /* 세워 둔 동안 층이 바뀐 횟수 (처음 맞은 때 ~ 떠날 때. 떠나기 직전 1분 = 나가는 경사로는 빼고 센다) */
+    var from=null; for(var a=0;a<FL.length;a++){ if(FL[a].t>tr.t-60000&&String(FL[a]['층']).toUpperCase()===tr.floor){ from=FL[a].t; break; } }
+    if(from!=null){ var leave=Infinity; for(var b=0;b<R.length;b++){ var r=R[b]; if(r.t>from&&(r['종류']==='park_out'||r['종류']==='indoor_out'||(r['종류']==='주기'&&ccNum(r['속도(km/h)'])>=3))){ leave=r.t; break; } }
+      var ev=R.filter(function(r){ return r['종류']==='floor'&&r.t>=from&&r.t<leave-60000; }).map(function(r){ return r['층']; }), ch=0, prev=tr.floor;
+      ev.forEach(function(f){ if(f!==prev) ch++; prev=f; }); var eu=ev.filter(function(v,i){ return ev.indexOf(v)===i; });
+      add('층 · '+tr.place+' 세워 둔 동안 유지', ch?(ch+'번 바뀜 ('+eu.join(' ↔ ')+')'):'바뀌지 않음', '바뀌지 않음', ch<=C.floorChangesMax); }
+  });
+  add('GPS (운전 중)', sats.length?('위성 가운데 '+ccPct(sats,.5)+'개 · 오차 가운데 '+(hacc.length?ccPct(hacc,.5).toFixed(1):'—')+'m'):'기록 없음', '위성 '+C.satsMin+'개 이상 · 오차 '+C.haccMax+'m 이하', sats.length?(ccPct(sats,.5)>=C.satsMin&&(!hacc.length||ccPct(hacc,.5)<=C.haccMax)):null);
+  return {items:items, segs:S.length, driveMin:Math.round(driveSec/60), reports:DP.length, tunnels:tunnels, first:P[0].t,
+    pass:items.filter(function(x){ return x.ok===true; }).length, fail:items.filter(function(x){ return x.ok===false; }).length};
+}
+/* ── 관제 화면 [자동 확인] : 지금 고른 기기 · 날짜의 기록을 위 계산으로 바로 확인한다 (읽기만 함, 기기 · 서버에는 아무것도 보내지 않음) ── */
+function ckKey(){ return 'caro_truth_'+(devOf()||'')+'_'+(selDate||todayStr()); }
+function ckEsc(s){ return String(s).replace(/[&<>"]/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+function ckTruthParse(txt){ var out=[]; String(txt||'').split(/\r?\n/).forEach(function(l){ l=l.trim(); if(!l||/^시각/.test(l)) return; var a=l.split(','); if(a.length<3) return;
+    out.push({'시각':a[0].trim(),'장소':a.slice(1,a.length-1).join(',').trim(),'층':a[a.length-1].trim()}); }); return ccTruth(out); }
+function ckRun(){
+  var box=document.getElementById('ckres'); if(!box) return;
+  var day=selDate||todayStr(), year=+day.slice(0,4), rows=csvRows(), head=rows[0];
+  var R=rows.slice(1).map(function(r){ var o={}; head.forEach(function(k,i){ o[k]=csvCell(r[i]).trim(); }); o.t=ccTime(o['시각'],year); return o; });
+  var ta=document.getElementById('cktruth'), txt=ta?ta.value:''; try{ localStorage.setItem(ckKey(),txt); }catch(e){}
+  var res=ccRun(R,ckTruthParse(txt),null);
+  if(res.err){ box.innerHTML='<div style="padding:14px;color:var(--muted)">'+ckEsc(res.err)+' (기기와 날짜를 고른 뒤 기록이 다 불러와지면 다시 눌러 주세요)</div>'; return; }
+  var tag=function(ok){ return ok===true?'<span style="display:inline-block;min-width:54px;text-align:center;padding:2px 8px;border-radius:6px;font-weight:800;color:#fff;background:var(--ok)">합격</span>'
+      :ok===false?'<span style="display:inline-block;min-width:54px;text-align:center;padding:2px 8px;border-radius:6px;font-weight:800;color:#fff;background:var(--bad)">불합격</span>'
+      :'<span style="display:inline-block;min-width:54px;text-align:center;padding:2px 8px;border-radius:6px;font-weight:800;color:#fff;background:var(--muted2)">판정 없음</span>'; };
+  box.innerHTML='<div style="font-size:15px;margin:2px 0 10px">'+res.items.length+'개 항목 중 <b style="color:var(--ok)">합격 '+res.pass+'</b> · <b style="color:var(--bad)">불합격 '+res.fail+'</b>'
+    +' <span style="color:var(--muted)">— 운전 구간 '+res.segs+'개 · '+res.driveMin+'분 · 보고 '+res.reports+'건'+(res.tunnels?(' · 터널 표시 '+res.tunnels+'번'):'')+'</span></div>'
+    +'<table style="border-collapse:collapse;width:100%;font-size:13.5px"><tr style="color:var(--muted);text-align:left"><th style="padding:6px;border-bottom:1px solid var(--border2)">항목</th><th style="padding:6px;border-bottom:1px solid var(--border2)">결과</th><th style="padding:6px;border-bottom:1px solid var(--border2)">합격 기준</th><th style="padding:6px;border-bottom:1px solid var(--border2)">판정</th></tr>'
+    +res.items.map(function(x){ return '<tr><td style="padding:6px;border-bottom:1px solid var(--border);font-weight:700">'+ckEsc(x.name)+'</td><td style="padding:6px;border-bottom:1px solid var(--border)">'+ckEsc(x.got)+'</td><td style="padding:6px;border-bottom:1px solid var(--border);color:var(--muted)">'+ckEsc(x.want)+'</td><td style="padding:6px;border-bottom:1px solid var(--border)">'+tag(x.ok)+'</td></tr>'; }).join('')+'</table>';
+}
+function ckOpen(){
+  var old=document.getElementById('ckdlg'); if(old) old.remove();
+  var dev=devOf(); if(!dev){ if(typeof toast==='function') toast('먼저 기기를 고르세요'); return; }
+  var t=''; try{ t=localStorage.getItem(ckKey())||''; }catch(e){}
+  var d=document.createElement('div'); d.id='ckdlg';
+  d.style.cssText='position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.55);display:flex;align-items:flex-start;justify-content:center;padding:40px 16px;overflow:auto';
+  d.innerHTML='<div style="background:var(--panel);color:var(--txt);border:1px solid var(--border2);border-radius:12px;max-width:980px;width:100%;padding:18px 20px;box-shadow:var(--shadow)">'
+    +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px"><b style="font-size:18px">자동 확인</b><span style="color:var(--muted)">'+ckEsc(dev)+' · '+ckEsc(selDate||todayStr())+'</span><span style="flex:1"></span><button class="csvbtn" id="ckclose">닫기</button></div>'
+    +'<div style="color:var(--muted);font-size:13px;margin-bottom:8px">지금 화면에 불러온 주행 기록을 기준대로 확인합니다. 층을 확인하려면 아래에 실제로 세운 곳을 한 줄에 하나씩 적으세요 (예: <code>'+ckEsc((selDate||todayStr())+' 12:42,공영주차장 옥상,3F')+'</code>). 적은 내용은 이 PC 에만 남습니다.</div>'
+    +'<textarea id="cktruth" rows="3" style="width:100%;box-sizing:border-box;background:var(--panel2);color:var(--txt);border:1px solid var(--border2);border-radius:8px;padding:8px;font-family:inherit;font-size:13px" placeholder="시각,장소,층"></textarea>'
+    +'<div style="margin:8px 0 12px"><button class="csvbtn" id="ckgo">다시 확인</button></div><div id="ckres"></div></div>';
+  document.body.appendChild(d);
+  document.getElementById('cktruth').value=t;
+  document.getElementById('ckclose').onclick=function(){ d.remove(); };
+  document.getElementById('ckgo').onclick=ckRun;
+  d.addEventListener('click',function(e){ if(e.target===d) d.remove(); });
+  ckRun();
+}
 </script>
 <script src="lib/qrcode/qrcode.js"></script>
 <script src="caro-mfa.js?v=1"></script>
