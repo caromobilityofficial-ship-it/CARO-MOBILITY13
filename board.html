@@ -390,7 +390,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(
 <script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=932e79971e43cfe8bab8710f6190897b&autoload=false&libraries=services" onerror="window.__kakaoSdkErr=1" async></script>
 <script>
 /* ═══════════ CARO 운영 현황판 v110.45 ═══════════ */
-var BOARD_VER='110.54', POLL_DRIVE_MS=2000,   /* ★[v110.47] 달리는 차가 있는 동안은 2초마다 */ POLL_MS=3000,   /* ★[v110.46] 3초마다 새로 받는다 (전에는 10초) — 사고 · 신호 끊김을 바로 보이게 */ PAGE_ROWS=10, KEY_NAME='caro_board_key', NAME_NAME='caro_board_name';
+var BOARD_VER='110.55', POLL_DRIVE_MS=2000,   /* ★[v110.47] 달리는 차가 있는 동안은 2초마다 */ POLL_MS=3000,   /* ★[v110.46] 3초마다 새로 받는다 (전에는 10초) — 사고 · 신호 끊김을 바로 보이게 */ PAGE_ROWS=10, KEY_NAME='caro_board_key', NAME_NAME='caro_board_name';
 var $=function(i){return document.getElementById(i);};
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
 function p2(n){ return (n<10?'0':'')+n; }
