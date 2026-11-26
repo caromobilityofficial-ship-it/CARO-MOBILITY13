@@ -21,7 +21,7 @@
     var s=document.createElement('style'); s.id='csw-css';
     s.textContent=
       '#csw-ov{position:fixed;inset:0;z-index:2147482000;background:rgba(20,22,28,.5);display:flex;align-items:flex-end;justify-content:center;}'
-     +'#csw-ov .csw-s{background:#f7f9fb;width:100%;max-width:480px;border-radius:22px 22px 0 0;padding:20px 18px calc(18px + env(safe-area-inset-bottom,0px));box-shadow:0 -10px 40px rgba(0,0,0,.2);}'
+     +'#csw-ov .csw-s{background:#f7f9fb;width:100%;max-width:480px;border-radius:22px 22px 0 0;padding:20px 18px calc(18px + var(--sab,0px));box-shadow:0 -10px 40px rgba(0,0,0,.2);}'
      +'#csw-ov .csw-t{font-size:1.1rem;font-weight:800;color:#18191c;margin-bottom:6px;}'
      +'#csw-ov .csw-d{font-size:.86rem;color:#5a6470;line-height:1.55;margin-bottom:14px;}'
      +'#csw-ov .csw-cars{display:flex;align-items:center;gap:10px;margin-bottom:12px;}'

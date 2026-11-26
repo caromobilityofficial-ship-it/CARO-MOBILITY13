@@ -8,7 +8,7 @@
 
 :root{
   --sat: env(safe-area-inset-top, 0px);
-  --sab: env(safe-area-inset-bottom, 0px);
+  --sab: max(env(safe-area-inset-bottom, 0px), var(--sab-native, 0px));
   --sal: env(safe-area-inset-left, 0px);
   --sar: env(safe-area-inset-right, 0px);
 
@@ -617,7 +617,7 @@ button:active{opacity:.82;}
 /* ══ SIDE CAPTURE ══ */
 .side-capture-overlay{position:fixed;inset:0;z-index:1020;background:rgba(0,0,0,.6);opacity:0;pointer-events:none;transition:opacity .28s;display:flex;align-items:flex-end;justify-content:center}
 .side-capture-overlay.open{opacity:1;pointer-events:all}
-.side-capture-box{width:100%;max-width:480px;background:#f0f3f7;border-radius:18px 18px 0 0;transform:translateY(100%);transition:transform .35s cubic-bezier(.4,0,.2,1);padding-bottom:env(safe-area-inset-bottom,16px)}
+.side-capture-box{width:100%;max-width:480px;background:#f0f3f7;border-radius:18px 18px 0 0;transform:translateY(100%);transition:transform .35s cubic-bezier(.4,0,.2,1);padding-bottom:max(10px,var(--sab,0px))}
 .side-capture-overlay.open .side-capture-box{transform:translateY(0)}
 .side-capture-header{display:flex;align-items:center;justify-content:space-between;padding:16px 18px 10px;border-bottom:1px solid var(--border)}
 .side-capture-title{font-family:var(--font-brand);font-size:.94rem;font-weight:500;letter-spacing:.06em;color:var(--text-1);flex:1;text-align:center}
@@ -704,7 +704,7 @@ button:active{opacity:.82;}
 .caro-cam-controls{
   display:flex;align-items:center;justify-content:center;
   gap:0;
-  padding:20px 24px calc(20px + env(safe-area-inset-bottom,0px));
+  padding:20px 24px calc(20px + var(--sab,0px));
   background:rgba(0,0,0,.7);
   flex-shrink:0;
   position:relative;
@@ -719,9 +719,9 @@ button:active{opacity:.82;}
   padding:0;
 }
 /* 좌우 버튼 절대 위치로 셔터 양쪽 배치 */
-.caro-cam-retry{position:absolute;left:32px;bottom:calc(20px + env(safe-area-inset-bottom,0px));}
-.caro-cam-cancel{position:absolute;left:32px;bottom:calc(20px + env(safe-area-inset-bottom,0px));}
-.caro-cam-save{position:absolute;right:32px;bottom:calc(20px + env(safe-area-inset-bottom,0px));}
+.caro-cam-retry{position:absolute;left:32px;bottom:calc(20px + var(--sab,0px));}
+.caro-cam-cancel{position:absolute;left:32px;bottom:calc(20px + var(--sab,0px));}
+.caro-cam-save{position:absolute;right:32px;bottom:calc(20px + var(--sab,0px));}
 .caro-cam-btn-icon{font-size:1.6rem;line-height:1;display:block;}
 .caro-cam-btn-label{font-size:.68rem;font-family:var(--font);letter-spacing:.04em;color:rgba(255,255,255,.8);}
 
@@ -745,7 +745,7 @@ button:active{opacity:.82;}
 /* ══ DRUM PICKER ══ */
 .drum-overlay{position:fixed;inset:0;z-index:1100;background:rgba(0,0,0,.5);display:flex;align-items:flex-end;justify-content:center;opacity:0;pointer-events:none;transition:opacity .28s ease}
 .drum-overlay.open{opacity:1;pointer-events:all}
-.drum-sheet{width:100%;max-width:480px;background:#f8f9fb;border-radius:20px 20px 0 0;transform:translateY(100%);transition:transform .32s cubic-bezier(.4,0,.2,1);padding-bottom:env(safe-area-inset-bottom,16px);overflow:hidden}
+.drum-sheet{width:100%;max-width:480px;background:#f8f9fb;border-radius:20px 20px 0 0;transform:translateY(100%);transition:transform .32s cubic-bezier(.4,0,.2,1);padding-bottom:max(10px,var(--sab,0px));overflow:hidden}
 .drum-overlay.open .drum-sheet{transform:translateY(0)}
 .drum-header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px 12px;border-bottom:1px solid rgba(0,0,0,.07)}
 .drum-title{font-family:var(--font);font-size:.94rem;font-weight:700;color:var(--text-1)}
@@ -1202,7 +1202,7 @@ button:active{opacity:.82;}
 /* 반납확인·대체주차·시간연장 — 컨트롤러와 동일한 폭 */
 #return-park-modal .modal-box,
 #alt-park-modal .modal-box{max-width:360px!important;}
-.extend-sheet{position:fixed;bottom:0;left:50%;transform:translateX(-50%) translateY(100%);width:100%;max-width:360px;background:var(--silver-base);border-radius:24px 24px 0 0;z-index:1000;transition:transform .32s cubic-bezier(.4,0,.2,1);padding-bottom:env(safe-area-inset-bottom,16px)}
+.extend-sheet{position:fixed;bottom:0;left:50%;transform:translateX(-50%) translateY(100%);width:100%;max-width:360px;background:var(--silver-base);border-radius:24px 24px 0 0;z-index:1000;transition:transform .32s cubic-bezier(.4,0,.2,1);padding-bottom:max(10px,var(--sab,0px))}
 .ctrl-sq-door{border-color:rgba(29,122,58,.2);background:rgba(29,122,58,.03);}
 
 /* 연장 시트 추가 */
@@ -1402,7 +1402,7 @@ video::-webkit-media-controls-panel{display:none !important;}
   max-height: 42vh;
   display: flex;
   flex-direction: column;
-  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-bottom: var(--sab,0px);
 }
 .car-strip-header {
   display: flex;
@@ -1484,7 +1484,7 @@ video::-webkit-media-controls-panel{display:none !important;}
   max-height: 42vh;
   display: flex;
   flex-direction: column;
-  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-bottom: var(--sab,0px);
 }
 .car-strip-header {
   display: flex;
@@ -1676,7 +1676,7 @@ video::-webkit-media-controls-panel{display:none !important;}
 }
 .mpd-footer{
   flex-shrink:0;
-  padding:12px 20px calc(20px + env(safe-area-inset-bottom,0px));
+  padding:12px 20px calc(20px + var(--sab,0px));
   border-top:1px solid var(--border-l);
   background:var(--glass2);
   backdrop-filter:blur(12px);
@@ -2189,7 +2189,7 @@ video::-webkit-media-controls-panel{display:none !important;}
 .csd-submit-bar {
   position: absolute;
   bottom: 0; left: 0; right: 0;
-  padding: 14px 20px calc(14px + env(safe-area-inset-bottom, 0px));
+  padding: 14px 20px calc(14px + var(--sab,0px));
   background: linear-gradient(180deg, transparent 0%, rgba(24,25,28,.9) 30%, var(--surface, #1a1d22) 100%);
   z-index: 5;
 }
@@ -2619,7 +2619,7 @@ video::-webkit-media-controls-panel{display:none !important;}
 
 /* 입력 바 */
 .csd-input-bar {
-  padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px));
+  padding: 10px 12px calc(10px + var(--sab,0px));
   display: flex;
   gap: 8px;
   align-items: flex-end;
@@ -4592,7 +4592,7 @@ select:focus{
 /* 새 홈 상단바(.nh-hd) 상태바 겹침 방지 — 실제 홈 상단바 */
 .nh-hd{ padding-top: max(env(safe-area-inset-top, 0px), 48px) !important; }
 /* ① 이벤트 뒤로 버튼: 월렌트처럼 좌우 넓게 (전체폭 - 32px) */
-#event-screen button.nh-ev-back{ position:fixed !important; left:16px !important; right:16px !important; top:auto !important; bottom:calc(16px + env(safe-area-inset-bottom,0px)) !important; width:calc(100% - 32px) !important; max-width:calc(100% - 32px) !important; height:52px !important; margin:0 !important; box-sizing:border-box !important; }
+#event-screen button.nh-ev-back{ position:fixed !important; left:16px !important; right:16px !important; top:auto !important; bottom:calc(16px + var(--sab,0px)) !important; width:calc(100% - 32px) !important; max-width:calc(100% - 32px) !important; height:52px !important; margin:0 !important; box-sizing:border-box !important; }
 /* ④ 로딩화면 하단 2026 텍스트: 제스처바 위로 올림 */
 #splash-screen .splash-footer{ bottom: 56px !important; }
 
@@ -4717,3 +4717,15 @@ select:focus{
 
 /* 결제 카드 아이콘 칸 — 은행명이 길어도 칸 밖으로 나가지 않게 (최소 36px, 내용에 맞춰 늘어남) */
 .apd-card-icon{ width: auto !important; min-width: 36px; padding: 0 6px; white-space: nowrap; }
+
+/* ═══════════════════════════════════════════════════════════════
+   ★v110.60 하단 시스템 버튼(◁ ○ ||) 영역 비우기
+   ─ 앱 3.4.1 부터는 앱이 화면을 버튼 위까지만 그려서 이 값(--sab)은 0 이다.
+   ─ 예전 앱이 안드로이드 16에서 화면 끝까지 그려질 때만 --sab 가 48px 가 되어 아래 버튼들을 올린다.
+   ═══════════════════════════════════════════════════════════════ */
+html body .photo-modal-box{ padding-bottom: var(--sab,0px) !important; }
+html body .modal-box{ padding-bottom: var(--sab,0px); }
+html body #caro-biz-sheet{ padding-bottom: calc(28px + var(--sab,0px)) !important; }
+html body #caro-bot .cbot-foot{ padding-bottom: calc(10px + var(--sab,0px)) !important; }
+html body .home-ctrl-switch{ bottom: var(--sab,0px); }
+html body .caro-cat-sheet{ padding-bottom: var(--sab,0px); box-sizing: border-box; }

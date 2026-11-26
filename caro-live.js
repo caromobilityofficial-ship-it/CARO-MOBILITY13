@@ -3,7 +3,7 @@
    ───────────────────────────────────────────────────────────────
    무엇: 이용 중인 예약을 휴대폰 잠금화면·알림창에 카드로 띄운다.
          차량번호 · 차 이름 · 상태 · [⛽ 연료 칸] · [⏱ 남은 시간 칸] · 🔓 열기 / 🔒 잠금 / ⚠️ 비상등 / 📢 경적.
-   언제: ★ 고객이 그 예약으로 차량 버튼(문열기·잠금·비상등·경적)을 처음 누른 순간부터 뜬다 (예약만 해서는 안 뜸).
+   언제: ★ 고객이 주행 전 외관 사진 [촬영 완료] 를 누르거나, 차량 버튼(문열기·잠금·비상등·경적)을 처음 누른 순간부터 뜬다 (예약만 해서는 안 뜸).
          다른 폰에서 이미 문을 열었던 예약(firstUnlockAt)도 뜬다. 반납하거나 반납 30분이 지나면 사라진다.
    방법: 10초마다 내 예약을 보고 앱(window.CaroLive.update)에 넘긴다. 연료는 90초마다 서버(myDeviceStatus)에 묻는다.
          카드 버튼을 누르면 앱이 window.caroLiveAction(type) 을 부르고, 여기서 서버(issueCommand)로 명령을 보낸다.
@@ -46,6 +46,18 @@
     };
     w.__caroLive = true;
     window.sendDeviceCommand = w;
+  }
+  /* ★v2 주행 전 외관 사진 [촬영 완료] 를 누르면 그때부터 카드가 뜬다 (플립·폴드 바깥 화면 '나우 바' 에도) */
+  function hookPhoto(){
+    var f = window.finishPhotoCapture;
+    if(typeof f !== 'function' || f.__caroLive) return;
+    var w = function(){
+      var out = f.apply(this, arguments);
+      try{ var r = pick(); if(r){ arm(r.bookNo); try{ if(typeof N.armed === 'function') N.armed(); }catch(x){} lastSig = ''; setTimeout(push, 300); } }catch(e){}
+      return out;
+    };
+    w.__caroLive = true;
+    window.finishPhotoCapture = w;
   }
 
   function t(x){ if(!x) return NaN; var v = (x instanceof Date) ? x.getTime() : (x && typeof x.toDate === 'function') ? x.toDate().getTime() : new Date(x).getTime(); return v; }
@@ -104,7 +116,7 @@
 
   function push(){
     try{
-      hook();
+      hook(); hookPhoto();
       var r = pick();
       if(r && !isArmed(r)) r = null;                       /* 아직 버튼을 한 번도 안 눌렀으면 띄우지 않는다 */
       if(!r){ if(shown){ try{ N.stop(); }catch(e){} shown = false; lastSig = ''; } return; }
@@ -173,9 +185,9 @@
   };
 
   if(window.__caroLivePending){ var pt = window.__caroLivePending; window.__caroLivePending = null; window.caroLiveAction(pt, 'open'); }
-  hook(); var hookTries = 0, hookT = setInterval(function(){ hook(); if(++hookTries > 30) clearInterval(hookT); }, 2000);   /* caro-secure 가 나중에 바꿔 끼워도 다시 감싼다 */
+  hook(); hookPhoto(); var hookTries = 0, hookT = setInterval(function(){ hook(); hookPhoto(); if(++hookTries > 30) clearInterval(hookT); }, 2000);   /* caro-secure 가 나중에 바꿔 끼워도 다시 감싼다 */
   setInterval(push, 10000);
   document.addEventListener('visibilitychange', function(){ if(!document.hidden) push(); });
   setTimeout(push, 3000);
-  console.log('✅ 잠금화면 실시간 카드 (caro-live v1)');
+  console.log('✅ 잠금화면 실시간 카드 (caro-live v2)');
 })();

@@ -2131,7 +2131,7 @@
     '.caro-photo-lock{margin:12px 16px 4px;padding:13px 14px;background:rgba(178,58,58,.08);border:1px solid rgba(178,58,58,.28);border-radius:12px;color:#b23a3a;font-size:.82rem;line-height:1.5;text-align:center;}'
    +'#caro-return-ov{position:fixed;inset:0;z-index:1150;background:rgba(20,22,28,.45);display:none;align-items:flex-end;justify-content:center;}'
    +'#caro-return-ov.open{display:flex;}'
-   +'.crt-sheet{background:#f0f3f7;width:100%;max-width:480px;border-radius:22px 22px 0 0;padding-bottom:calc(16px + env(safe-area-inset-bottom,0px));transform:translateY(100%);transition:transform .32s cubic-bezier(.22,1,.36,1);max-height:86vh;overflow-y:auto;}'
+   +'.crt-sheet{background:#f0f3f7;width:100%;max-width:480px;border-radius:22px 22px 0 0;padding-bottom:calc(16px + var(--sab,0px));transform:translateY(100%);transition:transform .32s cubic-bezier(.22,1,.36,1);max-height:86vh;overflow-y:auto;}'
    +'#caro-return-ov.open .crt-sheet{transform:translateY(0);}'
    +'.crt-head{display:flex;align-items:center;justify-content:space-between;padding:18px 18px 6px;}'
    +'.crt-title{font-size:1.12rem;font-weight:800;color:#18191c;}'
@@ -5301,6 +5301,8 @@
     var v=res[which+'Name']||res[which+'Place']||res[which+'Zone']||res.zoneName||res.zone||c.zone||c.location;
     if(v) return v;
     /* ★[v110.58] 예약에 장소 이름이 없으면 차량이 속한 거점 이름으로 (예전엔 늘 '지정 주차 구역') */
+    /* ★[v110.60] 예약에 담긴 차 정보엔 지역·좌표가 없을 때가 많다 → 차량 목록(CARS_DATA)에서 같은 차를 찾아 보탠다 */
+    try{ var cid=c.id!=null?c.id:res.carId; if(cid!=null&&!(c.region||c.lat)&&window.CARS_DATA){ (window.CARS_DATA||[]).some(function(x){ if(x&&String(x.id)===String(cid)){ c=Object.assign({},x,c); return true; } return false; }); if(c.zone||c.location) return c.zone||c.location; } }catch(e){}
     try{ var z=window.caroZoneOf?caroZoneOf(c):(c.region||null); var Z=z&&window.CARO_ZONES&&CARO_ZONES[z]; if(Z) return Z.name+(Z.addr?' · '+Z.addr:''); if(z) return z+' 거점'; }catch(e){}
     return '지정 주차 구역';
   }
