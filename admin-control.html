@@ -802,7 +802,7 @@ html[data-theme="light"] .mappill,html[data-theme="light"] .mtb,html[data-theme=
 <script>
 /* ★[v110.20] 화면 버전 자가 점검 — 태블릿 앱·브라우저가 옛 화면을 붙잡고 있으면(캐시) 켤 때·다시 볼 때 스스로 새로 받는다.
    로그인 전 화면에서도 동작한다(예전 자동 업데이트는 로그인 칸에 글자가 들어 있으면 '입력 중' 으로 보고 미뤘다). 같은 버전으로는 3번까지만 시도한다. */
-var CARO_PAGE_VER='110.57';
+var CARO_PAGE_VER='110.58';
 function caroSelfCheck(){
   try{
     fetch('version.txt?t='+Date.now(),{cache:'no-store'}).then(function(r){ return r.ok?r.text():''; }).then(function(t){
@@ -1731,7 +1731,8 @@ function attnOf(v){
   else if(sm&&now-sm.atMs>3*3600000) a.push({s:2,i:'wrench',t:MOVE_NM[sm.mode]+' 이동 '+durStr((now-sm.atMs)/1000)+'째',d:'['+MOVE_NM[sm.mode]+' 완료] 를 눌러야 다시 대여됩니다'});
   if(!IDMAP[v.id]) return a;
   var offMs=(v.lastSeen&&!v.online)?(now-v.lastSeen.getTime()):0;
-  if(offMs>10*60000&&offMs<7*86400000) a.push({s:3,i:'wifi',t:'통신 끊김 '+durStr(offMs/1000)+'째',d:'마지막 보고 '+whenStr(v.lastSeen.getTime())+' · 마지막 위치를 표시 중'});
+  if(v.cut) a.push({s:3,i:'wifi',t:'신호 끊김 '+durStr((now-v.cut.since)/1000)+'째 · 전원 확인',d:'몇 초마다 오던 신호가 갑자기 멈춤 (마지막 '+hms(v.cut.since,true)+') — 단말 전원 · 배선 · 퓨즈를 확인하세요'});
+  else if(offMs>10*60000&&offMs<7*86400000) a.push({s:3,i:'wifi',t:'통신 끊김 '+durStr(offMs/1000)+'째',d:'마지막 보고 '+whenStr(v.lastSeen.getTime())+' · 마지막 위치를 표시 중'});
   if(v.online&&v.mstate==='tow') a.push({s:3,i:'car',t:'시동 꺼진 채 이동',d:'견인 · 무단 이동 의심'});
   if(v.impact) a.push({s:3,i:'hazard',t:'충격 감지',d:(v.moving?'주행 중':'주차 중')+(typeof v.shock==='number'?(' · '+v.shock.toFixed(2)+'g'):'')});
   if(v.gpsLive&&v.station&&v.station.d>v.station.s.radiusM&&!r&&!sm) a.push({s:v.moving?3:2,i:'pin',t:'예약 없이 거점 밖',d:v.station.s.name+'에서 '+(v.station.d>=1000?((v.station.d/1000).toFixed(1)+'km'):(Math.round(v.station.d)+'m'))+(v.moving?' · 도난 · 무단 사용 의심':'')});
@@ -2336,7 +2337,9 @@ function remap(){
     v.lowbat=(typeof v.vbat==='number' && v.vbat>=5 && v.vbat<11.6 && d.acc!==true);   /* ★[v110.46] 5V 아래(전압선 미연결)는 저전압으로 보지 않는다 — 그런 기기가 20분 동안 '연결됨' 으로 남던 원인 */
     var win = v.park ? 630000 : (v.lowbat ? 1230000 : 150000);
     v.online=(d.status==='online'&&ls&&(Date.now()-ls.getTime()<win));
-    try{ var uL=(typeof UDPL==='object')?UDPL.last[devId]:null; v.udpAt=(uL&&uL.at)?new Date(uL.at):null; if(v.udpAt&&Date.now()-uL.at<15000&&d.status==='online') v.online=true; }catch(e){}   /* ★[v110.55] 빠른 길로 1초마다 소식이 오면 살아 있는 것 */
+    try{ var uL=(typeof UDPL==='object')?UDPL.last[devId]:null; v.udpAt=(uL&&uL.at)?new Date(uL.at):null; if(v.udpAt&&Date.now()-uL.at<15000&&d.status==='online') v.online=true; }catch(e){}
+    /* ★[v110.58] 신호 끊김 — 빠른 길이 갑자기 멈췄고 그 뒤 Firestore 보고도 없으면 바로 '끊김'. 저전압 보호 절전(일부러 끔)은 빼고 */
+    try{ var cut=(typeof udpCut==='function')?udpCut(devId):null, lsT=ls?ls.getTime():0; if(cut&&!v.lowbat&&!(lsT>cut.since+5000)){ v.online=false; v.cut=cut; } else v.cut=null; }catch(e){ v.cut=null; }   /* ★[v110.55] 빠른 길로 1초마다 소식이 오면 살아 있는 것 */
     /* ★ GPS 실시간 여부: 펌웨어는 '유효 fix(위성4+)' 일 때만 좌표를 새로 보냄.
        위성이 4개 미만(0~3)이면 좌표는 '마지막으로 잡힌 위치'로 고정(=옛 위치). 이걸 정직하게 구분. */
     /* ★펌웨어가 보내는 gsrc = none / gnss / dr / gnss+dr. 'gnss+dr'(융합)이 빠져 있어
@@ -2357,7 +2360,8 @@ function checkAlerts(){
     var r=resvOf(v);
     alertOnce('bat-'+v.id, vbOk(v)&&v.vbat<11.6, ''+v.name+' 배터리 '+(v.vbat||0).toFixed(1)+'V — 방전 위험');
     alertOnce('idle-'+v.id, typeof v.accOffSec==='number'&&v.accOffSec>3*86400, ''+v.name+' 3일 이상 시동 안 걸림 — 배터리 확인', false);
-    alertOnce('off-'+v.id, !!(v.lastSeen&&!v.online&&(Date.now()-v.lastSeen.getTime()>10*60000)&&(Date.now()-v.lastSeen.getTime()<7*86400000)), ''+v.name+' 단말 10분 이상 무응답 (마지막 위치 유지)');
+    alertOnce('cut-'+v.id, !!v.cut, ''+v.name+' 단말 신호 끊김 — 전원 · 배선 확인 (마지막 신호 '+(v.cut?hms(v.cut.since,true):'')+')');   /* ★[v110.58] 바로 알림 */
+    alertOnce('off-'+v.id, !v.cut && !!(v.lastSeen&&!v.online&&(Date.now()-v.lastSeen.getTime()>10*60000)&&(Date.now()-v.lastSeen.getTime()<7*86400000)), ''+v.name+' 단말 10분 이상 무응답 (마지막 위치 유지)');
     if(typeof v.lat==='number'&&v.gpsLive){ var ns=nearestStation(v.lat,v.lng); v.station=ns; var outside=ns&&ns.d>ns.s.radiusM;
       alertOnce('geo-'+v.id, !!(outside&&!r&&!smoveOf(v)), ''+v.name+' 예약 없이 거점 밖 ('+(ns?ns.s.name+' '+Math.round(ns.d)+'m':'')+') — 도난·무단사용 의심');
       alertOnce('mv-'+v.id, !!(v.moving&&!r&&!smoveOf(v)), ''+v.name+' 예약 없이 주행 중!'); }
@@ -3043,7 +3047,7 @@ waitAuth();
    켜지면 : 기기가 새 위치를 잡는 즉시(1초마다) 받아 표식을 GL_UDB 만큼 뒤에서 따라간다.
    묶음마다 앞 위치 2개가 함께 오므로 묶음이 하나 빠져도 그 자리가 메워진다. 중계가 4초 넘게 조용하면 지금 방식(Firestore)으로 저절로 돌아간다. */
 var CARO_RELAY_URL='';
-var UDPL={ws:null,on:false,last:{},retry:2000,tm:null,n:0,cfg:false,gap:0};
+var UDPL={ws:null,on:false,last:{},retry:2000,tm:null,n:0,cfg:false,gap:0,st:{},cutS:{}};
 function udpCfg(){
   if(UDPL.cfg) return; UDPL.cfg=true;
   try{ fetch('relay.json?t='+Date.now(),{cache:'no-store'}).then(function(r){ return r.ok?r.json():null; }).then(function(j){
@@ -3064,11 +3068,29 @@ function udpLater(){ clearTimeout(UDPL.tm); UDPL.tm=setTimeout(udpStart,UDPL.ret
 /* 탭을 다시 보거나 인터넷이 다시 붙으면 기다리지 않고 바로 다시 잇는다 */
 try{ document.addEventListener('visibilitychange',function(){ if(!document.hidden&&CARO_RELAY_URL&&!UDPL.ws){ UDPL.retry=2000; clearTimeout(UDPL.tm); udpStart(); } });
   window.addEventListener('online',function(){ if(CARO_RELAY_URL&&!UDPL.ws){ UDPL.retry=2000; clearTimeout(UDPL.tm); udpStart(); } }); }catch(e){}
-function udpPos(m){ if(!m||typeof m.dev!=='string') return; UDPL.last[m.dev]={at:Date.now(),m:m}; UDPL.n++;
+function udpPos(m){ if(!m||typeof m.dev!=='string') return;
+  /* ★[v110.58] 기기마다 '보통 몇 초마다 오는지' 를 배워 둔다 → 갑자기 멈추면 전원·배선이 끊긴 것으로 바로 알린다 */
+  try{ var nT=Date.now(), S=UDPL.st[m.dev]||(UDPL.st[m.dev]={n:0,gap:0}), P=UDPL.last[m.dev]; if(P){ var g=nT-P.at; if(g>0&&g<600000) S.gap=S.gap?(S.gap*0.8+g*0.2):g; } S.n++; }catch(e){}
+  UDPL.last[m.dev]={at:Date.now(),m:m}; UDPL.n++;
   try{ udpFloorApply(m.dev); }catch(e){ console.warn('udp floor',e); }
   if(typeof m.lat!=='number'||typeof m.lng!=='number'||!m.fix) return; try{ glLive(m.dev,m); }catch(e){ console.warn('udp',e); } }
 /* ★[v110.55] 빠른 길로 받은 것을 차량 목록 · 지도 · 층에 1초마다 반영한다 (예전 : 위치 표식만. 목록 · 속도 · 층은 HTTPS 보고나 충격 사건이 올 때만 바뀌었다)
    Firestore 문서가 더 새것이면 그것을 쓴다. 8초 넘게 빠른 길이 조용하면 덮어쓰지 않는다. */
+/* ★[v110.58] 신호 끊김(전원 차단 의심) — 1초~수십 초마다 오던 빠른 길 신호가 '평소 간격 × 3 + 15초' (최소 30초) 넘게 멈추면.
+   예전엔 Firestore 보고만 보고 판단해서 주차 중 2.5~10분 · 저전압 20분이 지나야 '오프라인' 이 됐고, 경보는 10분 뒤에야 떴다.
+   중계 서버와의 연결이 끊긴 동안(UDPL.on=false)에는 판단하지 않는다 (모든 차가 한꺼번에 끊김으로 보이지 않게). */
+function udpCut(dev){
+  if(!CARO_RELAY_URL||!UDPL.on) return null;
+  var L=UDPL.last[dev], S=UDPL.st[dev]; if(!L||!S||S.n<4) return null;
+  var sleep=!!(typeof DEV==='object'&&DEV[dev]&&DEV[dev].park===true);   /* 주차 절전(20초씩 낮잠) 중이면 최소 90초 */
+  var lim=Math.max(sleep?90000:30000, Math.min(600000, (S.gap||3000)*3+15000)), sil=Date.now()-L.at;
+  if(sil<lim||sil>6*3600000) return null;
+  return { since:L.at, sil:sil, lim:lim };
+}
+/* 5초마다 : 끊김이 새로 생기거나 풀린 기기가 있으면 바로 목록 · 경보를 다시 그린다 (30초를 기다리지 않음) */
+setInterval(function(){ try{ if(!CARO_RELAY_URL) return; var ch=false;
+  Object.keys(UDPL.last).forEach(function(dev){ var c=!!udpCut(dev); if(c!==!!UDPL.cutS[dev]){ UDPL.cutS[dev]=c; ch=true; } });
+  if(ch){ remap(); checkAlerts(); render(); } }catch(e){} }, 5000);
 function udpLiveOk(dev){ var L=UDPL.last[dev]; return !!(CARO_RELAY_URL&&L&&Date.now()-L.at<4000); }
 function udpFloorOverlay(dev,d){ var L=UDPL.last[dev]; if(!L||!d) return d; var m=L.m; if(Date.now()-L.at>8000) return d;
   var ls=(d.lastSeen&&d.lastSeen.toDate)?d.lastSeen.toDate().getTime():0;

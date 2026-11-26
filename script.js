@@ -106,10 +106,10 @@ window.getCarPriceByName=getCarPriceByName;
    차량 위치 (지역 지정 또는 자동 5:5 분배)
 ───────────────────────────────────────────── */
 var INCHEON_AREAS = {
-  '구월동': {lat:37.4490, lng:126.7080, spread:0.003},
-  '송도':   {lat:37.3820, lng:126.6560, spread:0.004},
-  '부평':   {lat:37.4893, lng:126.7235, spread:0.003},
-  '동인천': {lat:37.4762, lng:126.6188, spread:0.003}
+  '구월동': {lat:37.44483, lng:126.69968, spread:0.003},   /* ★[v110.58] 거점 주소의 실제 위치 */
+  '송도':   {lat:37.37972, lng:126.64504, spread:0.004},
+  '부평':   {lat:37.48957, lng:126.72335, spread:0.003},
+  '동인천': {lat:37.47878, lng:126.61857, spread:0.003}
 };
 
 /* ─────────────────────────────────────────────
@@ -118,8 +118,8 @@ var INCHEON_AREAS = {
    · 전부 예약완료/사용불가 → 회색
 ───────────────────────────────────────────── */
 var CARO_STATIONS = [
-  {id:'st_dongincheon', name:'동인천 거점', place:'동화마을 제2공영주차장', area:'동인천', addr:'인천 제물포구 제물량로 307', lat:37.4762, lng:126.6188},
-  {id:'st_bupyeong',    name:'부평 거점',    place:'부평역사쇼핑몰',        area:'부평',   addr:'인천 부평구 광장로 16',    lat:37.4893, lng:126.7235}
+  {id:'st_dongincheon', name:'동인천 거점', place:'동화마을 제2공영주차장', area:'동인천', addr:'인천 제물포구 제물량로 307', lat:37.47878, lng:126.61857},
+  {id:'st_bupyeong',    name:'부평 거점',    place:'부평역사쇼핑몰',        area:'부평',   addr:'인천 부평구 광장로 16',    lat:37.48957, lng:126.72335}
 ];
 window.CARO_STATIONS=CARO_STATIONS;
 
@@ -2081,7 +2081,7 @@ function updateMapMarkers(){
             className: '', iconSize: [34,44], iconAnchor: [17,37]
           });
     if(!(isFinite(car.lat)&&isFinite(car.lng))) return; var marker=L.marker([car.lat,car.lng],{icon:icon}).addTo(caroMap)
-      .bindPopup('<b>'+getCarName(car)+'</b><br>'+car.fuel+' · '+(Number(car.pricePerHour)||0).toLocaleString()+'원/h<br><span style="color:'+col+';font-weight:700;">'+label+'</span>');
+      .bindPopup('<b>'+getCarName(car)+'</b><br>'+(car.fuel||'')+' · '+(Number(car.pricePerHour)||0).toLocaleString()+'원/h<br><span style="color:'+col+';font-weight:700;">'+label+'</span>');
     mapMarkers.push(marker);
   });
 
@@ -2139,7 +2139,7 @@ function updateCarSheetCount(){
               className: '', iconSize: [34,44], iconAnchor: [17,37]
             });
       if(!(isFinite(car.lat)&&isFinite(car.lng))) return; var marker=L.marker([car.lat,car.lng],{icon:icon}).addTo(caroMap)
-        .bindPopup('<b>⭐ '+car.name+'</b><br>'+car.fuel+' · '+(Number(car.pricePerHour)||0).toLocaleString()+'원/h<br><span style="color:#c8a96e;font-weight:700;">CARO THE BLACK</span>');
+        .bindPopup('<b>⭐ '+car.name+'</b><br>'+(car.fuel||'')+' · '+(Number(car.pricePerHour)||0).toLocaleString()+'원/h<br><span style="color:#c8a96e;font-weight:700;">CARO THE BLACK</span>');
       mapMarkers.push(marker);
     });
   }
@@ -2263,7 +2263,7 @@ function renderReservationCard(){
     '<img class="res-car-img" src="'+selectedCar.img+'" alt="'+getCarName(selectedCar)+'"/>'+
     '<div class="res-car-info">'+
       '<div class="res-car-name">'+getCarName(selectedCar)+'</div>'+
-      '<div class="res-car-sub">'+selectedCar.fuel+'</div>'+
+      '<div class="res-car-sub">'+(selectedCar.fuel||'')+'</div>'+
       '<div class="res-car-price">'+selectedCar.pricePerHour.toLocaleString()+'원 / h</div>'+
       '<div style="margin-top:5px;">'+
         '<div style="font-size:.68rem;color:var(--text-m);margin-bottom:3px;">'+fuelLabel+' '+(fuelKnown?fuelPct+'%':'확인 중 (단말 연결 후 표시)')+'</div>'+
@@ -2407,7 +2407,7 @@ function goToPayment(){
       '<div class="pay-car-meta">'+
         '<span>📅 '+fmtDT(s)+' → '+fmtDT(e)+'</span>'+
         '<span>⏱ '+hrs+'시간</span>'+
-        '<span>⚡ '+selectedCar.fuel+'</span>'+
+        '<span>⚡ '+(selectedCar.fuel||'')+'</span>'+
         '<span>🛡 '+insName+'</span>'+
       '</div>'+
     '</div>';
@@ -2591,7 +2591,7 @@ function renderMyReservations(){
         '<img class="my-res-img" src="'+r.car.img+'" alt="'+getCarName(r.car)+'"/>'+
         '<div>'+
           '<div class="my-res-car-name">'+getCarName(r.car)+'</div>'+
-          '<div class="my-res-car-sub">'+r.car.fuel+'</div>'+
+          '<div class="my-res-car-sub">'+(r.car.fuel||'')+'</div>'+
         '</div>'+
       '</div>'+
       '<div class="my-res-detail">'+
@@ -3157,7 +3157,7 @@ function devRenderCarOverview(){
       '<img src="'+car.img+'" style="width:44px;height:34px;object-fit:contain;border-radius:14px;background:#1a2030;flex-shrink:0;"/>'+
       '<div style="flex:1;min-width:80px;">'+
         '<div style="font-size:.8rem;color:rgba(180,220,255,.85);font-weight:600;">'+car.name+'</div>'+
-        '<div style="font-size:.68rem;color:rgba(91,200,255,.5);">'+(Number(car.pricePerHour)||0).toLocaleString()+'원/h · '+car.fuel+'</div>'+
+        '<div style="font-size:.68rem;color:rgba(91,200,255,.5);">'+(Number(car.pricePerHour)||0).toLocaleString()+'원/h · '+(car.fuel||'')+'</div>'+
         fuelBar(fuel)+
       '</div>'+
       '<span class="dev-status-badge '+sc+'">'+status+'</span>';
@@ -6350,6 +6350,7 @@ function startReservationsListener(){
           /* ★[24차] 사진·첫 문열기·정산 상태(문열기 전 사진 확인·반납 화면용) — 사진 본문(base64)은 메모리에 두지 않고 개수만 */
           photoCount:(d.photoCount>0?d.photoCount:(d.photos&&typeof d.photos==='object'?Object.keys(d.photos).reduce(function(a,k){ return a+((Array.isArray(d.photos[k])?d.photos[k].length:0)); },0):0)),
           firstUnlockAt:d.firstUnlockAt||null, settlement:d.settlement||null, overdue:!!d.overdue,
+          swapRequest:d.swapRequest||null, swappedAt:d.swappedAt||null,   /* ★[v110.59] 운영팀 차량 교체 요청 (caro-swap.js 가 동의 창을 띄움) */
           receiptUrl:(d.payment&&d.payment.receiptUrl)||''   /* ★[25차] 토스 영수증 */
         };
         seen[res.bookNo]=true;
@@ -8527,6 +8528,7 @@ window.devUploadAllCars=function(){
   /* ════════════════════════════════════════
      5. 공통 성공 모달
   ════════════════════════════════════════ */
+  window.csShowSuccessModal = function(t, x, n){ return csShowSuccessModal(t, x, n); };   /* ★[v110.58] 고객앱 사고 접수·문의 완료 창이 안 뜨던 것 (밖에서 못 불렀다) */
   function csShowSuccessModal(title, text, num) {
     document.getElementById('cs-modal-title').textContent = title;
     document.getElementById('cs-modal-text').innerHTML = text;

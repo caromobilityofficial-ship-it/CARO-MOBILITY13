@@ -26,10 +26,11 @@ window.CARO_CONFIG = {
 
   /* ── 거점(반납 허용 지점) — 서버(functions) 의 STATIONS 와 동일하게 유지 ── */
   STATIONS: [
-    { id: "st_songdo",      name: "송도 거점",   addr: "인천 연수구 송도동 9-9",     lat: 37.3846, lng: 126.6500, radiusM: 300 },
-    { id: "st_guwol",       name: "구월동 거점", addr: "인천 남동구 구월동 1408-2",  lat: 37.4476, lng: 126.7007, radiusM: 300 },
-    { id: "st_bupyeong",    name: "부평 거점",   addr: "인천 부평구 광장로 16",      lat: 37.4893, lng: 126.7235, radiusM: 300 },
-    { id: "st_dongincheon", name: "동인천 거점", addr: "인천 제물포구 제물량로 307", lat: 37.4762, lng: 126.6188, radiusM: 300 }
+    /* ★[v110.58] 등록 주소의 실제 위치(카카오 주소 검색)로 바로잡음 — 서버 STATIONS 와 같은 값 */
+    { id: "st_songdo",      name: "송도 거점",   addr: "인천 연수구 송도동 9-9",     lat: 37.37972, lng: 126.64504, radiusM: 300 },
+    { id: "st_guwol",       name: "구월동 거점", addr: "인천 남동구 구월동 1408-2",  lat: 37.44483, lng: 126.69968, radiusM: 300 },
+    { id: "st_bupyeong",    name: "부평 거점",   addr: "인천 부평구 광장로 16",      lat: 37.48957, lng: 126.72335, radiusM: 300 },
+    { id: "st_dongincheon", name: "동인천 거점", addr: "인천 제물포구 제물량로 307", lat: 37.47878, lng: 126.61857, radiusM: 300 }
   ],
 
   /* ── 차량 제어 허용 시간창 (분) — 서버와 동일 ── */

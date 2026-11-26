@@ -85,6 +85,25 @@
         function(e){ rej(e); }, { enableHighAccuracy: true, timeout: 12000, maximumAge: 15000 });
     });
   }
+  /* ★[v110.58] 반납용 위치 : 지하주차장처럼 휴대폰 위치가 안 잡히면 실패로 끝내지 않고 '위치 없음' 으로 서버에 보낸다
+     → 서버가 차량 단말 위치로 거점 안인지 확인한다 (예전엔 '실외에서 다시 시도' 로 반납 자체가 막혔다) */
+  function getReturnPosition(){
+    return getPosition().catch(function(e){
+      if(e && e.code === 1) throw e;                 /* 위치 권한 거부는 그대로 안내 (단, 아래에서 차량 위치로 한 번 더 시도) */
+      return { lat: null, lng: null, accuracy: null, noFix: true };
+    }).catch(function(){ return { lat: null, lng: null, accuracy: null, noFix: true, denied: true }; });
+  }
+  /* 서버가 반납을 확정한 뒤 화면 정리 — 예전엔 옛 반납 함수(doReturnCar)를 불러
+     ① 서버와 다른 연료비 1만원 안내를 띄우고 ② 제어 화면에서 연 예약만 반납 표시해 '이용 중' 이 남았다 */
+  function finishLocalReturn(r){
+    try{ r.returned = true; r.returnedAt = new Date(); r.status = 'returned'; }catch(e){}
+    try{ if(window.homeCtrlTimer){ clearInterval(window.homeCtrlTimer); window.homeCtrlTimer = null; } }catch(e){}
+    try{ if(window.closeModal) closeModal('home-ctrl-modal'); }catch(e){}
+    try{ if(typeof window.saveUserData === 'function') saveUserData(); }catch(e){}
+    try{ if(window.renderMyReservations) renderMyReservations(); }catch(e){}
+    try{ if(window.renderCars) renderCars(); if(window.updateMapMarkers) updateMapMarkers(); }catch(e){}
+    try{ window.ctrlResIdx = -1; }catch(e){}
+  }
 
   /* ───────────────────────── 테스트 모드 띠 ───────────────────────── */
   if(!SECURE){
@@ -244,7 +263,8 @@
           var fn = window.FB_FN, db = window.FB_DB;
           var ref = fn.doc(db, 'devices', res.deviceId, 'commands', res.cmdId);
           var done = false, unsub = null;
-          var to = setTimeout(function(){ if(done) return; done = true; try{ unsub && unsub(); }catch(e){} _ctrlToast('⏱ 디바이스 응답 없음'); resolve(false); }, 30000);
+          /* ★[v110.58] 30초 → 100초 : 주차 절전 중인 단말은 최대 80초 뒤에 실행한다. 30초에 '응답 없음' 을 띄우면 고객이 다시 누르는 사이 문이 열린다 */
+          var to = setTimeout(function(){ if(done) return; done = true; try{ unsub && unsub(); }catch(e){} _ctrlToast('⏱ 차량 응답이 늦습니다 — 잠시 뒤 차량 상태를 확인해 주세요'); resolve(false); }, 100000);
           unsub = fn.onSnapshot(ref, function(snap){
             var d = snap && snap.data && snap.data(); if(!d) return;
             if(d.status === 'acked') _ctrlToast('📡 디바이스 응답 받음');
@@ -268,14 +288,14 @@
     var r = currentCtrlRes();
     if(!r){ returning = false; toast('반납할 예약을 찾을 수 없습니다.'); return; }
     toast('반납 위치를 확인하고 있습니다…');
-    getPosition().then(function(pos){
+    getReturnPosition().then(function(pos){
       var extra = window.__caroReturnExtra || {}; window.__caroReturnExtra = null;   /* ★[24차] 체크리스트·반납 사진 */
       return call('completeReturn', Object.assign({ bookNo: r.bookNo, lat: pos.lat, lng: pos.lng, accuracy: pos.accuracy }, extra));
     }).then(function(res){
       if(!res || !res.returned){ toast('반납 처리 결과를 확인할 수 없습니다. 고객센터로 문의해 주세요.'); return; }
       try{ if(window.caroCloseReturnScreen) window.caroCloseReturnScreen(); }catch(e){}
-      /* 서버가 반납을 확정(잠금 명령 포함). 로컬 화면 정리는 기존 함수로 */
-      try{ if(typeof origReturn === 'function') origReturn(); }catch(e){}
+      /* 서버가 반납을 확정(잠금 명령 포함). 화면 정리는 서버 결과 기준으로 */
+      finishLocalReturn(r);
       if(res.amount > 0 && res.orderId){
         var why = (res.breakdown || []).map(function(b){ return b.label + ' ' + Number(b.amount).toLocaleString() + '원'; }).join(', ');
         toast('✅ ' + (res.stationName || '거점') + ' 반납 완료. 추가 요금 ' + Number(res.amount).toLocaleString() + '원' + (why ? ' (' + why + ')' : '') + ' — 결제 화면으로 이동합니다.');

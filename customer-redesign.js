@@ -2198,7 +2198,25 @@
   function esc(t){ return (''+(t==null?'':t)).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
   function activeRes(){ return (window.ctrlResIdx>=0&&window.myReservations)?window.myReservations[window.ctrlResIdx]:null; }
 
+  /* ★[v110.58] 서버 모드에서는 반납 화면의 금액을 서버(settleReturn)와 같은 방식으로 계산한다
+     예전엔 '10분당 1만원' 으로 보여 주고 서버는 '시간 요금 × 초과 분(10분 유예)' 으로 청구해 금액이 달랐다 */
+  function calcCostsServer(res){
+    var car=res.car||{};
+    var rate=+(car.pricePerHour||res.rate||0)||0, ins=+((res.ins&&res.ins.pricePerHour)||0)||0;
+    var end=(res.end instanceof Date)?res.end:new Date(res.end);
+    var overMin=isNaN(end.getTime())?0:Math.max(0, Math.ceil((Date.now()-end.getTime())/60000)-10);
+    var blocks=overMin>0?Math.ceil(overMin/10)*10:0;
+    var penalty=blocks>0?Math.round((rate+ins)*blocks/60):0;
+    var kmRate=+car.kmRate||240, freeKm=+car.fuelFreeKm||0;
+    var drivenKm=+(res.drivenKm!=null?res.drivenKm:res.deviceKm)||0;
+    var billKm=Math.max(0, drivenKm-freeKm), distCost=Math.round(billKm*kmRate);
+    var fuel=(car.id!=null && window.fuelRealLevels && window.fuelRealLevels[car.id]!=null)?+window.fuelRealLevels[car.id]:null;
+    var fuelFee=(fuel!=null && fuel<=40)?10000:0;
+    return {server:true,kmRate:kmRate,freeKm:freeKm,drivenKm:drivenKm,billKm:billKm,distCost:distCost,hipass:0,
+            overdueMin:Math.max(0,Math.floor((Date.now()-end.getTime())/60000)),overBlocks:blocks,penalty:penalty,fuel:fuel,fuelFee:fuelFee,total:distCost+penalty+fuelFee};
+  }
   function calcCosts(res){
+    if(window.CARO_CONFIG&&CARO_CONFIG.SECURE_SERVER) return calcCostsServer(res);
     var car=res.car||{};
     var kmRate=+car.kmRate||0, freeKm=+car.fuelFreeKm||0;
     var drivenKm=+(res.drivenKm!=null?res.drivenKm:res.deviceKm)||0;   /* ★[23차] 단말이 기록한 deviceKm 도 읽는다 */
@@ -2301,6 +2319,14 @@
     var box=document.getElementById('rtSum'); if(!box) return;
     var c=ST.costs;
     var rows='';
+    if(c.server){
+      rows+='<div class="rt-sr"><span>주행거리 비용'+(c.drivenKm?(' ('+c.billKm+'km × '+won(c.kmRate)+'원)'):'')+'</span><b>'+won(c.distCost)+'원</b></div>';
+      rows+='<div class="rt-sr'+(c.penalty>0?' pen':'')+'"><span>초과 이용'+(c.overBlocks>0?(' ('+c.overBlocks+'분 · 반납 10분 뒤부터)'):' (반납 시간 + 10분까지 무료)')+'</span><b>'+won(c.penalty)+'원</b></div>';
+      rows+='<div class="rt-sr'+(c.fuelFee>0?' pen':'')+'"><span>연료 보충'+(c.fuel!=null?(' (잔량 '+Math.round(c.fuel)+'% · 40% 이하일 때)'):'')+'</span><b>'+won(c.fuelFee)+'원</b></div>';
+      box.innerHTML=rows+'<div class="rt-tot"><span>예상 합계</span><b>'+won(c.total)+'원</b></div>'
+        +'<div class="rt-note">※ 정확한 금액은 반납 순간 서버가 차량 기록(주행거리·연료·반납 시각)으로 확정합니다. 추가 요금이 있으면 반납 뒤 결제 화면으로 이어집니다.</div>';
+      return;
+    }
     rows+='<div class="rt-sr"><span>주행거리 비용'+(c.drivenKm?(' ('+c.billKm+'km × '+won(c.kmRate)+'원)'):'')+'</span><b>'+won(c.distCost)+'원</b></div>';
     rows+='<div class="rt-sr"><span>하이패스 사용</span><b>'+(c.hipass>0?won(c.hipass)+'원':'미사용')+'</b></div>';
     rows+='<div class="rt-sr'+(c.penalty>0?' pen':'')+'"><span>반납 지연 패널티'+(c.overdueMin>0?(' (지연 '+fmtOverdue(c.overdueMin)+' · 10분당 '+won(PENALTY_UNIT)+'원)'):'')+'</span><b>'+won(c.penalty)+'원</b></div>';
@@ -3925,10 +3951,10 @@
    ─────────────────────────────────────────────────────────── */
 (function(){ 'use strict';
   var ZONES={
-    '구월동':{ name:'구월동 거점', addr:'인천 남동구 구월동 1408-2', lat:37.4476, lng:126.7007 },
-    '송도':  { name:'송도 거점',   addr:'인천 연수구 송도동 9-9',   lat:37.3846, lng:126.6500 },
-    '동인천':{ name:'동인천 거점', addr:'인천 중구 제물량로 307',   lat:37.4762, lng:126.6188 },
-    '부평':  { name:'부평 거점',   addr:'인천 부평구 광장로 16',    lat:37.4893, lng:126.7235 }
+    '구월동':{ name:'구월동 거점', addr:'인천 남동구 구월동 1408-2', lat:37.44483, lng:126.69968 },   /* ★[v110.58] 주소 실제 위치로 */
+    '송도':  { name:'송도 거점',   addr:'인천 연수구 송도동 9-9',   lat:37.37972, lng:126.64504 },
+    '동인천':{ name:'동인천 거점', addr:'인천 제물포구 제물량로 307', lat:37.47878, lng:126.61857 },
+    '부평':  { name:'부평 거점',   addr:'인천 부평구 광장로 16',    lat:37.48957, lng:126.72335 }
   };
 
   function jitter(id){
@@ -5272,7 +5298,11 @@
   function placeOf(res,which){
     if(!res) return '지정 주차 구역';
     var c=res.car||{};
-    return res[which+'Name']||res[which+'Place']||res[which+'Zone']||res.zoneName||res.zone||c.zone||c.location||'지정 주차 구역';
+    var v=res[which+'Name']||res[which+'Place']||res[which+'Zone']||res.zoneName||res.zone||c.zone||c.location;
+    if(v) return v;
+    /* ★[v110.58] 예약에 장소 이름이 없으면 차량이 속한 거점 이름으로 (예전엔 늘 '지정 주차 구역') */
+    try{ var z=window.caroZoneOf?caroZoneOf(c):(c.region||null); var Z=z&&window.CARO_ZONES&&CARO_ZONES[z]; if(Z) return Z.name+(Z.addr?' · '+Z.addr:''); if(z) return z+' 거점'; }catch(e){}
+    return '지정 주차 구역';
   }
 
   /* ── 아이콘 ── */
@@ -5363,7 +5393,7 @@
 
   function inject(){
     var box=document.querySelector('#home-ctrl-modal .home-ctrl-box'); if(!box) return;
-    var res=getRes();
+    var res=curRes();   /* ★[v110.58] getRes() 는 항상 비어 있어 대여·반납 장소가 늘 '지정 주차 구역' 으로 보였다 */
     var menu=document.getElementById('caro-ctrl-menu');
     if(!menu){
       menu=document.createElement('div'); menu.id='caro-ctrl-menu';
