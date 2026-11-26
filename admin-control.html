@@ -802,7 +802,7 @@ html[data-theme="light"] .mappill,html[data-theme="light"] .mtb,html[data-theme=
 <script>
 /* ★[v110.20] 화면 버전 자가 점검 — 태블릿 앱·브라우저가 옛 화면을 붙잡고 있으면(캐시) 켤 때·다시 볼 때 스스로 새로 받는다.
    로그인 전 화면에서도 동작한다(예전 자동 업데이트는 로그인 칸에 글자가 들어 있으면 '입력 중' 으로 보고 미뤘다). 같은 버전으로는 3번까지만 시도한다. */
-var CARO_PAGE_VER='110.55';
+var CARO_PAGE_VER='110.57';
 function caroSelfCheck(){
   try{
     fetch('version.txt?t='+Date.now(),{cache:'no-store'}).then(function(r){ return r.ok?r.text():''; }).then(function(t){
@@ -826,6 +826,9 @@ setInterval(caroSelfCheck, 120000);
         onerror="window.__kakaoSdkErr='script'"></script>
 <script>window.__leafletOk = (typeof L !== 'undefined');</script>
 <script>
+/* ★[v110.57] 오차 글씨 : 10m 아래는 소수 한 자리 (1.5m · 2.4m), 그 위는 정수 */
+function accTxt(a){ return a<10?(Math.round(a*10)/10).toFixed(1):String(Math.round(a)); }
+
 /* ═══════════ CARO 관제센터 v1.0 — 데이터 도착 시에만 렌더(상시 루프 없음) ═══════════ */
 var ADMIN_EMAIL='caro.mobility.official@gmail.com';
 /* ★[13차 보안] 화면에 끼워 넣는 모든 '바깥에서 온 글자'는 esc() 를 거친다.
@@ -944,7 +947,7 @@ function smoothPos(v){
   v._sLat=undefined; v._sN=0;
   return [v.lat,v.lng];   /* 주행 중이거나 GPS 끊김 → 원시 좌표 그대로 */
 }
-function floorStr(f){ if(f==null) return '—'; return f>=1?f+'F':'B'+(1-f); }
+function floorStr(f){ if(f==null) return '—'; if(f===0.5) return '0.5F'; return f>=1?f+'F':'B'+(1-f); }   /* ★[v110.56] 1층과 지하 1층 사이 반층은 '0.5층' 으로 부른다 (여의도 주차장 표지 그대로) */
 /* ★[v110.13] 층은 주차장 안에서만 적는다. 정밀 측정 펌웨어가 '주차장 아님' 이라고 알려 준 기록은 층 대신 그 상태를 적는다 */
 var CTXLAB={out:'실외',cand:'확인중',tunnel:'터널',unknown:'기준없음'};
 function flrOf(o){ var c=o&&o.ctx; if(typeof c==='string'&&c&&c!=='park') return CTXLAB[c]||'—'; return floorStr(num(o&&o.floor)); }
@@ -1255,9 +1258,9 @@ function mapDraw(){
   if(v){
     if(v.ctx==='park'||v.ctx==='cand') pill=v.name+' · '+(v.ctx==='park'?('주차장 안 · '+floorStr(v.floor)):'실내 확인중')+(v.gsrc==='dr'&&!v._gPos?' (추측항법 위치)':' (입구 위치 표시)');   /* ★[v110.13] */
     else if(v._tun) pill=v.name+' · 터널·지하차도 통과 중'+(tunDepStr(v)?(' · '+tunDepStr(v)):'')+(v._tunEst?' — 전에 지나간 길로 어림한 위치':' — 들어간 자리에 표시 (나오면 이어집니다)');
-    else if(v.gsrc==='dr') pill=v.name+' · 지하/터널 — 추측항법 위치'+(v.posAcc?(' (약 ±'+Math.round(v.posAcc)+'m)'):'');
+    else if(v.gsrc==='dr') pill=v.name+' · 지하/터널 — 추측항법 위치'+(v.posAcc?(' (약 ±'+accTxt(v.posAcc)+'m)'):'');
     else if(live&&v.gsrc==='wifi') pill=v.name+' · 실내 — 주변 공유기로 잰 위치'+(v.wfAcc?(' (약 ±'+Math.round(v.wfAcc)+'m)'):'');   /* ★[v110.26] */
-    else if(live&&v.gaHeld) pill=v.name+' · 실내·지하 — 들어와 선 자리에 고정 (약 ±12m)';   /* ★[v110.27] 기기가 '달려와 선 자리' 에 임시로 고정해 둔 상태 */
+    else if(live&&v.gaHeld) pill=v.name+' · 실내·지하 — 들어와 선 자리에 고정'+((typeof v.posAcc==='number'&&v.posAcc>0)?(' (약 ±'+accTxt(v.posAcc)+'m)'):'');   /* ★[v110.57] 기기가 보낸 실제 오차 (v9.9-60 부터. 예전 기기는 늘 12) */   /* ★[v110.27] 기기가 '달려와 선 자리' 에 임시로 고정해 둔 상태 */
     else if(live&&v.gWeak) pill=v.name+' · 실내·지하(GPS 부정확) — 마지막 믿을 만한 자리';   /* ★[v110.25] */
     else if(live) pill=v.name+' · 실시간 추적'+((v.ctx==='out'&&typeof v.grade==='number'&&Math.abs(v.grade)>=3.5)?(' · '+gradeStr(v.grade)+(typeof v.roadAlt==='number'?' ('+(v.roadAlt>=0?'+':'')+v.roadAlt.toFixed(0)+'m)':'')):'');
     else if(hasPos) pill=v.name+' · GPS 끊김 (마지막 위치 · 위성'+(v.sats!=null?v.sats:0)+'개)';
@@ -1320,7 +1323,7 @@ function render(){
     /* ★[v110.13] 정밀 측정 펌웨어 : 층은 주차장 안에서만, 실외 언덕은 '주행 고도·경사' 로 따로 */
     var sub=function(id,t){ var e=$(id); if(e) e.textContent=t||'\u00a0'; };
     sub('lv-moves', ms_?(ms_[2]+(mstDur(v)?(' · '+mstDur(v)):'')):(v.lastSeen?(ago(v.lastSeen)+' 수신'):'')); if(!(GL.timer&&GL.pos&&GL.dev===devOf()&&GL.lagS>=10)) sub('lv-spds', (typeof v.heading==='number')?('방위 '+Math.round(v.heading)+'°'):'');   /* ★[v110.41] 마커 재생 중 '통신 지연' 을 적고 있으면 덮어쓰지 않는다 */
-    sub('lv-sats', v.gsrc==='wifi'?('와이파이 ±'+Math.round(v.wfAcc||30)+' m'):v.gaHeld?'실내 — 선 자리 고정':v.gWeak?'신호 약함(실내)':((typeof v.posAcc==='number'&&v.posAcc>0)?('위치 ±'+Math.round(v.posAcc)+' m'):'')); sub('lv-srcs', v.gpsLive?'실시간':((typeof v.lat==='number')?'마지막 위치':''));
+    sub('lv-sats', v.gsrc==='wifi'?('와이파이 ±'+Math.round(v.wfAcc||30)+' m'):v.gaHeld?('실내 — 선 자리 고정'+((typeof v.posAcc==='number'&&v.posAcc>0)?(' ±'+accTxt(v.posAcc)+' m'):'')):v.gWeak?'신호 약함(실내)':((typeof v.posAcc==='number'&&v.posAcc>0)?('위치 ±'+accTxt(v.posAcc)+' m'):'')); sub('lv-srcs', v.gpsLive?'실시간':((typeof v.lat==='number')?'마지막 위치':''));
     sub('lv-bats', (typeof v.vbat==='number')?(v.vbat<5?'측정 안 됨':(v.vbat<11.6?'방전 주의':(v.vbat>13.2?'충전 중':'정상'))):''); sub('lv-accs', (typeof v.accOffSec==='number'&&!v.acc&&v.accOffSec>0)?('끈 지 '+(v.accOffSec<3600?Math.floor(v.accOffSec/60)+'분':Math.floor(v.accOffSec/3600)+'시간')):'');
     if(v.ctx){
       if(v.ctx==='park'){ sub('lv-flrs','주차장'+(v.lift?' · 승강기':'')+(typeof v.floorConf==='number'?' · 신뢰 '+v.floorConf+'%':'')); $('lv-flr').textContent=floorStr(v.floor); }
@@ -1388,7 +1391,7 @@ function renderDiag(v){
     ['주행 고도 · 경사', (v.ctx&&v.ctx!=='park'&&v.ctx!=='cand'&&typeof v.roadAlt==='number')?('<span class="gd">'+(v.roadAlt>=0?'+':'')+v.roadAlt.toFixed(1)+' m · '+(gradeStr(v.grade)||'—')+'</span>'):'<span class="gd">—</span>'],
     ['고도 정밀도', (typeof v.altErr==='number'&&v.ctx&&v.ctx!=='out')?('<span class="'+(v.altErr<=0.5?'g':(v.altErr<=1.0?'y':'r'))+'">± '+v.altErr.toFixed(2)+' m</span>'):'<span class="gd">—</span>'],
     ['층 판정 신뢰도', (v.inPark&&typeof v.floorConf==='number')?('<span class="'+(v.floorConf>=60?'g':(v.floorConf>=35?'y':'r'))+'">'+v.floorConf+' %</span>'):'<span class="gd">—</span>'],
-    ['위치 정확도', (typeof v.posAcc==='number'&&v.posAcc>0)?('<span class="'+(v.posAcc<=10?'g':(v.posAcc<=25?'y':'r'))+'">약 ± '+Math.round(v.posAcc)+' m'+(typeof v.hdop==='number'?' (HDOP '+v.hdop.toFixed(1)+')':'')+'</span>'):'<span class="gd">—</span>'],
+    ['위치 정확도', (typeof v.posAcc==='number'&&v.posAcc>0)?('<span class="'+(v.posAcc<=10?'g':(v.posAcc<=25?'y':'r'))+'">약 ± '+accTxt(v.posAcc)+' m'+(typeof v.hdop==='number'?' (HDOP '+v.hdop.toFixed(1)+')':'')+'</span>'):'<span class="gd">—</span>'],
     /* ★[v110.16] 지하에서 위치를 이어 가는 기능(추측항법)이 준비됐는지 — 기기를 차에 고정하고 밖에서 달려야 '준비됨' 이 된다 */
     ['지하 위치(추측항법)', (v.gFusion===false)?'<span class="gd">꺼 둠 (기기 고정 후 켜기)</span>':v.drOk?(({0:'<span class="y">보정 중 · 밖에서 주행 필요</span>',1:'<span class="g">준비됨</span>',2:'<span class="y">일시 중지</span>',3:'<span class="r">꺼짐</span>'})[v.drMode]||'<span class="gd">확인 중</span>'):'<span class="gd">—</span>'],
     /* ★[v110.17] GPS 수신 상태 : 위성으로 잡은 위치인지, 모듈을 몇 번 다시 시작시켰는지, 안테나 신호 */
@@ -2381,7 +2384,7 @@ function subLogs(){
       var el=$('cmdlist'); if(el) el.innerHTML=h||'<div style="padding:12px;color:var(--muted);font-size:12px;">명령 기록 없음</div>'; try{ cmdProgDraw(first); }catch(e){} },
     function(e){ console.warn('cmds',e); }); }catch(e){ console.warn('cmds',e); } }
   try{ tlReset(); EVF='all'; if(!dev) cmdProgDraw(null); }catch(e){}   /* ★[v110.42] 시각 표시 · 이벤트 거름을 처음으로 */
-  TELE=[]; EVTS=[]; drawLogs();
+  TELE=[]; EVTS=[]; EVTS_RAW=[]; drawLogs();
   if(!dev||!FN.query) return;
   if(!selDate) selDate=todayStr();
   syncDateInput();
@@ -2389,16 +2392,16 @@ function subLogs(){
   try{
     unT=FN.onSnapshot(FN.query(FN.collection(db,'devices',dev,'telemetry'),
         FN.where('ts','>=',b[0]),FN.where('ts','<',b[1]),FN.orderBy('ts','desc'),FN.limit(4000)),
-      function(s){ TELE=[]; s.forEach(function(d){ var x=d.data()||{}; x._id=d.id; TELE.push(x); }); drawLogs(); },   /* ★[v110.34] 문서 이름(부팅 번호-기기 시계)을 같이 둔다 — 경로 점 시각을 기기 시계로 맞추는 데 쓴다 */
+      function(s){ TELE=[]; s.forEach(function(d){ var x=d.data()||{}; x._id=d.id; TELE.push(x); }); ovPrune(); drawLogs(); },   /* ★[v110.34] 문서 이름(부팅 번호-기기 시계)을 같이 둔다 — 경로 점 시각을 기기 시계로 맞추는 데 쓴다 */
       function(err){ console.warn('tele',err); });
     unE=FN.onSnapshot(FN.query(FN.collection(db,'devices',dev,'events'),
         FN.where('ts','>=',b[0]),FN.where('ts','<',b[1]),FN.orderBy('ts','desc'),FN.limit(500)),
-      function(s){ EVTS=[]; s.forEach(function(d){ var x=d.data()||{};
+      function(s){ EVTS=[]; s.forEach(function(d){ var x=d.data()||{}; x._id=d.id;
         /* ★[v110.15] 통신이 끊겨 늦게 올라온 사건(queued) : 올라온 시각이 아니라 실제로 일어난 시각(올라온 시각 − agoSec)으로 적는다 */
         if(x.queued===true&&typeof x.agoSec==='number'&&x.agoSec>5&&x.ts&&x.ts.toDate){ try{ var t0=new Date(x.ts.toDate().getTime()-x.agoSec*1000); x.tsUp=x.ts; x.ts={toDate:function(){return t0;}}; x.late=true; }catch(e){} }
         EVTS.push(x); });
       EVTS.sort(function(a,b){ var ta=(a.ts&&a.ts.toDate)?a.ts.toDate().getTime():0, tb=(b.ts&&b.ts.toDate)?b.ts.toDate().getTime():0; return tb-ta; });
-      drawLogs(); },
+      EVTS_RAW=EVTS; ovPrune(); drawLogs(); },
       function(err){ console.warn('evts',err); });
   }catch(e){ console.warn('logs',e); }
 }
@@ -2477,6 +2480,15 @@ function drawLogs(){
   try{ tlDraw(); }catch(e){ console.warn('tl',e); }   /* ★[v110.42] 하루 타임라인 */
 }
 /* ═══════════ [v9.2→v111] 선택 날짜 주행 경로 (튄 점 정리) + 충격 지점 + 출발·도착 표시 ═══════════ */
+/* ★[v110.55] 위성 없이 어림한 속도로 난 과속은 세지 않는다 — 11/25 여의도 지하주차장(위성 0개) 안에서 '과속 167km/h' 가 찍혔다.
+   (펌웨어 v9.9-58 부터는 기기가 처음부터 내지 않는다. 이 검사는 이미 쌓인 기록과 옛 펌웨어용) */
+var EVTS_RAW=[];
+function ovBogus(e){ var sp=Number(e.speed); if(sp>=150) return true; var f=num(e.floor); if(f!=null&&f<1) return true;
+  var t=toMs(e.ts); if(!t) return false;
+  for(var i=0;i<TELE.length;i++){ var r=TELE[i], tr=toMs(r.ts); if(!tr||Math.abs(tr-t)>10000) continue;
+    if(r.sats===0||r.gfix===1||r.ctx==='tunnel'||r.ctx==='park'||r.ctx==='cand') return true; }
+  return false; }
+function ovPrune(){ try{ if(!EVTS_RAW.length&&EVTS.length) EVTS_RAW=EVTS; EVTS=EVTS_RAW.filter(function(e){ return !(e.event==='overspeed'&&ovBogus(e)); }); }catch(e){} }
 var routeObjs=[];
 /* ★[v111] 이동경로 정리 — 실내·창가·빌딩숲에서 GPS가 튀는 점(수백m~1km 점프), 정차 중 떨림을 걸러 실제 이동만 선으로 그린다.
    1) 좌표 이상(0·국외)·위성 부족(5개 미만)·HDOP 3 초과·gsrc none 은 버림
@@ -2876,11 +2888,14 @@ function drawRoute(){
 }
 function csvCell(c){ var t=String(c==null?'':c); if(/^[=+\-@]/.test(t)) t="'"+t; return t; }   /* ★[v108] 엑셀 수식 주입 방지 */
 function csvRows(){   /* ★[v110.53] CSV 내보내기와 [자동 확인] 이 같은 줄을 쓴다 */
-  var rows=[['시각','종류','충격구분','층','고도(m)','방향(deg)','속도(km/h)','충격(g)','위도','경도','위성수','GPS종류','수평오차(m)','상태','부팅원인','경로점수','기압(hPa)','온도(C)','충격종류','이어진시간(ms)','위(g)','아래(g)','회전(deg/s)','앞선떨림(g)','뒤집힘','채움','보고걸린시간(ms)','접속횟수','응답없음횟수','상황','주행고도(m)','경사(%)']];   /* ★[v110.48] 끝 3칸 : 기기가 판단한 상황(out 실외 · cand 실내 확인중 · park 주차장 · tunnel 터널) · 출발점 대비 높이 · 경사 — 층 · 터널 판정을 기록으로 가려내기 위함 */   /* ★[v110.41] 뒤 3칸 : 통신 지연 진단(펌웨어 v9.9-precise53 부터) — 앞 보고 한 번에 걸린 시간 · 보안 접속을 새로 연 누적 횟수 · 15초 동안 응답이 없던 누적 횟수 */
+  var rows=[['시각','종류','충격구분','층','고도(m)','방향(deg)','속도(km/h)','충격(g)','위도','경도','위성수','GPS종류','수평오차(m)','상태','부팅원인','경로점수','기압(hPa)','온도(C)','충격종류','이어진시간(ms)','위(g)','아래(g)','회전(deg/s)','앞선떨림(g)','뒤집힘','채움','보고걸린시간(ms)','접속횟수','응답없음횟수','상황','주행고도(m)','경사(%)','기기시각','도착지연(초)']];   /* ★[v110.48] 끝 3칸 : 기기가 판단한 상황(out 실외 · cand 실내 확인중 · park 주차장 · tunnel 터널) · 출발점 대비 높이 · 경사 — 층 · 터널 판정을 기록으로 가려내기 위함 */   /* ★[v110.41] 뒤 3칸 : 통신 지연 진단(펌웨어 v9.9-precise53 부터) — 앞 보고 한 번에 걸린 시간 · 보안 접속을 새로 연 누적 횟수 · 15초 동안 응답이 없던 누적 횟수 */
   var kx=function(v){ return v!=null?v:''; };
+  /* ★[v110.55] 보고 · 사건이 '기기에서 만들어진 시각' 과 서버에 늦게 닿은 시간 — 문서 이름의 기기 시계로 계산한다 (보고가 통신에 묶였다 닿으면 '시각' 은 도착 시각이라 위치가 앞뒤로 튀어 보였다) */
+  var dvOff={}; TELE.concat(EVTS).forEach(function(d){ var k=rtIdMs(d._id), ms=toMs(d.ts); if(!k||!ms) return; var o=ms-k.ms; if(dvOff[k.b]==null||o<dvOff[k.b]) dvOff[k.b]=o; });
+  var dvT=function(d){ var k=rtIdMs(d._id), ms=toMs(d.ts); if(!k||!ms||dvOff[k.b]==null) return ['','']; var c=k.ms+dvOff[k.b], lag=(ms-c)/1000; if(lag<0||lag>900) return ['','']; var dd=new Date(c); return [fmtTs({toDate:function(){ return dd; }}),lag.toFixed(1)]; };
   EVTS.forEach(function(e){ var cls=e.event==='impact'?(impactMode(e)==='park'?'주차중':'주행중'):'';
-    rows.push([fmtTs(e.ts),e.event||'',cls,floorStr(num(e.floor)),e.alt!=null?e.alt:'',e.heading!=null?Math.round(e.heading):'',e.speed!=null?e.speed:'',e.shock!=null?e.shock:'',e.lat!=null?e.lat:'',e.lng!=null?e.lng:'','','','','',e.rst||'','','','',(e.event==='impact'&&impactMode(e)!=='park')?impKind(e):'',kx(e.kdur),kx(e.kup),kx(e.kdn),kx(e.krot),kx(e.krough),kx(e.knx),kx(e.kduty),'','','','','','']); });
-  TELE.forEach(function(t){ rows.push([fmtTs(t.ts),'주기','',flrOf(t),t.alt!=null?t.alt:'',t.heading!=null?Math.round(t.heading):'',t.speed!=null?t.speed:'',t.shock!=null?t.shock:'',t.lat!=null?t.lat:'',t.lng!=null?t.lng:'',t.sats!=null?t.sats:'',t.gfix!=null?t.gfix:'',t.hacc!=null?t.hacc:'',t.mstate||'','',(typeof t.rt==='string'&&t.rt)?(t.rt.split('|').length-4):'',t.hpa!=null?t.hpa:'',t.temp!=null?t.temp:'','','','','','','','','',kx(t.rq),kx(t.rd),kx(t.ns),kx(t.ctx),kx(t.roadAlt),kx(t.grade)]); });
+    rows.push([fmtTs(e.ts),e.event||'',cls,floorStr(num(e.floor)),e.alt!=null?e.alt:'',e.heading!=null?Math.round(e.heading):'',e.speed!=null?e.speed:'',e.shock!=null?e.shock:'',e.lat!=null?e.lat:'',e.lng!=null?e.lng:'','','','','',e.rst||'','','','',(e.event==='impact'&&impactMode(e)!=='park')?impKind(e):'',kx(e.kdur),kx(e.kup),kx(e.kdn),kx(e.krot),kx(e.krough),kx(e.knx),kx(e.kduty),'','','','','',''].concat(dvT(e))); });
+  TELE.forEach(function(t){ rows.push([fmtTs(t.ts),'주기','',flrOf(t),t.alt!=null?t.alt:'',t.heading!=null?Math.round(t.heading):'',t.speed!=null?t.speed:'',t.shock!=null?t.shock:'',t.lat!=null?t.lat:'',t.lng!=null?t.lng:'',t.sats!=null?t.sats:'',t.gfix!=null?t.gfix:'',t.hacc!=null?t.hacc:'',t.mstate||'','',(typeof t.rt==='string'&&t.rt)?(t.rt.split('|').length-4):'',t.hpa!=null?t.hpa:'',t.temp!=null?t.temp:'','','','','','','','','',kx(t.rq),kx(t.rd),kx(t.ns),kx(t.ctx),kx(t.roadAlt),kx(t.grade)].concat(dvT(t))); });
   return rows;
 }
 function csvExport(){
