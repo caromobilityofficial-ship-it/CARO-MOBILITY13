@@ -802,7 +802,7 @@ html[data-theme="light"] .mappill,html[data-theme="light"] .mtb,html[data-theme=
 <script>
 /* ★[v110.20] 화면 버전 자가 점검 — 태블릿 앱·브라우저가 옛 화면을 붙잡고 있으면(캐시) 켤 때·다시 볼 때 스스로 새로 받는다.
    로그인 전 화면에서도 동작한다(예전 자동 업데이트는 로그인 칸에 글자가 들어 있으면 '입력 중' 으로 보고 미뤘다). 같은 버전으로는 3번까지만 시도한다. */
-var CARO_PAGE_VER='110.58';
+var CARO_PAGE_VER='110.62';
 function caroSelfCheck(){
   try{
     fetch('version.txt?t='+Date.now(),{cache:'no-store'}).then(function(r){ return r.ok?r.text():''; }).then(function(t){
@@ -3047,7 +3047,7 @@ waitAuth();
    켜지면 : 기기가 새 위치를 잡는 즉시(1초마다) 받아 표식을 GL_UDB 만큼 뒤에서 따라간다.
    묶음마다 앞 위치 2개가 함께 오므로 묶음이 하나 빠져도 그 자리가 메워진다. 중계가 4초 넘게 조용하면 지금 방식(Firestore)으로 저절로 돌아간다. */
 var CARO_RELAY_URL='';
-var UDPL={ws:null,on:false,last:{},retry:2000,tm:null,n:0,cfg:false,gap:0,st:{},cutS:{}};
+var UDPL={ws:null,on:false,last:{},retry:2000,tm:null,n:0,cfg:false,gap:0,st:{},cutS:{},alive:{}};
 function udpCfg(){
   if(UDPL.cfg) return; UDPL.cfg=true;
   try{ fetch('relay.json?t='+Date.now(),{cache:'no-store'}).then(function(r){ return r.ok?r.json():null; }).then(function(j){
@@ -3060,7 +3060,7 @@ function udpStart(){ if(!CARO_RELAY_URL||UDPL.ws) return; var u=window.FB_AUTH&&
   UDPL.ws=ws;
   var fr=!!UDPL.force; UDPL.force=false;
   ws.onopen=function(){ (u.getIdToken?u.getIdToken(fr):Promise.resolve('')).then(function(t){ try{ ws.send(JSON.stringify({type:'auth',token:t})); }catch(e){} }).catch(function(){ try{ ws.close(); }catch(e){} }); };   /* ★[v110.55] 로그인 표가 끝나 닫혔으면 새 표를 받아 잇는다 (예전 : 끝나 가는 같은 표를 다시 내서 5초마다 끊겼다 이어졌다 반복할 수 있었다) */
-  ws.onmessage=function(ev){ var m; try{ m=JSON.parse(ev.data); }catch(e){ return; } if(m.type==='hello'){ UDPL.on=true; UDPL.retry=2000; return; } if(m.type==='pos') udpPos(m); };
+  ws.onmessage=function(ev){ var m; try{ m=JSON.parse(ev.data); }catch(e){ return; } if(m.type==='hello'){ UDPL.on=true; UDPL.retry=2000; return; } if(m.type==='pos') udpPos(m); else if(m.type==='alive') udpAlive(m); };
   ws.onclose=function(ev){ if(UDPL.ws===ws){ var quick=UDPL.on&&ev&&ev.code===4001; UDPL.ws=null; UDPL.on=false; if(quick){ UDPL.retry=300; UDPL.force=true; } udpLater(); } };   /* 로그인 표(1시간)가 끝나 닫힌 것이면 곧바로 새 표로 다시 잇는다 */
   ws.onerror=function(){ try{ ws.close(); }catch(e){} };
 }
@@ -3079,17 +3079,26 @@ function udpPos(m){ if(!m||typeof m.dev!=='string') return;
 /* ★[v110.58] 신호 끊김(전원 차단 의심) — 1초~수십 초마다 오던 빠른 길 신호가 '평소 간격 × 3 + 15초' (최소 30초) 넘게 멈추면.
    예전엔 Firestore 보고만 보고 판단해서 주차 중 2.5~10분 · 저전압 20분이 지나야 '오프라인' 이 됐고, 경보는 10분 뒤에야 떴다.
    중계 서버와의 연결이 끊긴 동안(UDPL.on=false)에는 판단하지 않는다 (모든 차가 한꺼번에 끊김으로 보이지 않게). */
+/* ★[v110.62] 살아 있음 신호 (펌웨어 v9.9-precise62 + 중계 서버 2판) : 위치를 안 보내는 동안(주차 절전 · 위성 없음)에도 20초마다 온다 */
+function udpAlive(m){ if(!m||typeof m.dev!=='string') return;
+  try{ var nT=Date.now(), S=UDPL.st[m.dev]||(UDPL.st[m.dev]={n:0,gap:0}), P=UDPL.alive[m.dev], Lp=UDPL.last[m.dev], pa=Math.max(P?P.at:0, Lp?Lp.at:0); if(pa){ var g=nT-pa; if(g>0&&g<600000) S.gap=S.gap?(S.gap*0.8+g*0.2):g; } S.n++; }catch(e){}
+  UDPL.alive[m.dev]={at:Date.now(),m:m}; }
+function udpFwNew(dev){ var d=(typeof DEV==='object'&&DEV[dev])||null, v=d&&/precise(\d+)/.exec(String(d.fw||'')); return !!(v&&+v[1]>=62); }
 function udpCut(dev){
   if(!CARO_RELAY_URL||!UDPL.on) return null;
-  var L=UDPL.last[dev], S=UDPL.st[dev]; if(!L||!S||S.n<4) return null;
-  var sleep=!!(typeof DEV==='object'&&DEV[dev]&&DEV[dev].park===true);   /* 주차 절전(20초씩 낮잠) 중이면 최소 90초 */
-  var lim=Math.max(sleep?90000:30000, Math.min(600000, (S.gap||3000)*3+15000)), sil=Date.now()-L.at;
+  var L=UDPL.last[dev], A=UDPL.alive[dev], S=UDPL.st[dev]; if((!L&&!A)||!S||S.n<4) return null;
+  /* ★[v110.62] 예전 펌웨어(61 이하)는 주차 절전에 들어가면 빠른 길을 아예 보내지 않는다 → 서 있던 차가 조용해진 것은 '끊김' 이 아니다.
+     (v110.58 : 차가 절전에 들어갈 때마다 다음 보고 전까지 '신호 끊김 · 전원 확인' 이 잘못 떴다) → 예전 펌웨어는 '달리던 중에 갑자기 멈춘 것' 만 끊김으로 본다 */
+  if(!A&&!udpFwNew(dev)){ var lm=L&&L.m; if(!(lm&&(lm.moving||(typeof lm.spd==='number'&&lm.spd>=5)))) return null; }
+  var sleep=!!((typeof DEV==='object'&&DEV[dev]&&DEV[dev].park===true)||(A&&A.m&&A.m.park));   /* 주차 절전(20초씩 낮잠) 중이면 최소 90초 */
+  var last=Math.max(L?L.at:0, A?A.at:0);
+  var lim=Math.max(sleep?90000:30000, Math.min(600000, (S.gap||3000)*3+15000)), sil=Date.now()-last;
   if(sil<lim||sil>6*3600000) return null;
-  return { since:L.at, sil:sil, lim:lim };
+  return { since:last, sil:sil, lim:lim };
 }
 /* 5초마다 : 끊김이 새로 생기거나 풀린 기기가 있으면 바로 목록 · 경보를 다시 그린다 (30초를 기다리지 않음) */
 setInterval(function(){ try{ if(!CARO_RELAY_URL) return; var ch=false;
-  Object.keys(UDPL.last).forEach(function(dev){ var c=!!udpCut(dev); if(c!==!!UDPL.cutS[dev]){ UDPL.cutS[dev]=c; ch=true; } });
+  Object.keys(UDPL.last).concat(Object.keys(UDPL.alive).filter(function(k){ return !UDPL.last[k]; })).forEach(function(dev){ var c=!!udpCut(dev); if(c!==!!UDPL.cutS[dev]){ UDPL.cutS[dev]=c; ch=true; } });
   if(ch){ remap(); checkAlerts(); render(); } }catch(e){} }, 5000);
 function udpLiveOk(dev){ var L=UDPL.last[dev]; return !!(CARO_RELAY_URL&&L&&Date.now()-L.at<4000); }
 function udpFloorOverlay(dev,d){ var L=UDPL.last[dev]; if(!L||!d) return d; var m=L.m; if(Date.now()-L.at>8000) return d;
@@ -3240,6 +3249,7 @@ function ckOpen(){
 </script>
 <script src="lib/qrcode/qrcode.js"></script>
 <script src="caro-mfa.js?v=1"></script>
+<script src="caro-wake.js?v=1"></script>   <!-- ★[v110.62] 명령을 보내면 중계 서버가 기기를 바로 깨운다 (펌웨어 v9.9-precise62) -->
 <script src="caro-admin-lock.js?v=2"></script>
 <script src="caro-autoupdate.js"></script>   <!-- ★[v108.3] 새 버전 올라오면 30초 안에 자동 적용 -->
 <script src="caro-icons.js?v=1"></script>
